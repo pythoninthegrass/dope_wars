@@ -368,3 +368,83 @@ describe('finish', () => {
     assert.equal(scores[9].score, 200)
   })
 })
+
+describe('bank-purchase fee (coat and gun dealers)', () => {
+  // Coat dealer
+  test('acceptCoatOffer pays from cash when sufficient', () => {
+    const state = Engine.newGame({ seed: 1 })
+    state.cash = 500
+    const offer = { pockets: 10, price: 300 }
+    const res = Engine.acceptCoatOffer(state, offer)
+    assert.equal(res.ok, true)
+    assert.equal(res.usedBank, false)
+    assert.equal(state.cash, 200)
+    assert.equal(state.coatCapacity, 110)
+  })
+
+  test('acceptCoatOffer uses bank with 25% fee when cash is short but bank is sufficient', () => {
+    const state = Engine.newGame({ seed: 1 })
+    state.cash = 0
+    state.bank = 1000
+    const offer = { pockets: 10, price: 400 }
+    const totalExpected = Math.ceil(400 * 1.25) // 500
+    const res = Engine.acceptCoatOffer(state, offer)
+    assert.equal(res.ok, true)
+    assert.equal(res.usedBank, true)
+    assert.equal(res.fee, Math.ceil(400 * Engine.RULES.bankPurchaseFee))
+    assert.equal(state.bank, 1000 - totalExpected)
+    assert.equal(state.cash, 0) // cash untouched
+    assert.equal(state.coatCapacity, 110)
+  })
+
+  test('acceptCoatOffer fails when both cash and bank are insufficient', () => {
+    const state = Engine.newGame({ seed: 1 })
+    state.cash = 0
+    state.bank = 100
+    const offer = { pockets: 10, price: 400 }
+    const res = Engine.acceptCoatOffer(state, offer)
+    assert.equal(res.ok, false)
+    assert.equal(state.coatCapacity, 100)
+  })
+
+  // Gun dealer
+  test('acceptGunOffer pays from cash when sufficient', () => {
+    const state = Engine.newGame({ seed: 1 })
+    state.cash = 500
+    const offer = { price: 300, damage: 5, space: 4 }
+    const res = Engine.acceptGunOffer(state, offer)
+    assert.equal(res.ok, true)
+    assert.equal(res.usedBank, false)
+    assert.equal(state.cash, 200)
+    assert.equal(state.guns, 1)
+  })
+
+  test('acceptGunOffer uses bank with 25% fee when cash is short but bank is sufficient', () => {
+    const state = Engine.newGame({ seed: 1 })
+    state.cash = 0
+    state.bank = 1000
+    const offer = { price: 400, damage: 5, space: 4 }
+    const totalExpected = Math.ceil(400 * 1.25) // 500
+    const res = Engine.acceptGunOffer(state, offer)
+    assert.equal(res.ok, true)
+    assert.equal(res.usedBank, true)
+    assert.equal(res.fee, Math.ceil(400 * Engine.RULES.bankPurchaseFee))
+    assert.equal(state.bank, 1000 - totalExpected)
+    assert.equal(state.cash, 0)
+    assert.equal(state.guns, 1)
+  })
+
+  test('acceptGunOffer fails when both cash and bank are insufficient', () => {
+    const state = Engine.newGame({ seed: 1 })
+    state.cash = 0
+    state.bank = 100
+    const offer = { price: 400, damage: 5, space: 4 }
+    const res = Engine.acceptGunOffer(state, offer)
+    assert.equal(res.ok, false)
+    assert.equal(state.guns, 0)
+  })
+
+  test('bankPurchaseFee is 0.25 in RULES', () => {
+    assert.equal(Engine.RULES.bankPurchaseFee, 0.25)
+  })
+})

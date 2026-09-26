@@ -676,6 +676,8 @@
       expensiveMultiply: 4,
       coatDealer: { minPockets: 10, maxPockets: 30, minPrice: 200, maxPrice: 500 },
       gunDealer: { minPrice: 250, maxPrice: 600 },
+      // Fee charged when drawing from bank to cover a coat/gun purchase (split: ATM + dealer's time)
+      bankPurchaseFee: 0.25,
     };
 
     function findDrug(id) { return RULES.drugs.find((d) => d.id === id); }
@@ -926,10 +928,17 @@
     }
 
     function acceptCoatOffer(state, offer) {
-      if (offer.price > state.cash) return { ok: false };
+      if (offer.price > state.cash) {
+        const fee = Math.ceil(offer.price * RULES.bankPurchaseFee);
+        const total = offer.price + fee;
+        if (state.bank < total) return { ok: false };
+        state.bank -= total;
+        state.coatCapacity += offer.pockets;
+        return { ok: true, usedBank: true, fee };
+      }
       state.cash -= offer.price;
       state.coatCapacity += offer.pockets;
-      return { ok: true };
+      return { ok: true, usedBank: false };
     }
 
     function rollGunDealerOffer(state, rng) {
@@ -939,11 +948,18 @@
     }
 
     function acceptGunOffer(state, offer) {
-      if (offer.price > state.cash) return { ok: false };
       if (coatUsed(state) + offer.space > state.coatCapacity) return { ok: false };
+      if (offer.price > state.cash) {
+        const fee = Math.ceil(offer.price * RULES.bankPurchaseFee);
+        const total = offer.price + fee;
+        if (state.bank < total) return { ok: false };
+        state.bank -= total;
+        state.guns += 1;
+        return { ok: true, usedBank: true, fee };
+      }
       state.cash -= offer.price;
       state.guns += 1;
-      return { ok: true };
+      return { ok: true, usedBank: false };
     }
 
     // Cop Chase weighted by the borough's police presence, docs/gameplay.md:94.
@@ -1388,12 +1404,20 @@
       }
       if (item.kind === 'coatDealer') {
         const offer = E.rollCoatDealerOffer(state, state.rng);
+        const needsBank = offer.price > state.cash;
+        const fee = Math.ceil(offer.price * E.RULES.bankPurchaseFee);
+        const totalWithFee = offer.price + fee;
+        const canAffordFromBank = needsBank && state.bank >= totalWithFee;
+        const canBuy = !needsBank || canAffordFromBank;
+        const priceNote = needsBank
+          ? `<div style="color:#800000;margin-top:4px">Not enough cash — ATM + dealer fee: $${fmt(fee)} (total $${fmt(totalWithFee)} from bank)</div>`
+          : '';
         openDialog(`
           <div class="titlebar"><span class="titlebar-title">Coat Dealer</span></div>
           <div class="dialog-body">
-            <div>Would you like to buy a trenchcoat with ${offer.pockets} more pockets for $${fmt(offer.price)}?</div>
+            <div>Would you like to buy a trenchcoat with ${offer.pockets} more pockets for $${fmt(offer.price)}?${priceNote}</div>
             <div class="dialog-buttons">
-              <button type="button" id="coatBuy">Buy</button>
+              <button type="button" id="coatBuy"${canBuy ? '' : ' disabled'}>Buy</button>
               <button type="button" id="coatDecline">Decline</button>
             </div>
           </div>
@@ -1407,12 +1431,20 @@
       }
       if (item.kind === 'gunDealer') {
         const offer = E.rollGunDealerOffer(state, state.rng);
+        const needsBank = offer.price > state.cash;
+        const fee = Math.ceil(offer.price * E.RULES.bankPurchaseFee);
+        const totalWithFee = offer.price + fee;
+        const canAffordFromBank = needsBank && state.bank >= totalWithFee;
+        const canBuy = !needsBank || canAffordFromBank;
+        const priceNote = needsBank
+          ? `<div style="color:#800000;margin-top:4px">Not enough cash — ATM + dealer fee: $${fmt(fee)} (total $${fmt(totalWithFee)} from bank)</div>`
+          : '';
         openDialog(`
           <div class="titlebar"><span class="titlebar-title">Gun Dealer</span></div>
           <div class="dialog-body">
-            <div>Need protection? I got a gun for $${fmt(offer.price)}.</div>
+            <div>Need protection? I got a gun for $${fmt(offer.price)}.${priceNote}</div>
             <div class="dialog-buttons">
-              <button type="button" id="gunBuy">Buy</button>
+              <button type="button" id="gunBuy"${canBuy ? '' : ' disabled'}>Buy</button>
               <button type="button" id="gunDecline">Decline</button>
             </div>
           </div>
