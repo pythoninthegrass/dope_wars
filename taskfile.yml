@@ -80,7 +80,7 @@ tasks:
       - task: core:test
       - task: abi:check
       - task: abi:conformance
-      - task: gen:bridge-expectations:check
+      # bridge:test runs the staleness check itself, so it is not repeated here.
       - task: bridge:test
       - task: game:smoke-test
 
