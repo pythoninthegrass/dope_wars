@@ -804,7 +804,7 @@
       if (state.day >= state.numDays) return { ok: false, reason: 'The game is over.' };
 
       state.day += 1;
-      state.debt = state.debt * (1 + RULES.debtInterest);
+      state.debt = Math.round(state.debt * (1 + RULES.debtInterest));
       state.bank = state.bank * (1 + RULES.bankInterest);
       state.location = destId;
       const priceEvents = generatePrices(state);

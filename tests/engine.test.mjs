@@ -188,7 +188,7 @@ describe('travel', () => {
     assert.equal(res.ok, true)
     assert.equal(state.day, before + 1)
     assert.equal(state.location, 'ghetto')
-    assert.equal(state.debt, 5500 * 1.1)
+    assert.equal(state.debt, 6050)
     assert.equal(state.bank, 1000 * 1.02)
     assert.ok(Object.keys(state.prices).length > 0)
   })
@@ -231,6 +231,21 @@ describe('finances', () => {
     assert.equal(res.ok, true)
     assert.equal(state.debt, 5500 - 2000)
     assert.equal(state.cash, 0)
+  })
+
+  test('paying full debt after interest accrues zeroes it out', () => {
+    const state = Engine.newGame({ seed: 1 })
+    state.cash = 999999
+    // Travel several times to compound interest
+    Engine.travel(state, 'ghetto')
+    Engine.travel(state, 'bronx')
+    Engine.travel(state, 'central_park')
+    // Debt should be an integer (no floating-point remainder)
+    assert.equal(state.debt, Math.round(state.debt), 'debt must be an integer after interest')
+    // Paying the exact debt should zero it out
+    const debtBefore = state.debt
+    Engine.finances(state, 'payLoan', debtBefore)
+    assert.equal(state.debt, 0, 'debt must be zero after full payoff')
   })
 
   test('never drives cash, bank, or debt negative', () => {
