@@ -1327,9 +1327,9 @@
           <div class="field-row"><span>Bank</span><strong>$${fmt(state.bank)}</strong></div>
           <div class="field-row"><span>Debt</span><strong>$${fmt(state.debt)}</strong></div>
           <div class="dialog-buttons">
-            <button type="button" id="finDeposit">Deposit</button>
-            <button type="button" id="finWithdraw">Withdraw</button>
-            <button type="button" id="finPayLoan">Pay Loan</button>
+            <button type="button" id="finDeposit" ${state.cash <= 0 ? 'disabled' : ''}>Deposit</button>
+            <button type="button" id="finWithdraw" ${Math.floor(state.bank) <= 0 ? 'disabled' : ''}>Withdraw</button>
+            <button type="button" id="finPayLoan" ${state.debt <= 0 || state.cash <= 0 ? 'disabled' : ''}>Pay Loan</button>
             <button type="button" id="finClose">Close</button>
           </div>
         </div>
