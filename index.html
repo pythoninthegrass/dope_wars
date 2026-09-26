@@ -471,6 +471,33 @@
     overflow: hidden;
     clip: rect(0 0 0 0);
   }
+
+  .price-arrow {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.1em;
+    font-size: 0.75em;
+    vertical-align: middle;
+    margin-right: 5%;
+  }
+  .price-arrow-up { color: #008800; }
+  .price-arrow-down { color: #cc0000; }
+  .price-arrow-neutral { color: #777; }
+  .price-arrow-neutral::before {
+    content: '';
+    display: block;
+    width: 70%;
+    border-top: 1.5px solid currentColor;
+  }
+
+  /* Fixed-width left-aligned price column: indicator slot + room for "1,000,000" */
+  .drugs-price {
+    text-align: left;
+    width: 7.5rem;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
 </style>
 </head>
 <body>
@@ -547,7 +574,7 @@
         <div class="table-title">Available drugs:</div>
         <div class="table-wrap inset">
           <table id="drugsTable">
-            <thead><tr><th>Drug</th><th class="num">Price</th></tr></thead>
+            <thead><tr><th>Drug</th><th class="drugs-price">Price</th></tr></thead>
             <tbody></tbody>
           </table>
         </div>
@@ -591,12 +618,15 @@
 
     function mulberry32(seed) {
       let a = seed >>> 0;
-      return function () {
+      const rng = function () {
         a |= 0; a = (a + 0x6D2B79F5) | 0;
         let t = Math.imul(a ^ (a >>> 15), 1 | a);
         t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
         return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
       };
+      rng.getState = () => a >>> 0;
+      rng.setState = (s) => { a = s >>> 0; };
+      return rng;
     }
 
     function randInt(rng, min, max) {
@@ -663,6 +693,7 @@
         location: RULES.startLocation,
         inventory: {},
         prices: {},
+        prevPrices: {},
         dead: false,
         lastDayWarned: false,
       };
@@ -678,6 +709,7 @@
     }
 
     function generatePrices(state) {
+      state.prevPrices = state.prices || {};
       const loc = findLocation(state.location);
       const rng = state.rng;
       const eventDrugs = new Set();
@@ -971,6 +1003,22 @@
       return scores;
     }
 
+    function serializeState(state) {
+      const obj = Object.assign({}, state);
+      obj.rngState = state.rng.getState();
+      delete obj.rng;
+      return JSON.stringify(obj);
+    }
+
+    function deserializeState(json) {
+      const obj = JSON.parse(json);
+      const rng = mulberry32(obj.seed);
+      rng.setState(obj.rngState);
+      obj.rng = rng;
+      delete obj.rngState;
+      return obj;
+    }
+
     window.DopeWarsEngine = {
       RULES,
       mulberry32,
@@ -997,6 +1045,8 @@
       insertHighScore,
       findDrug,
       findLocation,
+      serializeState,
+      deserializeState,
     };
   })();
 </script>
@@ -1043,6 +1093,7 @@
 
     function startNewGame(opts) {
       state = E.newGame(opts || { seed: seedFromUrl() });
+      localStorage.removeItem(SAVE_KEY);
       selectedBuyDrug = null;
       selectedSellDrug = null;
       lastDayWarned = false;
@@ -1083,6 +1134,8 @@
         lastDayWarned = true;
         showAlert('Last Day', "This is your last day, man. Maybe you should offload your stash.", '\u{1F4B0}');
       }
+
+      saveGame();
     }
 
     function renderDrugsTable() {
@@ -1092,7 +1145,19 @@
         const drug = E.findDrug(id);
         const tr = document.createElement('tr');
         if (id === selectedBuyDrug) tr.classList.add('selected');
-        tr.innerHTML = `<td>${drug.name}</td><td class="num">${fmt(state.prices[id])}</td>`;
+        const currPrice = state.prices[id];
+        const prevPrice = state.prevPrices && state.prevPrices[id];
+        let trendHtml = '';
+        if (state.day > 1) {
+          if (prevPrice != null && currPrice > prevPrice) {
+            trendHtml = '<span class="price-arrow price-arrow-up" aria-label="up">&#9650;</span>';
+          } else if (prevPrice != null && currPrice < prevPrice) {
+            trendHtml = '<span class="price-arrow price-arrow-down" aria-label="down">&#9660;</span>';
+          } else {
+            trendHtml = '<span class="price-arrow price-arrow-neutral" aria-label="unchanged"></span>';
+          }
+        }
+        tr.innerHTML = `<td>${drug.name}</td><td class="drugs-price">${trendHtml}${fmt(currPrice)}</td>`;
         tr.addEventListener('click', () => {
           selectedBuyDrug = id;
           render();
@@ -1112,8 +1177,7 @@
         const held = state.inventory[id];
         const tr = document.createElement('tr');
         if (id === selectedSellDrug) tr.classList.add('selected');
-        const priceHere = state.prices[id];
-        tr.innerHTML = `<td>${drug.name}</td><td class="num">${fmt(held.qty)}</td><td class="num">${priceHere != null ? fmt(priceHere) : '-'}</td>`;
+        tr.innerHTML = `<td>${drug.name}</td><td class="num">${fmt(held.qty)}</td><td class="num">${fmt(held.avgPrice)}</td>`;
         tr.addEventListener('click', () => {
           selectedSellDrug = id;
           render();
@@ -1199,7 +1263,11 @@
         return;
       }
       const spaceLeft = state.coatCapacity - E.coatUsed(state);
-      const max = Math.max(0, Math.min(maxAffordable, spaceLeft));
+      if (spaceLeft < 1) {
+        showAlert('Dealer', "Your trenchcoat is full! Sell something or buy a bigger coat.", '\u{1F9E5}');
+        return;
+      }
+      const max = Math.min(maxAffordable, spaceLeft);
       showQuantityDialog({
         title: 'Buy',
         prompt: `You can afford ${maxAffordable} units of ${drug.name}, and have room in your coat for ${spaceLeft} units.`,
@@ -1415,6 +1483,26 @@
       });
     }
 
+    // --- Persistence --------------------------------------------------------
+
+    const SAVE_KEY = 'dopewars.save';
+
+    function saveGame() {
+      if (!state) return;
+      try { localStorage.setItem(SAVE_KEY, E.serializeState(state)); } catch (e) { /* ignore */ }
+    }
+
+    function loadSavedGame() {
+      try {
+        const json = localStorage.getItem(SAVE_KEY);
+        if (!json) return null;
+        return E.deserializeState(json);
+      } catch (e) {
+        localStorage.removeItem(SAVE_KEY);
+        return null;
+      }
+    }
+
     // --- High scores --------------------------------------------------------
 
     const SCORES_KEY = 'dopewars.highscores';
@@ -1560,7 +1648,13 @@
       else if (key === 'n') { showNewGameDialog(); }
     });
 
-    startNewGame({ seed: seedFromUrl() });
+    const _saved = loadSavedGame();
+    if (_saved) {
+      state = _saved;
+      render();
+    } else {
+      startNewGame({ seed: seedFromUrl() });
+    }
   })();
 </script>
 </body>
