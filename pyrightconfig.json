@@ -1,0 +1,17 @@
+{
+  "$schema": "https://raw.githubusercontent.com/microsoft/pyright/main/packages/vscode-pyright/schemas/pyrightconfig.schema.json",
+  "//": [
+    "Only what this repo needs checked: the Python under tools/ (the ABI gates)",
+    "and core/abitest/ (Tier-C conformance). The repo has no pyproject.toml — the",
+    "Python here is build tooling, not a package, so the search paths are declared",
+    "instead of an install.",
+    "abi_conformance_test.py inserts tools/ onto sys.path at runtime so the gates",
+    "and the tests share one header parser (tools/abi_symbols.py) and cannot drift",
+    "from each other. This tells the type checker the same thing."
+  ],
+  "include": ["tools", "core/abitest"],
+  "extraPaths": ["tools"],
+  "pythonVersion": "3.13",
+  "reportMissingImports": "error",
+  "reportMissingModuleSource": "none"
+}

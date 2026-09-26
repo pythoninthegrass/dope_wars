@@ -2,8 +2,8 @@
 
 version: "3.0"
 
-set: ['e', 'u', 'pipefail']
-shopt: ['globstar']
+set: ["e", "u", "pipefail"]
+shopt: ["globstar"]
 
 vars:
   MISE_SHIMS: "{{.HOME}}/.local/share/mise/shims"
@@ -35,10 +35,53 @@ tasks:
       - task: core:build
       - task: extension:build
 
+  abi:check:
+    desc: "Static ABI gates (exporter single-source, conformance-test purity, export surface)"
+    cmds:
+      # One exporter: only core/src/abi.mojo may declare @export symbols.
+      - python3 tools/validate_abi_exporter.py
+      # Tier-C must reach the simulation only through the C ABI, never a core import.
+      - python3 tools/validate_abi_test_purity.py
+      # The header must parse, and its declarations must be unique.
+      - python3 tools/abi_symbols.py --check
+
+  abi:conformance:
+    desc: "Tier-C ABI conformance: ctypes suite + the C header self-consistency check"
+    cmds:
+      - task: core:abitest
+      - task: core:abi:header-check
+
+  # Generates game/bridge_expectations.gd, the expected bridge surface derived
+  # from include/dopewars.h. Two modes matter:
+  #   task gen:bridge-expectations         write the file
+  #   task gen:bridge-expectations:check   fail if it is stale with respect to the
+  #                                        header, so a signature change cannot
+  #                                        slip through with an expectation table
+  #                                        still asserting the old values
+  gen:bridge-expectations:
+    desc: "Regenerate game/bridge_expectations.gd from include/dopewars.h"
+    cmds:
+      - python3 tools/gen_bridge_expectations.py
+
+  gen:bridge-expectations:check:
+    desc: "Fail if game/bridge_expectations.gd is stale with respect to include/dopewars.h"
+    cmds:
+      - python3 tools/gen_bridge_expectations.py --check
+
+  bridge:test:
+    desc: "Godot -> GDExtension -> C ABI -> Mojo bridge integration test (TASK-001.05 AC#4)"
+    cmds:
+      - task: gen:bridge-expectations:check
+      - task: game:bridge-test
+
   check:
-    desc: "Mojo parity tests + full build + Godot headless smoke test; non-zero exit on any failure"
+    desc: "Mojo parity + ABI gates/conformance + bridge test + Godot smoke test; non-zero exit on any failure"
     cmds:
       - task: core:test
+      - task: abi:check
+      - task: abi:conformance
+      - task: gen:bridge-expectations:check
+      - task: bridge:test
       - task: game:smoke-test
 
   run:
@@ -57,4 +100,3 @@ tasks:
     cmds:
       - markdownlint -c .markdownlint.jsonc .
       - ./scripts/check-core-boundaries.sh
-

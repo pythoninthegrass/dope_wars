@@ -26,3 +26,21 @@ tasks:
     dir: game
     cmds:
       - godot --headless --path .
+
+  # The bridge test needs the generated expectations to exist before Godot
+  # imports the project, or the resource is not in the .godot/ cache and load()
+  # returns null for the wrong reason. Hence gen before import rather than a
+  # dependency of the test itself.
+  #
+  # The godot invocation is wrapped in `timeout` deliberately: a scene that never
+  # reaches get_tree().quit() -- because a script error aborted _ready partway,
+  # which Godot reports and then keeps spinning the main loop -- would otherwise
+  # hang the pipeline indefinitely rather than failing it. The test also enforces
+  # a minimum assertion count internally, so "ran and did nothing" fails fast
+  # instead of hanging or passing.
+  bridge-test:
+    desc: "Godot -> GDExtension -> C ABI -> Mojo bridge integration test"
+    deps: [":gen:bridge-expectations", ":game:import"]
+    dir: game
+    cmds:
+      - timeout 300 godot --headless --path . --scene res://godot_tests/bridge_test.tscn

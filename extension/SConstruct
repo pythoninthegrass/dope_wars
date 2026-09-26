@@ -12,6 +12,9 @@
 # own directory, so custom.py has to be passed by absolute path via
 # godot-cpp's own `customs` export hook.
 
+import os
+import subprocess
+
 customs = [File("custom.py").srcnode().abspath]
 env = SConscript("../third_party/godot-cpp/SConstruct", {"api_version": "4.7", "customs": customs})
 
@@ -38,6 +41,60 @@ sources = Glob("src/*.cpp")
 # so a rebuilt core lib triggers a relink here.
 core_lib = env.File("../core/build-output/lib/libdopewars.a")
 env.Append(LIBS=[core_lib])
+
+# The Mojo runtime, in shared form and with an rpath so Godot can dlopen the
+# GDExtension without LD_PRELOAD.
+#
+# Why this is not optional: `mojo build --emit object` leaves the allocator
+# entry points (KGEN_CompilerRT_AlignedAlloc/Free, and whatever else the
+# standard library pulls in) undefined, expecting the final link to resolve them.
+# The static libdopewars.a cannot satisfy them because it *is* the object that
+# needs them, so a shim that links only the .a links fine (the linker allows
+# undefined symbols in a shared object) and then fails at dlopen() inside Godot
+# with "undefined symbol: KGEN_CompilerRT_AlignedFree". Linking the runtime
+# resolves them at build time and makes the failure a compile error instead of a
+# runtime one.
+#
+# Discovered the hard way by adding dw_world_align to the shim: the TASK-001.03
+# smoke test passed without this because nothing it called reached the runtime's
+# allocator. A bridge test that exercises the wider ABI surface is what exposed
+# it, which is the argument for that test existing.
+#
+# The path is located through the venv's own interpreter rather than hard-coded,
+# so a Mojo version bump that moves the library changes nothing here. If the
+# library is missing, the build stops with a clear message rather than producing
+# an extension that cannot load.
+mojo_runtime_dir = None
+for candidate_python in (
+    os.path.join("..", "core", ".venv", "bin", "python"),
+    os.path.join("..", "core", ".venv", "bin", "python3"),
+):
+    if not os.path.exists(candidate_python):
+        continue
+    located = subprocess.check_output(
+        [
+            candidate_python,
+            "-c",
+            "import pathlib,sys; "
+            "print(next(p for p in pathlib.Path(sys.prefix).rglob('libKGENCompilerRTShared.so')).parent)",
+        ],
+        text=True,
+    ).strip()
+    if located:
+        mojo_runtime_dir = located
+    break
+
+if not mojo_runtime_dir:
+    raise SCons.Errors.UserError(
+        "libKGENCompilerRTShared.so not found under core/.venv — run `task core:build` "
+        "(it provisions the venv) before building the extension."
+    )
+
+env.Append(LIBPATH=[mojo_runtime_dir], LIBS=["KGENCompilerRTShared"])
+if env["platform"] == "linux":
+    env.Append(RPATH=[mojo_runtime_dir])
+elif env["platform"] == "macos":
+    env.Append(LINKFLAGS=["-Wl,-rpath,{}".format(mojo_runtime_dir)])
 
 # macOS: Apple's newer default linker (ld-prime, Xcode 26+) enforces
 # 8-byte alignment on Mach-O archive members. `ar` from Command Line
