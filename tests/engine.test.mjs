@@ -282,9 +282,9 @@ describe('arrival events', () => {
     assert.ok(state.inventory[ev.drug].qty > 0)
   })
 
-  test('instant death event (roll 60-64) kills the player', () => {
+  test('instant death event (roll 60-60.5) kills the player', () => {
     const state = Engine.newGame({ seed: 1 })
-    const rng = () => 0.61
+    const rng = () => 0.602
     const ev = Engine.rollArrivalEvent(state, rng)
     assert.equal(ev.type, 'freeWeedDeath')
     assert.equal(state.health, 0)

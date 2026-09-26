@@ -906,7 +906,7 @@
         const drug = findDrug(drugId);
         return { type: 'mamasBrownies', drug: drugId, qty: lost, message: `Mama's brownies! You lost ${lost} units of ${drug.name}.` };
       }
-      if (roll < 65) {
+      if (roll < 60.5) {
         applyDamage(state, state.health);
         return { type: 'freeWeedDeath', message: 'You hallucinated for three days... then you died because your brain disintegrated!' };
       }
