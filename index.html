@@ -1,0 +1,1562 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Dope Wars</title>
+<style>
+  :root {
+    --win-face: #c0c0c0;
+    --win-face-dark: #808080;
+    --win-face-darker: #404040;
+    --win-face-light: #ffffff;
+    --win-face-light2: #dfdfdf;
+    --win-titlebar: #000080;
+    --win-titlebar-text: #ffffff;
+    --led-green: #00ff2f;
+    --led-green-bg: #003300;
+    --led-red: #ff3030;
+    --led-red-bg: #330000;
+    --led-yellow: #ffe000;
+    --led-yellow-bg: #333300;
+    --page-bg: #2b2b2b;
+    font-size: 15px;
+  }
+
+  * { box-sizing: border-box; }
+
+  [hidden] { display: none !important; }
+
+  html, body {
+    height: 100%;
+  }
+
+  body {
+    margin: 0;
+    min-height: 100dvh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--page-bg);
+    font-family: Tahoma, "MS Sans Serif", Geneva, Verdana, sans-serif;
+    padding: 1rem;
+  }
+
+  .win {
+    background: var(--win-face);
+    border: 2px solid;
+    border-color: var(--win-face-light) var(--win-face-darker) var(--win-face-darker) var(--win-face-light);
+    box-shadow: 1px 1px 0 #000, 0 0 0 1px #000;
+  }
+
+  .outset {
+    border: 2px solid;
+    border-color: var(--win-face-light) var(--win-face-darker) var(--win-face-darker) var(--win-face-light);
+  }
+
+  .inset {
+    border: 2px solid;
+    border-color: var(--win-face-darker) var(--win-face-light) var(--win-face-light) var(--win-face-darker);
+  }
+
+  #game {
+    width: min(100%, 44rem);
+  }
+
+  .titlebar {
+    background: linear-gradient(90deg, var(--win-titlebar), #1084d0);
+    color: var(--win-titlebar-text);
+    font-weight: bold;
+    padding: 3px 4px 3px 6px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 0.95rem;
+    white-space: nowrap;
+  }
+
+  .titlebar-title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .titlebar-buttons {
+    display: flex;
+    gap: 2px;
+    flex: none;
+  }
+
+  .titlebar-buttons button {
+    width: 16px;
+    height: 14px;
+    font-size: 10px;
+    line-height: 1;
+    padding: 0;
+    background: var(--win-face);
+    color: #000;
+    font-weight: bold;
+  }
+
+  .menubar {
+    display: flex;
+    gap: 1rem;
+    padding: 2px 6px;
+    background: var(--win-face);
+    border-bottom: 1px solid var(--win-face-darker);
+    font-size: 0.9rem;
+  }
+
+  .menubar span {
+    padding: 1px 4px;
+    cursor: default;
+  }
+
+  .menubar span:hover,
+  .menubar span.open {
+    background: var(--win-titlebar);
+    color: #fff;
+  }
+
+  .menu-dropdown {
+    position: relative;
+  }
+
+  .menu-items {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    z-index: 20;
+    min-width: 9rem;
+    padding: 2px;
+    display: none;
+  }
+
+  .menu-items.open {
+    display: block;
+  }
+
+  .menu-items button {
+    display: block;
+    width: 100%;
+    text-align: left;
+    background: var(--win-face);
+    padding: 3px 8px;
+    font-size: 0.85rem;
+  }
+
+  .menu-items button:hover {
+    background: var(--win-titlebar);
+    color: #fff;
+  }
+
+  .content {
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .top-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    align-items: start;
+    gap: 8px;
+  }
+
+  .status-col {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+  }
+
+  .led {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 3px 8px;
+    font-family: "Courier New", monospace;
+    font-weight: bold;
+    letter-spacing: 1px;
+    border: 2px solid;
+    border-color: var(--win-face-darker) var(--win-face-light) var(--win-face-light) var(--win-face-darker);
+    font-size: clamp(0.85rem, 2.6vw, 1.15rem);
+  }
+
+  .led-label { opacity: 0.85; }
+  .led-value { white-space: nowrap; }
+
+  .led-cash, .led-bank { background: var(--led-green-bg); color: var(--led-green); }
+  .led-debt { background: var(--led-red-bg); color: var(--led-red); }
+  .led-guns { background: var(--led-yellow-bg); color: var(--led-yellow); }
+
+  .health-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.9rem;
+  }
+
+  .health-bar-track {
+    flex: 1;
+    height: 18px;
+    background: var(--led-red);
+  }
+
+  .health-bar-fill {
+    height: 100%;
+    background: #0000c0;
+    color: #ffe000;
+    font-weight: bold;
+    font-size: 0.8rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    white-space: nowrap;
+    min-width: 2.2rem;
+  }
+
+  .subway-panel {
+    min-width: 0;
+    padding: 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .subway-label {
+    font-size: 0.85rem;
+    margin-bottom: 2px;
+  }
+
+  .borough-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px;
+  }
+
+  .finish-panel {
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .finish-panel button {
+    width: 100%;
+    height: 100%;
+    min-height: 90px;
+    font-size: 1.4rem;
+    font-weight: bold;
+  }
+
+  button {
+    background: var(--win-face);
+    border: 2px solid;
+    border-color: var(--win-face-light) var(--win-face-darker) var(--win-face-darker) var(--win-face-light);
+    padding: 5px 8px;
+    font-family: inherit;
+    font-size: 0.9rem;
+    cursor: pointer;
+  }
+
+  button:active:not(:disabled) {
+    border-color: var(--win-face-darker) var(--win-face-light) var(--win-face-light) var(--win-face-darker);
+  }
+
+  button:disabled {
+    color: var(--win-face-dark);
+    cursor: default;
+  }
+
+  .action-row {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .action-row button { flex: 1 1 0; min-width: 80px; }
+
+  .tables-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .table-col {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .table-title {
+    font-size: 0.85rem;
+  }
+
+  .table-wrap {
+    background: #fff;
+    height: 220px;
+    overflow-y: auto;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+    font-size: 0.85rem;
+  }
+
+  thead th {
+    position: sticky;
+    top: 0;
+    background: var(--win-face);
+    border-bottom: 1px solid var(--win-face-darker);
+    text-align: left;
+    padding: 2px 6px;
+  }
+
+  th.num, td.num {
+    text-align: right;
+  }
+
+  tbody td {
+    padding: 2px 6px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    cursor: pointer;
+  }
+
+  tbody tr.selected td {
+    background: var(--win-titlebar);
+    color: #fff;
+  }
+
+  .footer-row {
+    display: flex;
+    gap: 6px;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+  }
+
+  @media (max-width: 40rem) {
+    .top-row, .tables-row { grid-template-columns: 1fr; }
+    .borough-grid { grid-template-columns: repeat(3, 1fr); }
+    .table-wrap { height: 160px; }
+  }
+
+  /* Modal dialogs */
+  .overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.35);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    padding: 1rem;
+  }
+
+  .overlay[hidden] { display: none; }
+
+  .dialog {
+    width: min(100% - 2rem, 26rem);
+    max-height: 90vh;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .dialog .titlebar { flex: none; }
+
+  .dialog-body {
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    font-size: 0.92rem;
+  }
+
+  .dialog-media {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .dialog-icon {
+    width: 40px;
+    height: 40px;
+    flex: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.6rem;
+    background: var(--win-face-light2);
+  }
+
+  .dialog-buttons {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .dialog-buttons button { min-width: 84px; }
+
+  .spinner-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    justify-content: center;
+  }
+
+  .spinner-row input {
+    width: 8rem;
+    font-family: inherit;
+    font-size: 1rem;
+    padding: 3px 6px;
+    text-align: right;
+  }
+
+  .spinner-btns {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .spinner-btns button {
+    padding: 0 6px;
+    line-height: 1;
+    font-size: 0.7rem;
+  }
+
+  .hint {
+    font-size: 0.8rem;
+    color: var(--win-face-darker);
+  }
+
+  .scores-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+  }
+
+  .scores-table th, .scores-table td {
+    padding: 3px 6px;
+    text-align: left;
+    border-bottom: 1px solid var(--win-face-dark);
+  }
+
+  .scores-table td.num, .scores-table th.num { text-align: right; }
+
+  .field-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .field-row input {
+    width: 8rem;
+    font-family: inherit;
+    text-align: right;
+    padding: 3px 6px;
+  }
+
+  .visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
+</style>
+</head>
+<body>
+<div id="game" class="win" role="application" aria-label="Dope Wars">
+  <div class="titlebar">
+    <span class="titlebar-title" id="titlebarTitle">Dope Wars, Day 1 of 31</span>
+    <div class="titlebar-buttons" aria-hidden="true">
+      <button type="button" tabindex="-1">_</button>
+      <button type="button" tabindex="-1">&#9633;</button>
+      <button type="button" tabindex="-1">X</button>
+    </div>
+  </div>
+  <div class="menubar">
+    <div class="menu-dropdown">
+      <span data-menu="file">File</span>
+      <div class="menu-items outset" data-menu-items="file">
+        <button type="button" data-action="new-game">New Game</button>
+        <button type="button" data-action="exit">Exit</button>
+      </div>
+    </div>
+    <div class="menu-dropdown">
+      <span data-menu="scores">Scores</span>
+      <div class="menu-items outset" data-menu-items="scores">
+        <button type="button" data-action="high-scores">High Scores</button>
+      </div>
+    </div>
+    <div class="menu-dropdown">
+      <span data-menu="sounds">Sounds</span>
+      <div class="menu-items outset" data-menu-items="sounds">
+        <button type="button" disabled>(no sound in this build)</button>
+      </div>
+    </div>
+    <div class="menu-dropdown">
+      <span data-menu="help">Help</span>
+      <div class="menu-items outset" data-menu-items="help">
+        <button type="button" data-action="help">How to play</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="content">
+    <div class="top-row">
+      <div class="status-col">
+        <div class="led led-cash"><span class="led-label">Cash:</span><span class="led-value" id="ledCash">2,000</span></div>
+        <div class="led led-bank"><span class="led-label">Bank:</span><span class="led-value" id="ledBank">0</span></div>
+        <div class="led led-debt"><span class="led-label">Debt:</span><span class="led-value" id="ledDebt">5,500</span></div>
+        <div class="led led-guns"><span class="led-label">Guns:</span><span class="led-value" id="ledGuns">0</span></div>
+        <div class="health-row">
+          <span>Health:</span>
+          <div class="health-bar-track inset" style="flex:1">
+            <div class="health-bar-fill" id="healthFill" style="width:100%">100%</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="subway-panel outset" id="subwayPanel">
+        <div class="subway-label">Subway from <span id="subwayFrom">Bronx</span>:</div>
+        <div class="borough-grid" id="boroughGrid"></div>
+      </div>
+
+      <div class="finish-panel outset" id="finishPanel" hidden>
+        <button type="button" id="finishBtn">Finish</button>
+      </div>
+    </div>
+
+    <div class="action-row">
+      <button type="button" id="buyBtn" disabled>Buy</button>
+      <button type="button" id="sellBtn" disabled>Sell</button>
+      <button type="button" id="financesBtn">Finances</button>
+    </div>
+
+    <div class="tables-row">
+      <div class="table-col">
+        <div class="table-title">Available drugs:</div>
+        <div class="table-wrap inset">
+          <table id="drugsTable">
+            <thead><tr><th>Drug</th><th class="num">Price</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="table-col">
+        <div class="table-title">Trenchcoat Space: <span id="coatUsed">0</span>/<span id="coatCap">100</span></div>
+        <div class="table-wrap inset">
+          <table id="coatTable">
+            <thead><tr><th>Drug</th><th class="num">Qty</th><th class="num">Price</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer-row">
+      <button type="button" data-action="new-game">New Game</button>
+      <button type="button" data-action="exit">Exit</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="overlay" hidden>
+  <div class="dialog win" id="dialogRoot"></div>
+</div>
+
+<script id="engine">
+  /*
+   * DopeWarsEngine — pure simulation, no DOM access.
+   * Ruleset: Keymash (https://keymash.com/games/dopewars/) / Beermat
+   * "Dope Wars for Windows" 1.2.0.0 (1999) observations first, falling back
+   * to docs/gameplay.md (the benmwebb/dopewars C source) for anything
+   * Keymash never revealed. See docs/ in this repo for citations.
+   *
+   * Every function that needs randomness takes an rng (a () => [0,1) float),
+   * so a whole run is reproducible from a seed and this module maps directly
+   * onto the eventual GDScript port.
+   */
+  (function () {
+    'use strict';
+
+    function mulberry32(seed) {
+      let a = seed >>> 0;
+      return function () {
+        a |= 0; a = (a + 0x6D2B79F5) | 0;
+        let t = Math.imul(a ^ (a >>> 15), 1 | a);
+        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+      };
+    }
+
+    function randInt(rng, min, max) {
+      return min + Math.floor(rng() * (max - min + 1));
+    }
+
+    const RULES = {
+      numDays: 31,
+      startCash: 2000,
+      startDebt: 5500,
+      startHealth: 100,
+      startCoatCapacity: 100,
+      debtInterest: 0.10,
+      bankInterest: 0.02,
+      startLocation: 'bronx',
+      gunDamage: 5,
+      gunSpace: 4,
+      playerArmor: 100,
+      locations: [
+        { id: 'bronx', name: 'Bronx', police: 10, minDrugs: 7, maxDrugs: 12 },
+        { id: 'ghetto', name: 'Ghetto', police: 5, minDrugs: 8, maxDrugs: 12 },
+        { id: 'centralpark', name: 'Central Park', police: 15, minDrugs: 6, maxDrugs: 12 },
+        { id: 'manhattan', name: 'Manhattan', police: 90, minDrugs: 4, maxDrugs: 10 },
+        { id: 'coneyisland', name: 'Coney Island', police: 20, minDrugs: 6, maxDrugs: 12 },
+        { id: 'brooklyn', name: 'Brooklyn', police: 70, minDrugs: 4, maxDrugs: 11 },
+      ],
+      drugs: [
+        { id: 'acid', name: 'Acid', min: 1000, max: 4400, cheap: true, expensive: false },
+        { id: 'cocaine', name: 'Cocaine', min: 15000, max: 29000, cheap: false, expensive: true },
+        { id: 'crack', name: 'Crack', min: 1500, max: 4800, cheap: false, expensive: false },
+        { id: 'ecstasy', name: 'Ecstasy', min: 800, max: 2200, cheap: false, expensive: false },
+        { id: 'hashish', name: 'Hashish', min: 480, max: 1320, cheap: true, expensive: false },
+        { id: 'heroin', name: 'Heroin', min: 5500, max: 13500, cheap: false, expensive: true },
+        { id: 'opium', name: 'Opium', min: 540, max: 3700, cheap: false, expensive: true },
+        { id: 'peyote', name: 'Peyote', min: 220, max: 700, cheap: false, expensive: false },
+        { id: 'shrooms', name: 'Shrooms', min: 600, max: 1300, cheap: false, expensive: false },
+        { id: 'smack', name: 'Smack', min: 3500, max: 10000, cheap: false, expensive: true },
+        { id: 'speed', name: 'Speed', min: 90, max: 250, cheap: true, expensive: true },
+        { id: 'weed', name: 'Weed', min: 300, max: 1100, cheap: true, expensive: false },
+      ],
+      cheapDivide: 4,
+      expensiveMultiply: 4,
+      coatDealer: { minPockets: 10, maxPockets: 30, minPrice: 200, maxPrice: 500 },
+      gunDealer: { minPrice: 250, maxPrice: 600 },
+    };
+
+    function findDrug(id) { return RULES.drugs.find((d) => d.id === id); }
+    function findLocation(id) { return RULES.locations.find((l) => l.id === id); }
+
+    function newGame(opts) {
+      opts = opts || {};
+      const seed = opts.seed != null ? opts.seed : Math.floor(Math.random() * 2 ** 31);
+      const state = {
+        seed,
+        rng: mulberry32(seed),
+        day: 1,
+        numDays: opts.numDays || RULES.numDays,
+        cash: opts.startCash != null ? opts.startCash : RULES.startCash,
+        debt: RULES.startDebt,
+        bank: 0,
+        health: RULES.startHealth,
+        coatCapacity: RULES.startCoatCapacity,
+        guns: 0,
+        location: RULES.startLocation,
+        inventory: {},
+        prices: {},
+        dead: false,
+        lastDayWarned: false,
+      };
+      generatePrices(state);
+      return state;
+    }
+
+    function coatUsed(state) {
+      let used = 0;
+      for (const k in state.inventory) used += state.inventory[k].qty;
+      used += state.guns * RULES.gunSpace;
+      return used;
+    }
+
+    function generatePrices(state) {
+      const loc = findLocation(state.location);
+      const rng = state.rng;
+      const eventDrugs = new Set();
+      if (rng() < 0.70) {
+        const pool = RULES.drugs.slice();
+        eventDrugs.add(pool[randInt(rng, 0, pool.length - 1)].id);
+        if (rng() < 0.40) {
+          eventDrugs.add(pool[randInt(rng, 0, pool.length - 1)].id);
+          if (rng() < 0.05) {
+            eventDrugs.add(pool[randInt(rng, 0, pool.length - 1)].id);
+          }
+        }
+      }
+
+      const prices = {};
+      const events = [];
+      for (const drugId of eventDrugs) {
+        const drug = findDrug(drugId);
+        const base = randInt(rng, drug.min, drug.max);
+        let goExpensive = drug.expensive && (!drug.cheap || rng() < 0.5);
+        if (goExpensive) {
+          prices[drugId] = base * RULES.expensiveMultiply;
+          events.push({ type: 'expensive', drug: drugId, message: `Addicts are buying ${drug.name} at outrageous prices!` });
+        } else if (drug.cheap) {
+          prices[drugId] = Math.max(1, Math.floor(base / RULES.cheapDivide));
+          events.push({ type: 'cheap', drug: drugId, message: `The market is flooded with cheap ${drug.name}!` });
+        } else {
+          prices[drugId] = base;
+        }
+      }
+
+      const targetCount = randInt(rng, loc.minDrugs, loc.maxDrugs);
+      const remaining = RULES.drugs.filter((d) => !(d.id in prices));
+      shuffle(remaining, rng);
+      for (const drug of remaining) {
+        if (Object.keys(prices).length >= targetCount) break;
+        prices[drug.id] = randInt(rng, drug.min, drug.max);
+      }
+
+      state.prices = prices;
+      state.priceEvents = events;
+      return events;
+    }
+
+    function shuffle(arr, rng) {
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = randInt(rng, 0, i);
+        const tmp = arr[i]; arr[i] = arr[j]; arr[j] = tmp;
+      }
+      return arr;
+    }
+
+    function buy(state, drugId, qty) {
+      const price = state.prices[drugId];
+      if (price == null) return { ok: false, reason: `${findDrug(drugId).name} isn't traded here.` };
+      if (qty <= 0) return { ok: false, reason: 'Nothing to buy.' };
+      const maxAffordable = Math.floor(state.cash / price);
+      if (maxAffordable < 1) return { ok: false, reason: `Duh! Check the price of ${findDrug(drugId).name}, dude!` };
+      const spaceLeft = state.coatCapacity - coatUsed(state);
+      if (qty > maxAffordable || qty > spaceLeft) {
+        return { ok: false, reason: 'Not enough cash or coat space.' };
+      }
+      state.cash -= price * qty;
+      const held = state.inventory[drugId] || { qty: 0, avgPrice: 0 };
+      const totalCost = held.avgPrice * held.qty + price * qty;
+      held.qty += qty;
+      held.avgPrice = totalCost / held.qty;
+      state.inventory[drugId] = held;
+      return { ok: true };
+    }
+
+    function sell(state, drugId, qty) {
+      const price = state.prices[drugId];
+      if (price == null) return { ok: false, reason: `${findDrug(drugId).name} isn't traded here.` };
+      const held = state.inventory[drugId];
+      if (!held || qty > held.qty || qty <= 0) return { ok: false, reason: "You don't have that many to sell." };
+      state.cash += price * qty;
+      held.qty -= qty;
+      if (held.qty === 0) delete state.inventory[drugId];
+      return { ok: true };
+    }
+
+    function travel(state, destId) {
+      if (destId === state.location) return { ok: false, reason: 'You are already there.' };
+      if (!findLocation(destId)) return { ok: false, reason: 'Unknown location.' };
+      if (state.dead) return { ok: false, reason: 'You are dead.' };
+      if (state.day >= state.numDays) return { ok: false, reason: 'The game is over.' };
+
+      state.day += 1;
+      state.debt = state.debt * (1 + RULES.debtInterest);
+      state.bank = state.bank * (1 + RULES.bankInterest);
+      state.location = destId;
+      const priceEvents = generatePrices(state);
+      return { ok: true, priceEvents };
+    }
+
+    function finances(state, action, amount) {
+      amount = Math.max(0, Math.floor(amount || 0));
+      if (action === 'deposit') {
+        const amt = Math.min(amount, state.cash);
+        state.cash -= amt; state.bank += amt;
+        return { ok: true, amount: amt };
+      }
+      if (action === 'withdraw') {
+        const amt = Math.min(amount, state.bank);
+        state.bank -= amt; state.cash += amt;
+        return { ok: true, amount: amt };
+      }
+      if (action === 'payLoan') {
+        const amt = Math.min(amount, state.cash, state.debt);
+        state.cash -= amt; state.debt -= amt;
+        return { ok: true, amount: amt };
+      }
+      return { ok: false, reason: 'Unknown finances action.' };
+    }
+
+    function randomTradeableDrug(state, rng) {
+      const ids = Object.keys(state.prices);
+      if (ids.length === 0) return null;
+      return ids[randInt(rng, 0, ids.length - 1)];
+    }
+
+    function addToInventory(state, drugId, qty) {
+      const spaceLeft = state.coatCapacity - coatUsed(state);
+      const grant = Math.max(0, Math.min(qty, spaceLeft));
+      if (grant <= 0) return 0;
+      const held = state.inventory[drugId] || { qty: 0, avgPrice: 0 };
+      held.qty += grant;
+      state.inventory[drugId] = held;
+      return grant;
+    }
+
+    function removeFromInventory(state, drugId, qty) {
+      const held = state.inventory[drugId];
+      if (!held) return 0;
+      const removed = Math.min(qty, held.qty);
+      held.qty -= removed;
+      if (held.qty === 0) delete state.inventory[drugId];
+      return removed;
+    }
+
+    function applyDamage(state, amount) {
+      state.health = Math.max(0, state.health - amount);
+      if (state.health <= 0) state.dead = true;
+      return state.health;
+    }
+
+    // Percentile roll on arrival, per docs/gameplay.md:96-107, restricted to
+    // what the Keymash playthrough actually surfaced.
+    function rollArrivalEvent(state, rng) {
+      const roll = rng() * 100;
+      if (roll < 10) {
+        const pct = randInt(rng, 80, 95) / 100;
+        const before = state.cash;
+        state.cash = Math.floor(state.cash * pct);
+        return { type: 'mugged', message: `You were mugged in the subway! You lost $${before - state.cash}.` };
+      }
+      if (roll < 30) {
+        const drugId = randomTradeableDrug(state, rng);
+        if (!drugId) return { type: 'none' };
+        const amount = randInt(rng, 3, 7);
+        const granted = addToInventory(state, drugId, amount);
+        const drug = findDrug(drugId);
+        return { type: 'freeDrugs', drug: drugId, qty: granted, message: `You meet a friend! He lays ${granted} units of ${drug.name} on you!` };
+      }
+      if (roll < 50) {
+        const held = Object.keys(state.inventory);
+        if (held.length > 0 && rng() < 0.5) {
+          const drugId = held[randInt(rng, 0, held.length - 1)];
+          const amount = randInt(rng, 3, 7);
+          const lost = removeFromInventory(state, drugId, amount);
+          const drug = findDrug(drugId);
+          return { type: 'dogChase', drug: drugId, qty: lost, message: `Police dogs chased you! You dropped ${lost} units of ${drug.name}.` };
+        }
+        const drugId = randomTradeableDrug(state, rng);
+        if (!drugId) return { type: 'none' };
+        const amount = randInt(rng, 3, 7);
+        const granted = addToInventory(state, drugId, amount);
+        const drug = findDrug(drugId);
+        return { type: 'foundDrugs', drug: drugId, qty: granted, message: `You found ${granted} units of ${drug.name} on a dead dude in the subway!` };
+      }
+      if (roll < 60) {
+        const candidates = ['weed', 'hashish'].filter((id) => state.inventory[id] && state.inventory[id].qty > 0);
+        if (candidates.length === 0) return { type: 'none' };
+        candidates.sort((a, b) => state.inventory[b].qty - state.inventory[a].qty);
+        const drugId = candidates[0];
+        const amount = randInt(rng, 2, 6);
+        const lost = removeFromInventory(state, drugId, amount);
+        const drug = findDrug(drugId);
+        return { type: 'mamasBrownies', drug: drugId, qty: lost, message: `Mama's brownies! You lost ${lost} units of ${drug.name}.` };
+      }
+      if (roll < 65) {
+        applyDamage(state, state.health);
+        return { type: 'freeWeedDeath', message: 'You hallucinated for three days... then you died because your brain disintegrated!' };
+      }
+      if (roll < 75) {
+        const amt = randInt(rng, 1, 10);
+        state.cash = Math.max(0, state.cash - amt);
+        return { type: 'flavor', message: `You stopped to get a bite to eat. That cost you $${amt}.` };
+      }
+      return { type: 'none' };
+    }
+
+    function rollCoatDealerOffer(state, rng) {
+      const cfg = RULES.coatDealer;
+      const pockets = randInt(rng, cfg.minPockets, cfg.maxPockets);
+      const price = randInt(rng, cfg.minPrice, cfg.maxPrice);
+      return { pockets, price };
+    }
+
+    function acceptCoatOffer(state, offer) {
+      if (offer.price > state.cash) return { ok: false };
+      state.cash -= offer.price;
+      state.coatCapacity += offer.pockets;
+      return { ok: true };
+    }
+
+    function rollGunDealerOffer(state, rng) {
+      const cfg = RULES.gunDealer;
+      const price = randInt(rng, cfg.minPrice, cfg.maxPrice);
+      return { price, damage: RULES.gunDamage, space: RULES.gunSpace };
+    }
+
+    function acceptGunOffer(state, offer) {
+      if (offer.price > state.cash) return { ok: false };
+      if (coatUsed(state) + offer.space > state.coatCapacity) return { ok: false };
+      state.cash -= offer.price;
+      state.guns += 1;
+      return { ok: true };
+    }
+
+    // Cop Chase weighted by the borough's police presence, docs/gameplay.md:94.
+    function shouldStartChase(state, rng) {
+      const loc = findLocation(state.location);
+      return randInt(rng, 0, 80 + loc.police) >= 50;
+    }
+
+    function startChase(state, rng) {
+      const day = state.day;
+      const deputies = Math.min(9, 1 + Math.floor(day / 4));
+      return {
+        cop: 'Officer Hardass',
+        deputies,
+        canFight: state.guns > 0,
+      };
+    }
+
+    function getFightRatings(state) {
+      let attack = 80 + state.guns * RULES.gunDamage;
+      let defend = 100;
+      attack = Math.max(10, attack);
+      defend = Math.max(10, defend);
+      return { attack, defend };
+    }
+
+    function runFromChase(state, chase, isAggressor, rng) {
+      const chance = isAggressor ? 0.30 : 0.60;
+      const escaped = rng() < chance;
+      if (!escaped) {
+        const dmg = randInt(rng, 3, 12);
+        applyDamage(state, dmg);
+      }
+      return { escaped };
+    }
+
+    function fight(state, chase, rng) {
+      const ratings = getFightRatings(state);
+      const attackRoll = randInt(rng, 0, ratings.attack);
+      const defendRoll = randInt(rng, 0, ratings.defend);
+      const hit = attackRoll > defendRoll;
+      let damage = 0;
+      if (hit) {
+        const guns = Math.max(1, state.guns);
+        let raw = 0;
+        for (let i = 0; i < guns; i++) raw += randInt(rng, 0, RULES.gunDamage);
+        damage = Math.max(1, Math.round(raw * (100 / RULES.playerArmor)));
+        applyDamage(state, damage);
+      }
+      return { hit, damage, dead: state.dead };
+    }
+
+    function finish(state) {
+      const score = state.cash + state.bank - state.debt;
+      return { score, dead: !!state.dead, day: state.day };
+    }
+
+    function insertHighScore(scores, entry) {
+      scores.push(entry);
+      scores.sort((a, b) => b.score - a.score);
+      scores.length = Math.min(scores.length, 10);
+      return scores;
+    }
+
+    window.DopeWarsEngine = {
+      RULES,
+      mulberry32,
+      randInt,
+      newGame,
+      coatUsed,
+      generatePrices,
+      buy,
+      sell,
+      travel,
+      finances,
+      rollArrivalEvent,
+      rollCoatDealerOffer,
+      acceptCoatOffer,
+      rollGunDealerOffer,
+      acceptGunOffer,
+      shouldStartChase,
+      startChase,
+      getFightRatings,
+      runFromChase,
+      fight,
+      applyDamage,
+      finish,
+      insertHighScore,
+      findDrug,
+      findLocation,
+    };
+  })();
+</script>
+
+<script id="ui">
+  (function () {
+    'use strict';
+    const E = window.DopeWarsEngine;
+    const fmt = (n) => Math.round(n).toLocaleString('en-US');
+
+    let state = null;
+    let selectedBuyDrug = null;
+    let selectedSellDrug = null;
+    let lastDayWarned = false;
+
+    const els = {
+      titlebarTitle: document.getElementById('titlebarTitle'),
+      ledCash: document.getElementById('ledCash'),
+      ledBank: document.getElementById('ledBank'),
+      ledDebt: document.getElementById('ledDebt'),
+      ledGuns: document.getElementById('ledGuns'),
+      healthFill: document.getElementById('healthFill'),
+      subwayFrom: document.getElementById('subwayFrom'),
+      boroughGrid: document.getElementById('boroughGrid'),
+      subwayPanel: document.getElementById('subwayPanel'),
+      finishPanel: document.getElementById('finishPanel'),
+      finishBtn: document.getElementById('finishBtn'),
+      buyBtn: document.getElementById('buyBtn'),
+      sellBtn: document.getElementById('sellBtn'),
+      financesBtn: document.getElementById('financesBtn'),
+      drugsTable: document.querySelector('#drugsTable tbody'),
+      coatTable: document.querySelector('#coatTable tbody'),
+      coatUsed: document.getElementById('coatUsed'),
+      coatCap: document.getElementById('coatCap'),
+      overlay: document.getElementById('overlay'),
+      dialogRoot: document.getElementById('dialogRoot'),
+    };
+
+    function seedFromUrl() {
+      const params = new URLSearchParams(location.search);
+      const s = params.get('seed');
+      return s ? parseInt(s, 10) : undefined;
+    }
+
+    function startNewGame(opts) {
+      state = E.newGame(opts || { seed: seedFromUrl() });
+      selectedBuyDrug = null;
+      selectedSellDrug = null;
+      lastDayWarned = false;
+      render();
+    }
+
+    function render() {
+      els.titlebarTitle.textContent = `Dope Wars, Day ${state.day} of ${state.numDays}`;
+      els.ledCash.textContent = fmt(state.cash);
+      els.ledBank.textContent = fmt(state.bank);
+      els.ledDebt.textContent = fmt(state.debt);
+      els.ledGuns.textContent = fmt(state.guns);
+      els.healthFill.style.width = `${Math.max(0, state.health)}%`;
+      els.healthFill.textContent = `${Math.max(0, Math.round(state.health))}%`;
+
+      const loc = E.findLocation(state.location);
+      els.subwayFrom.textContent = loc.name;
+
+      const isLastDay = state.day >= state.numDays;
+      els.subwayPanel.hidden = isLastDay;
+      els.finishPanel.hidden = !isLastDay;
+
+      els.boroughGrid.innerHTML = '';
+      for (const l of E.RULES.locations) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.textContent = l.name;
+        btn.disabled = l.id === state.location || state.dead;
+        btn.addEventListener('click', () => doTravel(l.id));
+        els.boroughGrid.appendChild(btn);
+      }
+
+      renderDrugsTable();
+      renderCoatTable();
+      updateActionButtons();
+
+      if (isLastDay && !lastDayWarned) {
+        lastDayWarned = true;
+        showAlert('Last Day', "This is your last day, man. Maybe you should offload your stash.", '\u{1F4B0}');
+      }
+    }
+
+    function renderDrugsTable() {
+      els.drugsTable.innerHTML = '';
+      const drugIds = Object.keys(state.prices).sort((a, b) => E.findDrug(a).name.localeCompare(E.findDrug(b).name));
+      for (const id of drugIds) {
+        const drug = E.findDrug(id);
+        const tr = document.createElement('tr');
+        if (id === selectedBuyDrug) tr.classList.add('selected');
+        tr.innerHTML = `<td>${drug.name}</td><td class="num">${fmt(state.prices[id])}</td>`;
+        tr.addEventListener('click', () => {
+          selectedBuyDrug = id;
+          render();
+        });
+        els.drugsTable.appendChild(tr);
+      }
+    }
+
+    function renderCoatTable() {
+      els.coatTable.innerHTML = '';
+      const used = E.coatUsed(state);
+      els.coatUsed.textContent = fmt(used);
+      els.coatCap.textContent = fmt(state.coatCapacity);
+      const ids = Object.keys(state.inventory).sort((a, b) => E.findDrug(a).name.localeCompare(E.findDrug(b).name));
+      for (const id of ids) {
+        const drug = E.findDrug(id);
+        const held = state.inventory[id];
+        const tr = document.createElement('tr');
+        if (id === selectedSellDrug) tr.classList.add('selected');
+        const priceHere = state.prices[id];
+        tr.innerHTML = `<td>${drug.name}</td><td class="num">${fmt(held.qty)}</td><td class="num">${priceHere != null ? fmt(priceHere) : '-'}</td>`;
+        tr.addEventListener('click', () => {
+          selectedSellDrug = id;
+          render();
+        });
+        els.coatTable.appendChild(tr);
+      }
+    }
+
+    function updateActionButtons() {
+      els.buyBtn.disabled = !selectedBuyDrug || !(selectedBuyDrug in state.prices) || state.dead;
+      const canSell = selectedSellDrug && state.inventory[selectedSellDrug] && (selectedSellDrug in state.prices);
+      els.sellBtn.disabled = !canSell || state.dead;
+    }
+
+    // --- Dialog machinery -------------------------------------------------
+
+    function closeDialog() {
+      els.overlay.hidden = true;
+      els.dialogRoot.innerHTML = '';
+    }
+
+    function openDialog(html) {
+      els.dialogRoot.innerHTML = html;
+      els.overlay.hidden = false;
+    }
+
+    function showAlert(title, message, icon) {
+      openDialog(`
+        <div class="titlebar"><span class="titlebar-title">${title}</span></div>
+        <div class="dialog-body">
+          <div class="dialog-media">
+            <div class="dialog-icon outset">${icon || 'ℹ️'}</div>
+            <div>${message}</div>
+          </div>
+          <div class="dialog-buttons">
+            <button type="button" id="alertOk">OK</button>
+          </div>
+        </div>
+      `);
+      document.getElementById('alertOk').addEventListener('click', closeDialog);
+      document.getElementById('alertOk').focus();
+    }
+
+    function showQuantityDialog(opts) {
+      // opts: {title, drugName, max, unitLabel, onConfirm}
+      openDialog(`
+        <div class="titlebar"><span class="titlebar-title">${opts.title}</span></div>
+        <div class="dialog-body">
+          <div>${opts.prompt}</div>
+          <div class="spinner-row">
+            <input type="number" id="qtyInput" min="0" max="${opts.max}" value="${opts.max}" />
+            <span>${opts.unitLabel || ''}</span>
+          </div>
+          <div class="dialog-buttons">
+            <button type="button" id="qtyOk">OK</button>
+            <button type="button" id="qtyCancel">Cancel</button>
+          </div>
+        </div>
+      `);
+      const input = document.getElementById('qtyInput');
+      input.focus();
+      input.select();
+      document.getElementById('qtyCancel').addEventListener('click', closeDialog);
+      document.getElementById('qtyOk').addEventListener('click', () => {
+        const qty = Math.max(0, Math.min(opts.max, parseInt(input.value, 10) || 0));
+        closeDialog();
+        opts.onConfirm(qty);
+      });
+    }
+
+    function doBuy() {
+      const drugId = selectedBuyDrug;
+      if (!drugId) return;
+      const drug = E.findDrug(drugId);
+      const price = state.prices[drugId];
+      const maxAffordable = Math.floor(state.cash / price);
+      if (maxAffordable < 1) {
+        showAlert('Dealer', `Duh! Check the price of ${drug.name}, dude!`, '\u{1F937}');
+        return;
+      }
+      const spaceLeft = state.coatCapacity - E.coatUsed(state);
+      const max = Math.max(0, Math.min(maxAffordable, spaceLeft));
+      showQuantityDialog({
+        title: 'Buy',
+        prompt: `You can afford ${maxAffordable} units of ${drug.name}, and have room in your coat for ${spaceLeft} units.`,
+        max,
+        unitLabel: `units @ $${fmt(price)}`,
+        onConfirm: (qty) => {
+          if (qty > 0) E.buy(state, drugId, qty);
+          render();
+        },
+      });
+    }
+
+    function doSell() {
+      const drugId = selectedSellDrug;
+      if (!drugId) return;
+      const drug = E.findDrug(drugId);
+      const held = state.inventory[drugId];
+      const max = held ? held.qty : 0;
+      showQuantityDialog({
+        title: 'Sell',
+        prompt: `You have ${max} units of ${drug.name}.`,
+        max,
+        unitLabel: `units @ $${fmt(state.prices[drugId])}`,
+        onConfirm: (qty) => {
+          if (qty > 0) E.sell(state, drugId, qty);
+          render();
+        },
+      });
+    }
+
+    function doFinances() {
+      openDialog(`
+        <div class="titlebar"><span class="titlebar-title">Finances</span></div>
+        <div class="dialog-body">
+          <div class="field-row"><span>Cash</span><strong>$${fmt(state.cash)}</strong></div>
+          <div class="field-row"><span>Bank</span><strong>$${fmt(state.bank)}</strong></div>
+          <div class="field-row"><span>Debt</span><strong>$${fmt(state.debt)}</strong></div>
+          <div class="dialog-buttons">
+            <button type="button" id="finDeposit">Deposit</button>
+            <button type="button" id="finWithdraw">Withdraw</button>
+            <button type="button" id="finPayLoan">Pay Loan</button>
+            <button type="button" id="finClose">Close</button>
+          </div>
+        </div>
+      `);
+      document.getElementById('finClose').addEventListener('click', closeDialog);
+      document.getElementById('finDeposit').addEventListener('click', () => {
+        showQuantityDialog({
+          title: 'Deposit', prompt: `Deposit how much of your $${fmt(state.cash)} cash?`,
+          max: Math.floor(state.cash),
+          onConfirm: (amt) => { E.finances(state, 'deposit', amt); render(); doFinances(); },
+        });
+      });
+      document.getElementById('finWithdraw').addEventListener('click', () => {
+        showQuantityDialog({
+          title: 'Withdraw', prompt: `Withdraw how much of your $${fmt(state.bank)} bank balance?`,
+          max: Math.floor(state.bank),
+          onConfirm: (amt) => { E.finances(state, 'withdraw', amt); render(); doFinances(); },
+        });
+      });
+      document.getElementById('finPayLoan').addEventListener('click', () => {
+        showQuantityDialog({
+          title: 'Pay Loan', prompt: `Pay down how much of your $${fmt(state.debt)} debt?`,
+          max: Math.floor(Math.min(state.cash, state.debt)),
+          onConfirm: (amt) => { E.finances(state, 'payLoan', amt); render(); doFinances(); },
+        });
+      });
+    }
+
+    // --- Travel + arrival events -------------------------------------------
+
+    function doTravel(destId) {
+      const res = E.travel(state, destId);
+      if (!res.ok) { render(); return; }
+      selectedBuyDrug = null;
+      selectedSellDrug = null;
+      render();
+      runArrivalSequence(res.priceEvents);
+    }
+
+    function runArrivalSequence(priceEvents) {
+      const queue = [];
+      for (const ev of priceEvents || []) queue.push({ kind: 'toast', message: ev.message });
+
+      if (E.shouldStartChase(state, state.rng)) {
+        queue.push({ kind: 'chase' });
+      } else {
+        const arrivalEvent = E.rollArrivalEvent(state, state.rng);
+        if (arrivalEvent.type !== 'none') queue.push({ kind: 'event', event: arrivalEvent });
+        if (state.rng() < 0.15 && !state.dead) queue.push({ kind: 'coatDealer' });
+        if (state.rng() < 0.15 && !state.dead) queue.push({ kind: 'gunDealer' });
+      }
+
+      processQueue(queue);
+    }
+
+    function processQueue(queue) {
+      if (queue.length === 0) { render(); return; }
+      const item = queue.shift();
+      if (item.kind === 'toast') {
+        showAlert('Word on the street', item.message, '\u{1F4C8}');
+        document.getElementById('alertOk').addEventListener('click', () => processQueue(queue), { once: true });
+        return;
+      }
+      if (item.kind === 'event') {
+        showAlert('Random Event', item.event.message, item.event.type === 'freeWeedDeath' ? '☠️' : '⚠️');
+        document.getElementById('alertOk').addEventListener('click', () => {
+          render();
+          if (state.dead) { handleDeath(); return; }
+          processQueue(queue);
+        }, { once: true });
+        return;
+      }
+      if (item.kind === 'coatDealer') {
+        const offer = E.rollCoatDealerOffer(state, state.rng);
+        openDialog(`
+          <div class="titlebar"><span class="titlebar-title">Coat Dealer</span></div>
+          <div class="dialog-body">
+            <div>Would you like to buy a trenchcoat with ${offer.pockets} more pockets for $${fmt(offer.price)}?</div>
+            <div class="dialog-buttons">
+              <button type="button" id="coatBuy">Buy</button>
+              <button type="button" id="coatDecline">Decline</button>
+            </div>
+          </div>
+        `);
+        document.getElementById('coatDecline').addEventListener('click', () => { closeDialog(); render(); processQueue(queue); });
+        document.getElementById('coatBuy').addEventListener('click', () => {
+          E.acceptCoatOffer(state, offer);
+          closeDialog(); render(); processQueue(queue);
+        });
+        return;
+      }
+      if (item.kind === 'gunDealer') {
+        const offer = E.rollGunDealerOffer(state, state.rng);
+        openDialog(`
+          <div class="titlebar"><span class="titlebar-title">Gun Dealer</span></div>
+          <div class="dialog-body">
+            <div>Need protection? I got a gun for $${fmt(offer.price)}.</div>
+            <div class="dialog-buttons">
+              <button type="button" id="gunBuy">Buy</button>
+              <button type="button" id="gunDecline">Decline</button>
+            </div>
+          </div>
+        `);
+        document.getElementById('gunDecline').addEventListener('click', () => { closeDialog(); render(); processQueue(queue); });
+        document.getElementById('gunBuy').addEventListener('click', () => {
+          E.acceptGunOffer(state, offer);
+          closeDialog(); render(); processQueue(queue);
+        });
+        return;
+      }
+      if (item.kind === 'chase') {
+        runCopChase(queue);
+        return;
+      }
+      processQueue(queue);
+    }
+
+    function runCopChase(queue) {
+      const chase = E.startChase(state, state.rng);
+      renderChaseDialog(chase, queue, false);
+    }
+
+    function renderChaseDialog(chase, queue, wasAggressor) {
+      openDialog(`
+        <div class="titlebar"><span class="titlebar-title">Cop Chase!</span></div>
+        <div class="dialog-body">
+          <div class="dialog-media">
+            <div class="dialog-icon outset">\u{1F694}</div>
+            <div>${chase.cop} and ${chase.deputies} of his deputies are chasing you!</div>
+          </div>
+          <div class="health-row">
+            <span>Health:</span>
+            <div class="health-bar-track inset" style="flex:1">
+              <div class="health-bar-fill" style="width:${Math.max(0, state.health)}%">${Math.max(0, Math.round(state.health))}%</div>
+            </div>
+          </div>
+          <div class="dialog-buttons">
+            <button type="button" id="chaseRun">Run</button>
+            <button type="button" id="chaseStay">Stay</button>
+            <button type="button" id="chaseFight" ${chase.canFight ? '' : 'disabled'}>Fight</button>
+          </div>
+        </div>
+      `);
+      document.getElementById('chaseRun').addEventListener('click', () => {
+        const res = E.runFromChase(state, chase, wasAggressor, state.rng);
+        if (state.dead) { handleDeath(); return; }
+        if (res.escaped) {
+          showAlert('Cop Chase', 'You lost them in the alleys.', '\u{1F3C3}');
+          document.getElementById('alertOk').addEventListener('click', () => { render(); processQueue(queue); }, { once: true });
+        } else {
+          showAlert('Cop Chase', "They're firing on you, man! You've been hit!", '\u{1F4A5}');
+          document.getElementById('alertOk').addEventListener('click', () => renderChaseDialog(chase, queue, wasAggressor), { once: true });
+        }
+      });
+      document.getElementById('chaseStay').addEventListener('click', () => {
+        showAlert('Cop Chase', 'You stand your ground and wait for them to close in.', '⏳');
+        document.getElementById('alertOk').addEventListener('click', () => renderChaseDialog(chase, queue, wasAggressor), { once: true });
+      });
+      document.getElementById('chaseFight').addEventListener('click', () => {
+        const res = E.fight(state, chase, state.rng);
+        if (state.dead) { handleDeath(); return; }
+        const msg = res.hit ? `You took ${res.damage} damage!` : 'They missed!';
+        showAlert('Cop Chase', msg, res.hit ? '\u{1F4A5}' : '\u{1F4A8}');
+        document.getElementById('alertOk').addEventListener('click', () => renderChaseDialog(chase, queue, wasAggressor), { once: true });
+      });
+    }
+
+    function handleDeath() {
+      const result = E.finish(state);
+      offerHighScore(result, () => {
+        showAlert('You Died', 'You have been killed. Game over.', '☠️');
+      });
+    }
+
+    // --- High scores --------------------------------------------------------
+
+    const SCORES_KEY = 'dopewars.highscores';
+
+    function loadScores() {
+      try {
+        return JSON.parse(localStorage.getItem(SCORES_KEY)) || [];
+      } catch (e) { return []; }
+    }
+
+    function saveScores(scores) {
+      try { localStorage.setItem(SCORES_KEY, JSON.stringify(scores)); } catch (e) { /* ignore */ }
+    }
+
+    function offerHighScore(result, after) {
+      openDialog(`
+        <div class="titlebar"><span class="titlebar-title">Game Over</span></div>
+        <div class="dialog-body">
+          <div>Final score: <strong>$${fmt(result.score)}</strong>${result.dead ? ' (dead)' : ''}</div>
+          <div class="field-row"><span>Your name</span><input type="text" id="scoreName" maxlength="16" value="Player" /></div>
+          <div class="dialog-buttons">
+            <button type="button" id="scoreSave">Save score</button>
+            <button type="button" id="scoreSkip">Skip</button>
+          </div>
+        </div>
+      `);
+      document.getElementById('scoreSkip').addEventListener('click', () => { closeDialog(); after && after(); });
+      document.getElementById('scoreSave').addEventListener('click', () => {
+        const name = document.getElementById('scoreName').value.trim() || 'Player';
+        const scores = loadScores();
+        E.insertHighScore(scores, { name, score: Math.round(result.score), day: result.day, dead: result.dead, date: new Date().toISOString().slice(0, 10) });
+        saveScores(scores);
+        closeDialog();
+        after && after();
+      });
+    }
+
+    function showHighScores() {
+      const scores = loadScores();
+      const rows = scores.map((s) => `<tr><td>${s.name}</td><td class="num">$${fmt(s.score)}</td><td class="num">${s.day}</td><td>${s.dead ? 'Dead' : ''}</td><td>${s.date}</td></tr>`).join('');
+      openDialog(`
+        <div class="titlebar"><span class="titlebar-title">High Scores</span></div>
+        <div class="dialog-body">
+          <table class="scores-table">
+            <thead><tr><th>Name</th><th class="num">Score</th><th class="num">Day</th><th>Status</th><th>Date</th></tr></thead>
+            <tbody>${rows || '<tr><td colspan="5">No scores yet.</td></tr>'}</tbody>
+          </table>
+          <div class="dialog-buttons"><button type="button" id="scoresClose">Close</button></div>
+        </div>
+      `);
+      document.getElementById('scoresClose').addEventListener('click', closeDialog);
+    }
+
+    function showNewGameDialog() {
+      openDialog(`
+        <div class="titlebar"><span class="titlebar-title">New Game</span></div>
+        <div class="dialog-body">
+          <div class="field-row"><span>Number of days</span><input type="number" id="ngDays" min="5" max="99" value="31" /></div>
+          <div class="field-row"><span>Starting cash</span><input type="number" id="ngCash" min="500" max="100000" value="2000" step="100" /></div>
+          <div class="dialog-buttons">
+            <button type="button" id="ngStart">Start Game</button>
+            <button type="button" id="ngCancel">Cancel</button>
+          </div>
+        </div>
+      `);
+      document.getElementById('ngCancel').addEventListener('click', closeDialog);
+      document.getElementById('ngStart').addEventListener('click', () => {
+        const numDays = Math.max(5, parseInt(document.getElementById('ngDays').value, 10) || 31);
+        const startCash = Math.max(500, parseInt(document.getElementById('ngCash').value, 10) || 2000);
+        closeDialog();
+        startNewGame({ numDays, startCash, seed: Math.floor(Math.random() * 2 ** 31) });
+      });
+    }
+
+    function showHelp() {
+      showAlert('How to play', 'Buy low, sell high, dodge the cops, pay off Marks before he sends muscle, and cash out with the highest net worth by day ' + (state ? state.numDays : 31) + '. Click a drug to Buy or Sell it, click a borough to travel (this is the only way to advance a day).', '❓');
+    }
+
+    function doFinish() {
+      const result = E.finish(state);
+      offerHighScore(result, () => {
+        showAlert('Custom Game Complete', `Final score: $${fmt(result.score)}`, '\u{1F3C1}');
+      });
+    }
+
+    // --- Menu handling --------------------------------------------------
+
+    function closeAllMenus() {
+      document.querySelectorAll('.menu-items.open').forEach((el) => el.classList.remove('open'));
+      document.querySelectorAll('.menubar span.open').forEach((el) => el.classList.remove('open'));
+    }
+
+    document.querySelectorAll('.menubar > .menu-dropdown > span').forEach((span) => {
+      span.addEventListener('click', (e) => {
+        const key = span.dataset.menu;
+        const itemsEl = document.querySelector(`.menu-items[data-menu-items="${key}"]`);
+        const wasOpen = itemsEl.classList.contains('open');
+        closeAllMenus();
+        if (!wasOpen) { itemsEl.classList.add('open'); span.classList.add('open'); }
+        e.stopPropagation();
+      });
+    });
+    document.addEventListener('click', closeAllMenus);
+
+    document.querySelectorAll('[data-action]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const action = btn.dataset.action;
+        if (action === 'new-game') showNewGameDialog();
+        else if (action === 'exit') showAlert('Exit', 'Thanks for playing. Close this browser tab to exit.', '\u{1F44B}');
+        else if (action === 'high-scores') showHighScores();
+        else if (action === 'help') showHelp();
+      });
+    });
+
+    els.buyBtn.addEventListener('click', doBuy);
+    els.sellBtn.addEventListener('click', doSell);
+    els.financesBtn.addEventListener('click', doFinances);
+    els.finishBtn.addEventListener('click', doFinish);
+
+    // --- Keyboard shortcuts -----------------------------------------------
+
+    document.addEventListener('keydown', (e) => {
+      const dialogOpen = !els.overlay.hidden;
+      if (dialogOpen) {
+        if (e.key === 'Escape') {
+          const cancelBtn = els.dialogRoot.querySelector('[id$="Cancel"], [id$="Decline"], [id="scoresClose"], [id="alertOk"]');
+          if (cancelBtn) cancelBtn.click();
+        } else if (e.key === 'Enter' && document.activeElement.tagName !== 'BUTTON') {
+          const okBtn = els.dialogRoot.querySelector('[id$="Ok"], [id$="Save"], [id$="Start"], [id$="Buy"]');
+          if (okBtn) okBtn.click();
+        }
+        return;
+      }
+      if (document.activeElement && ['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) return;
+      const key = e.key.toLowerCase();
+      if (key >= '1' && key <= '6') {
+        const idx = parseInt(key, 10) - 1;
+        const loc = E.RULES.locations[idx];
+        if (loc && loc.id !== state.location) doTravel(loc.id);
+      } else if (key === 'b') { if (!els.buyBtn.disabled) doBuy(); }
+      else if (key === 's') { if (!els.sellBtn.disabled) doSell(); }
+      else if (key === 'f') { doFinances(); }
+      else if (key === 'n') { showNewGameDialog(); }
+    });
+
+    startNewGame({ seed: seedFromUrl() });
+  })();
+</script>
+</body>
+</html>
