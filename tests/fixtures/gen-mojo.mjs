@@ -69,6 +69,8 @@ const ALLOWED = [
   'bank', 'health', 'coatCapacity', 'guns', 'day', 'location', 'rng',
   'offer.*', 'chase.*', 'pockets', 'price', 'deputies', 'canFight', 'qty',
   'drug', 'amount',
+  // an empty container argument (setField {inventory: {}}) emits a bare path
+  'inventory', 'prices',
 ]
 
 // setPrices and setInventory take a bare drug id as the key, so their argument
@@ -141,11 +143,23 @@ function lexeme(v) {
 const pairs = []
 function flatten(prefix, value) {
   if (Array.isArray(value)) {
+    // An empty container emits a bare `path=` so the reader can tell "set this
+    // to empty" from "this field was not mentioned". No string lexeme is ever
+    // empty, so the empty value is unambiguous.
+    if (value.length === 0) {
+      pairs.push(`${prefix}=`)
+      return
+    }
     value.forEach((v, i) => flatten(`${prefix}.${i}`, v))
     return
   }
   if (value !== null && typeof value === 'object') {
-    for (const [k, v] of Object.entries(value)) flatten(`${prefix}.${k}`, v)
+    const entries = Object.entries(value)
+    if (entries.length === 0) {
+      pairs.push(`${prefix}=`)
+      return
+    }
+    for (const [k, v] of entries) flatten(`${prefix}.${k}`, v)
     return
   }
   const stripped = prefix.slice(prefix.indexOf('.') + 1)
@@ -180,12 +194,15 @@ function encodeStep(fx, rec) {
   record = rec
   const call = rec.call
   // Scripted RNG floats go through the same encoder as every other number, so
-  // the reader never has to parse a decimal.
-  const rng = (rec.rng ?? []).map(lexeme).join(',')
+  // the reader never has to parse a decimal. An absent `rng` is `-`; a present
+  // but empty one is the empty string, which means "scripted with no draws" and
+  // must not silently fall back to the seeded stream.
+  const rng = rec.rng === undefined ? '-' : rec.rng.map(lexeme).join(',')
   const args = group('args', rec.args ?? {})
   const ret = group('ret', rec.expect.return)
   const state = group('state', rec.expect.state ?? {})
-  return `${call}|${rng}|${args}|${ret}|${state}`
+  // The fixture basename leads so a harness can replay one fixture at a time.
+  return `${fx.replace(/\.jsonl$/, '')}|${call}|${rng}|${args}|${ret}|${state}`
 }
 
 function main() {
@@ -205,7 +222,7 @@ function main() {
 # if this file is stale.
 #
 # One record per fixture step:
-#   call | rng lexemes | arg pairs | return pairs | state pairs
+#   fixture | call | rng lexemes | arg pairs | return pairs | state pairs
 # Pairs are \`dotted.path=lexeme\`, ';'-separated, in document order.
 #
 # Mojo 1.1.0 has no global variables, so the corpus is returned by a function.

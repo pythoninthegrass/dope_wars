@@ -78,11 +78,11 @@ code and compares that, rather than comparing the sentence.
 | `Unknown finances action.` | `DW_ERR_INVALID_ARGUMENT` |
 | `nothing affordable` | runner-helper result, not an engine code |
 
-`Not enough cash or coat space.` is one sentence covering two conditions, so the
-harness disambiguates it from the state: if the requested quantity exceeds the
-affordable count it is `DW_ERR_INSUFFICIENT_CASH`, otherwise
-`DW_ERR_INSUFFICIENT_SPACE`. The fixture's own state snapshot makes that
-deterministic.
+`Not enough cash or coat space.` is one sentence covering two conditions, and a
+bare `{ ok: false }` from a dealer covers two more. The harness accepts either
+code for those, because the oracle genuinely does not distinguish them. The
+state snapshot still pins the outcome, so this only tolerates a different
+*label* on the same branch, never a different branch.
 
 ## Running
 

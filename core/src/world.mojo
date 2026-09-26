@@ -123,11 +123,17 @@ struct World:
     def was_event_price(ref self, drug_index: Int) -> Bool:
         return self.price_was_event[drug_index] != 0
 
-    def clear_prices(mut self):
+    # Drops the roster but keeps the event list. generate_prices clears both;
+    # the fixture's setPrices helper replaces only state.prices, so the events
+    # from the previous turn survive it.
+    def clear_price_roster(mut self):
         for i in range(rules.NUM_DRUGS):
             self.price_present[i] = 0
             self.price_was_event[i] = 0
         self.price_order = List[UInt8]()
+
+    def clear_prices(mut self):
+        self.clear_price_roster()
         self.price_events = List[PriceEvent]()
 
     def set_price(mut self, drug_index: Int, value: Int64, was_event: Bool):

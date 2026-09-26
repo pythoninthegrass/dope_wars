@@ -3,7 +3,7 @@
 # tests/fixtures/gen-mojo.mjs turns each tests/fixtures/*.jsonl line into a
 # single flat record:
 #
-#   call | rng lexemes | arg pairs | return pairs | state pairs
+#   fixture | call | rng lexemes | arg pairs | return pairs | state pairs
 #
 # where a pair is `dotted.path=lexeme`, pairs within a group are ';'-separated,
 # and pairs appear in the oracle's own document order. Nothing nests, so this
@@ -104,14 +104,18 @@ struct Group(Copyable, Movable):
 
 
 struct Record(Copyable, Movable):
+    var fixture: String
     var call: String
+    var has_rng: Bool
     var rng: List[Float64]
     var args: Group
     var ret: Group
     var state: Group
 
     def __init__(out self):
+        self.fixture = ""
         self.call = ""
+        self.has_rng = False
         self.rng = List[Float64]()
         self.args = Group()
         self.ret = Group()
@@ -128,26 +132,36 @@ def _parse_group(mut target: Group, text: String, prefix: String) raises:
         if len(fields) != 2:
             raise Error("malformed pair in the oracle record: " + String(chunk))
         var path = String(fields[0])
+        if path == prefix:
+            # The whole group is an empty container (a call with no arguments).
+            # Nothing to record.
+            continue
         if not path.startswith(prefix + "."):
             raise Error("pair " + path + " is not under " + prefix)
         target.add(strip_first_segment(path), String(fields[1]))
 
 
-def _parse_rng(mut target: List[Float64], text: String) raises:
+def _parse_rng(mut target: List[Float64], text: String) raises -> Bool:
+    # '-' means the step has no scripted RNG; an empty string means it has one
+    # with no draws, which is a different thing.
+    if text == "-":
+        return False
     if text.byte_length() == 0:
-        return
+        return True
     for chunk in text.split(","):
         target.append(lexeme.to_float(String(chunk)))
+    return True
 
 
 def parse_record(line: String) raises -> Record:
     var out = Record()
-    var fields = line.split("|", maxsplit=4)
-    if len(fields) != 5:
-        raise Error("expected 5 '|'-separated groups in the oracle record")
-    out.call = String(fields[0])
-    _parse_rng(out.rng, String(fields[1]))
-    _parse_group(out.args, String(fields[2]), "args")
-    _parse_group(out.ret, String(fields[3]), "ret")
-    _parse_group(out.state, String(fields[4]), "state")
+    var fields = line.split("|", maxsplit=5)
+    if len(fields) != 6:
+        raise Error("expected 6 '|'-separated groups in the oracle record")
+    out.fixture = String(fields[0])
+    out.call = String(fields[1])
+    out.has_rng = _parse_rng(out.rng, String(fields[2]))
+    _parse_group(out.args, String(fields[3]), "args")
+    _parse_group(out.ret, String(fields[4]), "ret")
+    _parse_group(out.state, String(fields[5]), "state")
     return out^

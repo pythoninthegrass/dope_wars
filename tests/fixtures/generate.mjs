@@ -43,6 +43,7 @@ const FIXTURES = [
       { call: 'setField', args: { coatCapacity: 5 } },
       { call: 'buy', args: { drug: 'speed', qty: 5 } },
       { call: 'buy', args: { drug: 'speed', qty: 1 } }, // overflow
+      { call: 'buy', args: { drug: 'speed', qty: 0 } }, // nothing to buy
       { call: 'buy', args: { drug: 'cocaine', qty: 1 } }, // not tradeable
       { call: 'setField', args: { cash: 5 } },
       { call: 'setPrices', args: { cocaine: 15000 } },
@@ -51,6 +52,7 @@ const FIXTURES = [
       { call: 'setPrices', args: { speed: 100 } },
       { call: 'sell', args: { drug: 'speed', qty: 3 } },
       { call: 'sell', args: { drug: 'speed', qty: 99 } }, // over
+      { call: 'sell', args: { drug: 'speed', qty: 0 } }, // nothing to sell
       { call: 'setPrices', args: { cocaine: 20000 } },
       { call: 'sell', args: { drug: 'speed', qty: 1 } }, // not tradeable
     ],

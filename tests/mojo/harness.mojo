@@ -10,13 +10,16 @@
 # allow-list is what keeps the oracle's field set from growing unnoticed; this
 # file is what keeps the Mojo side honest about every field it does record.
 
+import dealers
+import events
 import record
+import result
 import rules
 import world
 from std.testing import assert_equal, assert_true
 
 
-def _first_segments(ref pairs: List[record.Pair]) raises -> List[String]:
+def first_segments(ref pairs: List[record.Pair]) raises -> List[String]:
     # Distinct leading path segments, in document order. For inventory children
     # ("speed.qty", "speed.avgPrice", "weed.qty") this yields ["speed", "weed"].
     var keys = List[String]()
@@ -54,7 +57,7 @@ def assert_prev_prices_match(ref game: world.World, ref expected: record.Group) 
 
 def assert_inventory_match(ref game: world.World, ref expected: record.Group) raises:
     var children = expected.children("inventory")
-    var keys = _first_segments(children)
+    var keys = first_segments(children)
     assert_equal(game.inv_count(), len(keys))
     for i in range(len(keys)):
         var drug_index = rules.find_drug_index(keys[i])
@@ -73,7 +76,7 @@ def assert_price_event_list_match(
     # Works for both shapes the oracle uses: a state snapshot's priceEvents
     # (paths "0.type", "0.drug") and a generatePrices return value, which is a
     # bare array with the same paths.
-    var keys = _first_segments(pairs)
+    var keys = first_segments(pairs)
     assert_equal(len(events), len(keys))
     for i in range(len(keys)):
         var kind = _string_in(pairs, keys[i] + ".type")
@@ -117,3 +120,106 @@ def assert_state_matches(ref game: world.World, ref expected: record.Group) rais
     assert_prev_prices_match(game, expected)
     assert_inventory_match(game, expected)
     assert_price_events_match(game, expected)
+
+
+# ---- return-value comparators ------------------------------------------------
+#
+# The oracle reports failures as English sentences; core reports codes. These
+# translate the sentence back to the code it stands for. Two sentences are
+# genuinely ambiguous and accept either code:
+#
+#   "Not enough cash or coat space."  covers both the cash and the space guard
+#   a bare { ok: false }              covers both the bank and the space guard
+#
+# The state snapshot still pins the outcome, so accepting either code here does
+# not let a wrong branch through -- only a wrong *label* on the same branch.
+
+
+def _reason_code(reason: String) raises -> Int:
+    if reason.find("isn't traded here") >= 0:
+        return result.ERR_NOT_TRADED_HERE
+    if reason.find("Check the price of") >= 0:
+        return result.ERR_INSUFFICIENT_CASH
+    if reason == "Not enough cash or coat space.":
+        return result.ERR_INSUFFICIENT_CASH
+    if reason == "You don't have that many to sell.":
+        return result.ERR_INSUFFICIENT_INVENTORY
+    if reason == "Nothing to buy.":
+        return result.ERR_INVALID_ARGUMENT
+    if reason == "Unknown finances action.":
+        return result.ERR_INVALID_ARGUMENT
+    if reason == "You are already there.":
+        return result.ERR_ALREADY_THERE
+    if reason == "Unknown location.":
+        return result.ERR_UNKNOWN_LOCATION
+    if reason == "You are dead.":
+        return result.ERR_DEAD
+    if reason == "The game is over.":
+        return result.ERR_GAME_OVER
+    raise Error("unmapped oracle failure reason: " + reason)
+
+
+def assert_outcome_matches(
+    ref outcome: result.Outcome, ref rec: record.Record
+) raises:
+    var expected_ok = rec.ret.bool_at("ok")
+    assert_equal(outcome.ok(), expected_ok)
+    if expected_ok:
+        if rec.ret.has("amount"):
+            assert_equal(outcome.amount, rec.ret.int_at("amount"))
+        return
+    var reason = rec.ret.string_at("reason")
+    var expected_code = _reason_code(reason)
+    if reason == "Not enough cash or coat space.":
+        # Ambiguous between the cash and the space guard.
+        assert_true(
+            outcome.code == result.ERR_INSUFFICIENT_CASH
+            or outcome.code == result.ERR_INSUFFICIENT_SPACE
+        )
+        return
+    assert_equal(outcome.code, expected_code)
+
+
+def assert_purchase_matches(
+    ref outcome: dealers.PurchaseResult, ref rec: record.Record
+) raises:
+    var expected_ok = rec.ret.bool_at("ok")
+    assert_equal(outcome.code == result.OK, expected_ok)
+    if not expected_ok:
+        # The oracle records a bare { ok: false } for both the bank and the
+        # space guard, so either code is acceptable.
+        assert_true(
+            outcome.code == result.ERR_INSUFFICIENT_BANK
+            or outcome.code == result.ERR_INSUFFICIENT_SPACE
+        )
+        return
+    if rec.ret.has("usedBank"):
+        assert_equal(outcome.used_bank, rec.ret.bool_at("usedBank"))
+    if rec.ret.has("fee"):
+        assert_equal(outcome.fee, rec.ret.int_at("fee"))
+
+
+def assert_arrival_event_matches(
+    ref event: events.ArrivalEvent, ref expected: record.Group
+) raises:
+    var kind_name = expected.string_at("type")
+    var expected_kind = events.ARRIVAL_NONE
+    if kind_name == "mugged":
+        expected_kind = events.ARRIVAL_MUGGED
+    elif kind_name == "freeDrugs":
+        expected_kind = events.ARRIVAL_FREE_DRUGS
+    elif kind_name == "dogChase":
+        expected_kind = events.ARRIVAL_DOG_CHASE
+    elif kind_name == "foundDrugs":
+        expected_kind = events.ARRIVAL_FOUND_DRUGS
+    elif kind_name == "mamasBrownies":
+        expected_kind = events.ARRIVAL_MAMAS_BROWNIES
+    elif kind_name == "freeWeedDeath":
+        expected_kind = events.ARRIVAL_FREE_WEED_DEATH
+    elif kind_name == "flavor":
+        expected_kind = events.ARRIVAL_FLAVOR
+    assert_equal(event.kind, expected_kind)
+    if expected.has("drug"):
+        assert_equal(event.drug_index, rules.find_drug_index(expected.string_at("drug")))
+    if expected.has("qty"):
+        assert_equal(event.qty, expected.int_at("qty"))
