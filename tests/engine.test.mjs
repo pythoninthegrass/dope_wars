@@ -205,6 +205,14 @@ describe('travel', () => {
     const res = Engine.travel(state, 'ghetto')
     assert.equal(res.ok, false)
   })
+
+  test('cannot travel when dead', () => {
+    const state = Engine.newGame({ seed: 1 })
+    state.dead = true
+    const res = Engine.travel(state, 'ghetto')
+    assert.equal(res.ok, false)
+    assert.match(res.reason, /dead/i)
+  })
 })
 
 describe('finances', () => {

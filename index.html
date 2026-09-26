@@ -1133,7 +1133,7 @@
 
       const isLastDay = state.day >= state.numDays;
       els.subwayPanel.hidden = isLastDay;
-      els.finishPanel.hidden = !isLastDay;
+      els.finishPanel.hidden = !isLastDay || state.dead;
 
       els.boroughGrid.innerHTML = '';
       for (const l of E.RULES.locations) {
@@ -1620,6 +1620,7 @@
     }
 
     function doFinish() {
+      if (state.dead) return;
       els.finishBtn.disabled = true;
       const result = E.finish(state);
       offerHighScore(result, () => showNewGameDialog());
@@ -1678,7 +1679,7 @@
       if (key >= '1' && key <= '6') {
         const idx = parseInt(key, 10) - 1;
         const loc = E.RULES.locations[idx];
-        if (loc && loc.id !== state.location) doTravel(loc.id);
+        if (loc && loc.id !== state.location && !state.dead) doTravel(loc.id);
       } else if (key === 'b') { if (!els.buyBtn.disabled) doBuy(); }
       else if (key === 's') { if (!els.sellBtn.disabled) doSell(); }
       else if (key === 'f') { doFinances(); }
