@@ -27,7 +27,7 @@ Each `.jsonl` line is one engine call plus the expected result:
 Fields:
 
 - `step` — zero-based index; must match the line's position in the file.
-- `call` — one of the engine exports (`newGame`, `generatePrices`, `buy`, `sell`, `travel`, `finances`, `rollArrivalEvent`, `rollCoatDealerOffer`, `acceptCoatOffer`, `rollGunDealerOffer`, `acceptGunOffer`, `shouldStartChase`, `startChase`, `runFromChase`, `fight`, `finish`) or a runner helper (`setPrices`, `setInventory`, `setField`, `buyCheapest`, `insertHighScores`, `serializeRoundTrip`).
+- `call` — one of the engine exports (`newGame`, `generatePrices`, `buy`, `sell`, `travel`, `finances`, `rollArrivalEvent`, `rollCoatDealerOffer`, `acceptCoatOffer`, `rollGunDealerOffer`, `acceptGunOffer`, `shouldStartChase`, `startChase`, `getFightRatings`, `applyDamage`, `runFromChase`, `fight`, `finish`) or a runner helper (`setPrices`, `setInventory`, `setField`, `buyCheapest`, `insertHighScores`, `serializeRoundTrip`).
 - `args` — positional-arg bag; each dispatch case unpacks the fields it needs (see `run-step.mjs`).
 - `rng` — optional array of `[0,1)` floats for a scripted RNG. Used by fixtures that force specific arrival-event / combat branches. Full-run fixtures omit `rng` and let the engine consume the seeded `state.rng` (mulberry32) it was born with.
 - `expect.return` — deep-equal target for the call's return value.
@@ -58,6 +58,31 @@ Each `.meta.json` sidecar records:
 | `07-finish-scoring` | `finish` score = cash + bank − debt; `insertHighScore` top-10 truncation |
 | `08-serialize-roundtrip` | `serializeState` → `deserializeState` preserves full state |
 | `09-full-run-31day` | 31-day playthrough with deterministic policy (travel to `locations[day % 6]`, buy cheapest per stop) |
+| `10-rolls-and-helpers` | `shouldStartChase` police weighting (incl. the 49/50 threshold), `rollCoatDealerOffer` and `rollGunDealerOffer` range ends, `getFightRatings`, `applyDamage` |
+| `11-finances` | `finances` deposit/withdraw/payLoan, clamping to available cash/bank/debt, amount floor, unknown action |
+
+## Failure reasons and `dw_result`
+
+`buy`, `sell`, `travel`, `finances` and the dealer `accept*` calls return
+`{ ok: false, reason: "<English sentence>" }` in JS. The Mojo core does not
+carry presentation strings (`docs/layer-boundaries.md`), so it returns a
+`dw_result` code instead. A replay harness maps the oracle's `reason` to the
+code and compares that, rather than comparing the sentence.
+
+| Oracle `reason` | `dw_result` |
+| --- | --- |
+| `<Drug> isn't traded here.` | `DW_ERR_NOT_TRADED_HERE` |
+| `Duh! Check the price of <Drug>, dude!` | `DW_ERR_INSUFFICIENT_CASH` |
+| `Not enough cash or coat space.` | `DW_ERR_INSUFFICIENT_CASH` or `DW_ERR_INSUFFICIENT_SPACE` |
+| `You don't have that many to sell.` | `DW_ERR_INSUFFICIENT_INVENTORY` |
+| `Unknown finances action.` | `DW_ERR_INVALID_ARGUMENT` |
+| `nothing affordable` | runner-helper result, not an engine code |
+
+`Not enough cash or coat space.` is one sentence covering two conditions, so the
+harness disambiguates it from the state: if the requested quantity exceeds the
+affordable count it is `DW_ERR_INSUFFICIENT_CASH`, otherwise
+`DW_ERR_INSUFFICIENT_SPACE`. The fixture's own state snapshot makes that
+deterministic.
 
 ## Running
 

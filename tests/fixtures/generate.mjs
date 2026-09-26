@@ -208,6 +208,58 @@ const FIXTURES = [
       return steps
     })(),
   },
+  {
+    name: '10-rolls-and-helpers',
+    meta: { seed: 1, description: 'RNG-driven rolls and pure helpers', mechanic: 'shouldStartChase police weighting, coat/gun dealer offer ranges, getFightRatings, applyDamage' },
+    steps: [
+      { call: 'newGame', args: { seed: 1 } },
+      // shouldStartChase: randInt(rng, 0, 80 + police) >= 50. Bronx has police 10,
+      // so the span is 0..90 and the threshold sits between 49 and 50.
+      { call: 'shouldStartChase', rng: [0.0] },
+      { call: 'shouldStartChase', rng: [0.54] }, // floor(0.54*91) = 49 -> false
+      { call: 'shouldStartChase', rng: [0.55] }, // floor(0.55*91) = 50 -> true
+      { call: 'shouldStartChase', rng: [0.999] },
+      // Manhattan has police 90, so the span widens to 0..170.
+      { call: 'travel', args: { dest: 'manhattan' } },
+      { call: 'shouldStartChase', rng: [0.0] },
+      { call: 'shouldStartChase', rng: [0.999] },
+      // rollCoatDealerOffer: pockets = randInt(10,30), price = randInt(200,500).
+      { call: 'rollCoatDealerOffer', rng: [0.0, 0.0] },
+      { call: 'rollCoatDealerOffer', rng: [0.999, 0.999] },
+      // rollGunDealerOffer: price = randInt(250,600), damage/space from RULES.
+      { call: 'rollGunDealerOffer', rng: [0.0] },
+      { call: 'rollGunDealerOffer', rng: [0.999] },
+      // getFightRatings: attack = 80 + guns*5, defend = 100.
+      { call: 'setField', args: { guns: 0 } },
+      { call: 'getFightRatings' },
+      { call: 'setField', args: { guns: 3 } },
+      { call: 'getFightRatings' },
+      // applyDamage returns the new health and sets dead at zero.
+      { call: 'setField', args: { guns: 0, health: 100, dead: false } },
+      { call: 'applyDamage', args: { amount: 30 } },
+      { call: 'applyDamage', args: { amount: 1000 } },
+    ],
+  },
+  {
+    name: '11-finances',
+    meta: { seed: 1, description: 'deposit / withdraw / payLoan', mechanic: 'clamping to available cash/bank/debt, amount floor, unknown action' },
+    steps: [
+      { call: 'newGame', args: { seed: 1 } },
+      { call: 'setField', args: { cash: 2000, bank: 0, debt: 5500 } },
+      { call: 'finances', args: { action: 'deposit', amount: 500 } },
+      { call: 'finances', args: { action: 'deposit', amount: 99999 } }, // clamps to cash
+      { call: 'finances', args: { action: 'withdraw', amount: 200 } },
+      { call: 'finances', args: { action: 'withdraw', amount: 99999 } }, // clamps to bank
+      { call: 'finances', args: { action: 'payLoan', amount: 1000 } },
+      { call: 'finances', args: { action: 'payLoan', amount: 99999 } }, // clamps to min(cash, debt)
+      // amount is floored, and a negative amount is clamped to zero.
+      { call: 'setField', args: { cash: 100, bank: 0, debt: 0 } },
+      { call: 'finances', args: { action: 'deposit', amount: 10.7 } },
+      { call: 'finances', args: { action: 'deposit', amount: -50 } },
+      { call: 'finances', args: { action: 'deposit', amount: 0 } },
+      { call: 'finances', args: { action: 'bogus', amount: 100 } },
+    ],
+  },
 ]
 
 const Engine = loadEngine()

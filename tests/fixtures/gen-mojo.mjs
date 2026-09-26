@@ -50,6 +50,10 @@ const ALLOWED = [
   // trade / travel / finances / dealer / combat results
   'ok', 'reason', 'amount', 'usedBank', 'fee', 'pockets', 'escaped', 'hit',
   'damage', 'won', 'cop', 'deputies', 'canFight', 'score', 'dead', 'day',
+  'attack', 'defend', 'space',
+  // a call that returns a bare scalar (shouldStartChase -> bool,
+  // applyDamage -> health) has no field name, so it lands under `.value`.
+  'value',
   // arrival-event and price-event results
   'type', 'drug', 'qty',
   // bare-array returns (generatePrices -> [{type,drug,message}]) have no
@@ -64,7 +68,7 @@ const ALLOWED = [
   'seed', 'action', 'dest', 'isAggressor', 'offer', 'count', 'cash', 'debt',
   'bank', 'health', 'coatCapacity', 'guns', 'day', 'location', 'rng',
   'offer.*', 'chase.*', 'pockets', 'price', 'deputies', 'canFight', 'qty',
-  'drug',
+  'drug', 'amount',
 ]
 
 // setPrices and setInventory take a bare drug id as the key, so their argument
@@ -161,6 +165,12 @@ let fixtureName = ''
 let record = null
 function group(prefix, value) {
   pairs.length = 0
+  // A bare scalar return (shouldStartChase -> bool, applyDamage -> health) has
+  // no field name to hang a path on, so it lands under `<group>.value`.
+  if (value === null || typeof value !== 'object') {
+    flatten(`${prefix}.value`, value)
+    return pairs.join(';')
+  }
   flatten(prefix, value)
   return pairs.join(';')
 }
