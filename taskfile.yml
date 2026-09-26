@@ -55,6 +55,6 @@ tasks:
   lint:
     desc: "markdownlint over the repo plus a boundary gate on core/src"
     cmds:
-      - markdownlint -f -c .markdownlint.jsonc .
+      - markdownlint -c .markdownlint.jsonc .
       - ./scripts/check-core-boundaries.sh
 
