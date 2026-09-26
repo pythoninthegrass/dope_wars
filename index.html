@@ -333,6 +333,11 @@
     color: #fff;
   }
 
+  tbody tr.selected-unavailable td {
+    background: #5a1010;
+    color: #ff8080;
+  }
+
   .footer-row {
     display: flex;
     gap: 6px;
@@ -1160,6 +1165,7 @@
         tr.innerHTML = `<td>${drug.name}</td><td class="drugs-price">${trendHtml}${fmt(currPrice)}</td>`;
         tr.addEventListener('click', () => {
           selectedBuyDrug = id;
+          selectedSellDrug = state.inventory[id] ? id : null;
           render();
         });
         els.drugsTable.appendChild(tr);
@@ -1176,10 +1182,11 @@
         const drug = E.findDrug(id);
         const held = state.inventory[id];
         const tr = document.createElement('tr');
-        if (id === selectedSellDrug) tr.classList.add('selected');
+        if (id === selectedSellDrug) tr.classList.add(id in state.prices ? 'selected' : 'selected-unavailable');
         tr.innerHTML = `<td>${drug.name}</td><td class="num">${fmt(held.qty)}</td><td class="num">${fmt(held.avgPrice)}</td>`;
         tr.addEventListener('click', () => {
           selectedSellDrug = id;
+          selectedBuyDrug = id;
           render();
         });
         els.coatTable.appendChild(tr);
