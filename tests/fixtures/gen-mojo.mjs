@@ -92,7 +92,7 @@ function allowed(stripped, call, group) {
 // reasons, none of which contain a structural character -- so rather than
 // carrying an escape scheme through the Mojo reader, a violation fails
 // generation loudly.
-const STRUCTURAL = /[%;=|]/
+const STRUCTURAL = /[%;=|"\\]/
 
 // Non-integer values are emitted as an IEEE-754 decomposition, `d:sign:exp:mant`,
 // rather than as a decimal. A float64's shortest round-trip decimal can need 17
@@ -179,7 +179,9 @@ function encodeStep(fx, rec) {
   fixtureName = fx
   record = rec
   const call = rec.call
-  const rng = (rec.rng ?? []).map((f) => String(f)).join(',')
+  // Scripted RNG floats go through the same encoder as every other number, so
+  // the reader never has to parse a decimal.
+  const rng = (rec.rng ?? []).map(lexeme).join(',')
   const args = group('args', rec.args ?? {})
   const ret = group('ret', rec.expect.return)
   const state = group('state', rec.expect.state ?? {})
@@ -205,20 +207,22 @@ function main() {
 # One record per fixture step:
 #   call | rng lexemes | arg pairs | return pairs | state pairs
 # Pairs are \`dotted.path=lexeme\`, ';'-separated, in document order.
+#
+# Mojo 1.1.0 has no global variables, so the corpus is returned by a function.
 
-alias MStep = String
-
-var MJO_STEPS: List[MStep] = [
+def mjo_steps() -> List[String]:
+    return [
 `
-  const body = lines.map((l) => `    t"${escapeMojo(l)}",`).join('\n')
-  writeFileSync(OUT, header + body + '\n]\n')
+  const body = lines.map((l) => `        "${escapeMojo(l)}",`).join('\n')
+  writeFileSync(OUT, header + body + '\n    ]\n')
   const bytes = readFileSync(OUT).length
   console.log(`wrote ${OUT}: ${lines.length} steps, ${(bytes / 1024).toFixed(1)} KiB`)
 }
 
-// Mojo string literals: the flat format already excludes `"` from lexemes.
+// Mojo string literals. The flat format already excludes `"` and `\` from
+// lexemes, so this is a guard rather than a real escape path.
 function escapeMojo(s) {
-  return s.replace(/\\/g, '\\\\')
+  return s.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
 }
 
 main()

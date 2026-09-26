@@ -15,18 +15,20 @@
 # runner's deepEqual is JSON.stringify. So `children` and `child_keys` return
 # document order and callers must compare in that order.
 
-
-def suffix(ref text: String, start: Int) -> String:
-    var all = text.bytes()
-    var out = List[UInt8]()
-    var i = start
-    while i < len(all):
-        out.append(all[i])
-        i += 1
-    return String(out)
+import lexeme
 
 
-struct Pair:
+def strip_first_segment(ref text: String) raises -> String:
+    # "prices.acid" -> "acid"; "priceEvents.0.type" -> "0.type". Splitting on the
+    # first dot is both simpler and safer than byte surgery: String(List[UInt8])
+    # stringifies the list rather than building from its bytes.
+    var parts = text.split(".", maxsplit=1)
+    if len(parts) != 2:
+        raise Error("path has no dot: " + text)
+    return String(parts[1])
+
+
+struct Pair(Copyable, Movable):
     var path: String
     var lex: String
 
@@ -44,7 +46,7 @@ struct Pair:
         return lexeme.to_bool(self.lex)
 
 
-struct Group:
+struct Group(Copyable, Movable):
     var pairs: List[Pair]
 
     def __init__(out self):
@@ -85,24 +87,23 @@ struct Group:
 
     # Every pair whose path sits strictly under `prefix`, in document order,
     # with the prefix and its dot stripped.
-    def children(ref self, prefix: String) -> List[Pair]:
+    def children(ref self, prefix: String) raises -> List[Pair]:
         var out = List[Pair]()
         var dotted = prefix + "."
-        var head = dotted.byte_length()
         for pair in self.pairs:
-            if pair.path.byte_length() > head and pair.path.startswith(dotted):
-                out.append(Pair(suffix(pair.path, head), pair.lex))
+            if pair.path.startswith(dotted):
+                out.append(Pair(strip_first_segment(pair.path), pair.lex))
         return out^
 
     # Just the child keys under `prefix`, in document order.
-    def child_keys(ref self, prefix: String) -> List[String]:
+    def child_keys(ref self, prefix: String) raises -> List[String]:
         var out = List[String]()
         for pair in self.children(prefix):
             out.append(pair.path)
         return out^
 
 
-struct Record:
+struct Record(Copyable, Movable):
     var call: String
     var rng: List[Float64]
     var args: Group
@@ -117,14 +118,19 @@ struct Record:
         self.state = Group()
 
 
-def _parse_group(mut target: Group, text: String) raises:
+def _parse_group(mut target: Group, text: String, prefix: String) raises:
+    # Paths are stored relative to their group, so a Group's accessors take
+    # "seed" rather than "state.seed".
     if text.byte_length() == 0:
         return
     for chunk in text.split(";"):
         var fields = chunk.split("=", maxsplit=1)
         if len(fields) != 2:
             raise Error("malformed pair in the oracle record: " + String(chunk))
-        target.add(String(fields[0]), String(fields[1]))
+        var path = String(fields[0])
+        if not path.startswith(prefix + "."):
+            raise Error("pair " + path + " is not under " + prefix)
+        target.add(strip_first_segment(path), String(fields[1]))
 
 
 def _parse_rng(mut target: List[Float64], text: String) raises:
@@ -141,7 +147,7 @@ def parse_record(line: String) raises -> Record:
         raise Error("expected 5 '|'-separated groups in the oracle record")
     out.call = String(fields[0])
     _parse_rng(out.rng, String(fields[1]))
-    _parse_group(out.args, String(fields[2]))
-    _parse_group(out.ret, String(fields[3]))
-    _parse_group(out.state, String(fields[4]))
+    _parse_group(out.args, String(fields[2]), "args")
+    _parse_group(out.ret, String(fields[3]), "ret")
+    _parse_group(out.state, String(fields[4]), "state")
     return out^
