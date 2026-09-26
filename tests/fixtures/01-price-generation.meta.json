@@ -1,0 +1,5 @@
+{
+  "seed": 7,
+  "description": "10 generatePrices calls at seed 7 (bronx)",
+  "mechanic": "price roster + event scaling"
+}

@@ -1,0 +1,5 @@
+{
+  "seed": 1,
+  "description": "finish + high score table",
+  "mechanic": "score = cash + bank - debt, top-10 sort/truncate"
+}

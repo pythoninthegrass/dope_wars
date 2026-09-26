@@ -3,10 +3,12 @@
 // playable file (no build step, no separate module to drift from index.html).
 import { test, describe } from 'node:test'
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import vm from 'node:vm'
+import { snapshotState } from './fixtures/engine-loader.mjs'
+import { makeRunStep } from './fixtures/run-step.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const html = readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8')
@@ -519,4 +521,32 @@ describe('bank-purchase fee (coat and gun dealers)', () => {
   test('bankPurchaseFee is 0.25 in RULES', () => {
     assert.equal(Engine.RULES.bankPurchaseFee, 0.25)
   })
+})
+
+// Golden-fixture replay: every .jsonl under tests/fixtures/ must round-trip
+// through the engine with byte-identical return values and state snapshots.
+// See tests/fixtures/README.md for the format and generator workflow.
+describe('fixture corpus', () => {
+  const runStep = makeRunStep(Engine)
+  const fixturesDir = path.join(__dirname, 'fixtures')
+  const files = readdirSync(fixturesDir).filter((f) => f.endsWith('.jsonl')).sort()
+  assert.ok(files.length > 0, 'no fixtures found under tests/fixtures/')
+
+  for (const file of files) {
+    test(`replay ${file}`, () => {
+      const raw = readFileSync(path.join(fixturesDir, file), 'utf8').trim()
+      const lines = raw.split('\n').filter((l) => l.length > 0)
+      let state = null
+      for (const line of lines) {
+        const record = JSON.parse(line)
+        const step = { call: record.call, args: record.args, rng: record.rng }
+        const ret = runStep(state, step)
+        if (record.call === 'newGame') state = ret
+        const actualReturn = JSON.parse(JSON.stringify(ret))
+        assert.deepEqual(actualReturn, record.expect.return, `${file} step ${record.step} ${record.call} return`)
+        const actualState = state ? snapshotState(state) : null
+        assert.deepEqual(actualState, record.expect.state, `${file} step ${record.step} ${record.call} state`)
+      }
+    })
+  }
 })
