@@ -279,6 +279,17 @@ describe('arrival events', () => {
     assert.ok(state.cash >= 800 && state.cash <= 950)
   })
 
+  test('mugging with $0 subtracts 5% of health instead', () => {
+    const state = Engine.newGame({ seed: 1 })
+    state.cash = 0
+    const healthBefore = state.health
+    const rng = () => 0.05
+    const ev = Engine.rollArrivalEvent(state, rng)
+    assert.equal(ev.type, 'mugged')
+    assert.equal(state.cash, 0)
+    assert.equal(state.health, Math.floor(healthBefore * 0.95))
+  })
+
   test('free drugs (roll 10-29) adds inventory at $0 cost if coat space allows', () => {
     const state = Engine.newGame({ seed: 1 })
     state.prices = { speed: 100 }
@@ -288,6 +299,17 @@ describe('arrival events', () => {
     assert.equal(ev.type, 'freeDrugs')
     assert.equal(state.cash, cashBefore)
     assert.ok(state.inventory[ev.drug].qty > 0)
+  })
+
+  test('free drugs (roll 10-29) returns none when coat is full', () => {
+    const state = Engine.newGame({ seed: 1 })
+    state.prices = { speed: 100 }
+    // fill the coat completely
+    const drugId = Object.keys(state.prices)[0]
+    state.inventory[drugId] = { qty: state.coatCapacity, avgPrice: 0 }
+    const rng = () => 0.15
+    const ev = Engine.rollArrivalEvent(state, rng)
+    assert.equal(ev.type, 'none')
   })
 
   test('instant death event (roll 60-60.5) kills the player', () => {

@@ -869,6 +869,11 @@
     function rollArrivalEvent(state, rng) {
       const roll = rng() * 100;
       if (roll < 10) {
+        if (state.cash === 0) {
+          const damage = Math.floor(state.health * 0.05);
+          applyDamage(state, damage);
+          return { type: 'mugged', message: `You were mugged in the subway! They beat you up instead.` };
+        }
         const pct = randInt(rng, 80, 95) / 100;
         const before = state.cash;
         state.cash = Math.floor(state.cash * pct);
@@ -879,6 +884,7 @@
         if (!drugId) return { type: 'none' };
         const amount = randInt(rng, 3, 7);
         const granted = addToInventory(state, drugId, amount);
+        if (granted === 0) return { type: 'none' };
         const drug = findDrug(drugId);
         return { type: 'freeDrugs', drug: drugId, qty: granted, message: `You meet a friend! He lays ${granted} units of ${drug.name} on you!` };
       }
