@@ -2,16 +2,20 @@
 
 version: "3.0"
 
+vars:
+  MOJO_VERSION: "1.1.0"
+
 tasks:
   _install-venv:
     internal: true
-    desc: "Create the uv venv and install Mojo (nightly channel) if not present"
+    desc: "Create the uv venv and install the pinned Mojo if not already present"
     dir: core
     cmds:
-      - uv venv --python 3.13
-      - uv pip install mojo --index https://whl.modular.com/nightly/simple/ --prerelease allow
+      - uv venv --python 3.13 --allow-existing
+      - uv pip install "mojo=={{.MOJO_VERSION}}"
     status:
       - test -x {{.ROOT_DIR}}/core/.venv/bin/mojo
+      - .venv/bin/mojo --version 2>/dev/null | grep -q "Mojo {{.MOJO_VERSION}} "
 
   build:
     desc: "Build core/build-output/lib/libdopewars.a from the Mojo sources"
@@ -19,9 +23,29 @@ tasks:
     dir: core
     cmds:
       - mkdir -p build-output/lib
-      - .venv/bin/mojo build src/dopewars.mojo --emit object -o build-output/dopewars.o
+      - .venv/bin/mojo build src/abi.mojo --emit object -o build-output/dopewars.o
       - ar rcs build-output/lib/libdopewars.a build-output/dopewars.o
     sources:
       - "src/**/*.mojo"
     generates:
       - build-output/lib/libdopewars.a
+
+  test:
+    desc: "Replay the JS oracle fixtures against the Mojo core (TASK-001.04 parity gate)"
+    deps: [_install-venv]
+    dir: core
+    cmds:
+      - |
+        status=0
+        for f in ../tests/mojo/*_test.mojo; do
+          echo "== $f"
+          .venv/bin/mojo run -I src -I ../tests/mojo "$f" || status=1
+        done
+        exit $status
+
+  test:check-generated:
+    desc: "Fail if tests/mojo/fixtures.mojo is stale with respect to tests/fixtures/*.jsonl"
+    dir: core
+    cmds:
+      - node ../tests/fixtures/gen-mojo.mjs
+      - git diff --exit-code -- ../tests/mojo/fixtures.mojo

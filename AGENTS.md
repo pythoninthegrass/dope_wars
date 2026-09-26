@@ -50,14 +50,19 @@ Mojo LOC target at parity: `>=43%` of non-vendor non-generated LOC, matching the
 
 ### Build commands
 
-- `task check` — full four-layer build (Mojo core → static lib → C++ GDExtension → Godot) plus a headless GDScript smoke test that asserts `DopeWarsWorld.new().abi_version() == DW_ABI_VERSION`. Non-zero exit on any failure.
+- `task check` — Mojo parity replay against the JS oracle fixtures, then the full four-layer build (Mojo core → static lib → C++ GDExtension → Godot), then a headless GDScript smoke test that asserts `DopeWarsWorld.new().abi_version() == DW_ABI_VERSION`. Non-zero exit on any failure.
 - `task run` — build the full stack and launch the game interactively.
 - `task build` — build only, no smoke test.
-- `task core:build` — build `core/build-output/lib/libdopewars.a` from Mojo sources.
+- `task core:build` — build `core/build-output/lib/libdopewars.a` from `core/src/abi.mojo`, the only file declaring `@export` symbols.
+- `task core:test` — replay `tests/fixtures/*.jsonl` against the Mojo core. This is the parity gate for the simulation; pass fixture-name substrings to narrow it (`task core:test -- 04 05`).
 - `task extension:build` — build the GDExtension shim (`game/bin/libdopewars.*`).
 - `task game:import` / `task game:smoke-test` — headless Godot import and smoke test in isolation.
+- `task loc` — non-vendor, non-generated SLOC by language and the resulting Mojo share, split into `core/` and the parity harness.
+- `task lint` — markdownlint plus the `core/src` boundary gate (no Godot/FFI imports, no I/O, no global mutable state, no logging).
 
-Toolchain: `godot`, `uv`, `scons`, `task`, `python` are pinned in `.tool-versions` and resolve via mise. Mojo lives in `core/.venv`, created by `uv pip install mojo` against the Modular nightly index — see `taskfiles/core.yml`. `third_party/godot-cpp` is pinned via git submodule (SHA in `.gitmodules` history).
+Toolchain: `godot`, `uv`, `scons`, `task`, `python` are pinned in `.tool-versions` and resolve via mise. Mojo is pinned to an exact version in `taskfiles/core.yml` (`MOJO_VERSION`) and installed from PyPI into `core/.venv`; the venv task's `status:` check is version-aware, so a stale venv is rebuilt rather than silently used. `third_party/godot-cpp` is pinned via git submodule (SHA in `.gitmodules` history).
+
+`mojo test` does not exist. Mojo tests are `def test_*() raises` functions run through `TestSuite.discover_tests[__functions_in_module()]().run()` in a `main()` that `mojo run` executes.
 
 ## Conventions
 

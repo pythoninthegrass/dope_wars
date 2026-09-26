@@ -36,8 +36,9 @@ tasks:
       - task: extension:build
 
   check:
-    desc: "Full build + Godot headless smoke test; non-zero exit on any failure"
+    desc: "Mojo parity tests + full build + Godot headless smoke test; non-zero exit on any failure"
     cmds:
+      - task: core:test
       - task: game:smoke-test
 
   run:
@@ -45,3 +46,15 @@ tasks:
     cmds:
       - task: build
       - task: game:run
+
+  loc:
+    desc: "Non-vendor, non-generated LOC by language and the resulting Mojo share (target >=43%)"
+    cmds:
+      - ./scripts/loc.sh
+
+  lint:
+    desc: "markdownlint over the repo plus a boundary gate on core/src"
+    cmds:
+      - markdownlint -f -c .markdownlint.jsonc .
+      - ./scripts/check-core-boundaries.sh
+
