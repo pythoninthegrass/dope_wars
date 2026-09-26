@@ -367,6 +367,48 @@ describe('combat', () => {
     assert.equal(state.health, 0)
     assert.equal(state.dead, true)
   })
+
+  test('fight hit kills a deputy and does not damage the player', () => {
+    const state = Engine.newGame({ seed: 1 })
+    state.guns = 1
+    const chase = Engine.startChase(state, Engine.mulberry32(1))
+    const deputiesBefore = chase.deputies
+    const healthBefore = state.health
+    // high first call → big attackRoll; low second call → small defendRoll → guaranteed hit
+    let calls = 0
+    const rng = () => calls++ === 0 ? 0.99 : 0.01
+    const res = Engine.fight(state, chase, rng)
+    assert.equal(res.hit, true)
+    assert.equal(chase.deputies, deputiesBefore - 1)
+    assert.equal(state.health, healthBefore)
+  })
+
+  test('fight miss damages the player and does not kill a deputy', () => {
+    const state = Engine.newGame({ seed: 1 })
+    state.guns = 1
+    const chase = Engine.startChase(state, Engine.mulberry32(1))
+    const deputiesBefore = chase.deputies
+    const healthBefore = state.health
+    // low first call → small attackRoll; high second call → big defendRoll → guaranteed miss
+    let calls = 0
+    const rng = () => calls++ === 0 ? 0.01 : 0.99
+    const res = Engine.fight(state, chase, rng)
+    assert.equal(res.hit, false)
+    assert.equal(chase.deputies, deputiesBefore)
+    assert.ok(state.health < healthBefore)
+  })
+
+  test('fight returns won when last deputy is killed', () => {
+    const state = Engine.newGame({ seed: 1 })
+    state.guns = 1
+    const chase = Engine.startChase(state, Engine.mulberry32(1))
+    chase.deputies = 1
+    let calls = 0
+    const rng = () => calls++ === 0 ? 0.99 : 0.01
+    const res = Engine.fight(state, chase, rng)
+    assert.equal(res.won, true)
+    assert.equal(chase.deputies, 0)
+  })
 })
 
 describe('finish', () => {

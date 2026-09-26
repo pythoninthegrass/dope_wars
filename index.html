@@ -1009,13 +1009,13 @@
       const hit = attackRoll > defendRoll;
       let damage = 0;
       if (hit) {
-        const guns = Math.max(1, state.guns);
-        let raw = 0;
-        for (let i = 0; i < guns; i++) raw += randInt(rng, 0, RULES.gunDamage);
+        chase.deputies = Math.max(0, chase.deputies - 1);
+      } else {
+        const raw = randInt(rng, 0, RULES.gunDamage);
         damage = Math.max(1, Math.round(raw * (100 / RULES.playerArmor)));
         applyDamage(state, damage);
       }
-      return { hit, damage, dead: state.dead };
+      return { hit, damage, dead: state.dead, won: chase.deputies <= 0 };
     }
 
     function finish(state) {
@@ -1513,8 +1513,13 @@
       document.getElementById('chaseFight').addEventListener('click', () => {
         const res = E.fight(state, chase, state.rng);
         if (state.dead) { handleDeath(); return; }
-        const msg = res.hit ? `You took ${res.damage} damage!` : 'They missed!';
-        showAlert('Cop Chase', msg, res.hit ? '\u{1F4A5}' : '\u{1F4A8}');
+        if (res.won) {
+          showAlert('Cop Chase', 'You took them all down! You got away!', '\u{1F3C3}');
+          document.getElementById('alertOk').addEventListener('click', () => { render(); processQueue(queue); }, { once: true });
+          return;
+        }
+        const msg = res.hit ? `You hit a deputy! ${chase.deputies} left.` : `You got hit for ${res.damage} damage!`;
+        showAlert('Cop Chase', msg, res.hit ? '\u{1F4A8}' : '\u{1F4A5}');
         document.getElementById('alertOk').addEventListener('click', () => renderChaseDialog(chase, queue, wasAggressor), { once: true });
       });
     }
