@@ -42,6 +42,15 @@ The test file extracts `<script id="engine">` from `index.html` and runs it in `
 - Markdown is linted with `markdownlint-cli` using `.markdownlint.jsonc` (`markdownlint -f -c .markdownlint.jsonc .`); `.markdownlintignore` excludes `.claude/**` and `backlog/**`. Line length (MD013) is disabled — do not hard-wrap prose.
 - Screenshots referenced by `docs/mechanics-notes.md` live in `screenshots/` but are gitignored and not committed; don't assume they're present in a fresh clone.
 
+## Context7 Libraries
+
+- astral-sh/docs
+- godotengine/godot-docs
+- j178/prek
+- mrlesk/backlog.md
+- websites/taskfile_dev
+- websites/mojolang
+
 <!-- BACKLOG.MD MCP GUIDELINES START -->
 <!-- backlog.md-instructions-version: 1.48.0 -->
 
