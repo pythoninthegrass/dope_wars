@@ -1065,7 +1065,6 @@
     let state = null;
     let selectedBuyDrug = null;
     let selectedSellDrug = null;
-    let lastDayWarned = false;
 
     const els = {
       titlebarTitle: document.getElementById('titlebarTitle'),
@@ -1101,7 +1100,6 @@
       localStorage.removeItem(SAVE_KEY);
       selectedBuyDrug = null;
       selectedSellDrug = null;
-      lastDayWarned = false;
       render();
     }
 
@@ -1135,8 +1133,8 @@
       renderCoatTable();
       updateActionButtons();
 
-      if (isLastDay && !lastDayWarned) {
-        lastDayWarned = true;
+      if (isLastDay && !state.lastDayWarned) {
+        state.lastDayWarned = true;
         showAlert('Last Day', "This is your last day, man. Maybe you should offload your stash.", '\u{1F4B0}');
       }
 
@@ -1487,6 +1485,7 @@
       const result = E.finish(state);
       offerHighScore(result, () => {
         showAlert('You Died', 'You have been killed. Game over.', '☠️');
+        document.getElementById('alertOk').addEventListener('click', () => showNewGameDialog(), { once: true });
       });
     }
 
@@ -1589,10 +1588,9 @@
     }
 
     function doFinish() {
+      els.finishBtn.disabled = true;
       const result = E.finish(state);
-      offerHighScore(result, () => {
-        showAlert('Custom Game Complete', `Final score: $${fmt(result.score)}`, '\u{1F3C1}');
-      });
+      offerHighScore(result, () => showNewGameDialog());
     }
 
     // --- Menu handling --------------------------------------------------
