@@ -41,16 +41,22 @@ The test file extracts `<script id="engine">` from `index.html` and runs it in `
 
 The Godot reference implementation is a four-layer stack, one direction of dependency, modeled on `~/git/jumpnbump/` (Zig core / C ABI / C++ GDExtension / GDScript game) with Mojo swapped in for Zig. See `docs/abi-contract.md` for the ABI conventions and `docs/layer-boundaries.md` for what each layer is and is not allowed to do.
 
-- `core/` — Mojo simulation. Pure sim: RNG, pricing, trading, events, combat, scoring, serialization. Zero Godot imports, zero FFI imports, no file I/O, no global mutable state outside the `dw_world` handle. Where `<script id="engine">` (`index.html:609-1079`) ends up.
+- `core/` — Mojo simulation. Pure sim: RNG, pricing, trading, events, combat, scoring, serialization. Zero Godot imports, zero FFI imports, no file I/O, no global mutable state outside the `dw_world` handle. Where `<script id="engine">` (`index.html:609-1079`) ends up. `core/src/abi.mojo` is the sole `@export` source; `core/abitest/` is the Tier-C conformance suite, which reaches the built library only through the C header.
 - `include/dopewars.h` — the frozen C ABI. The only cross-language contract. Opaque caller-owned `dw_world` handle, `dw_result` = `int32_t`, `uint8_t`-typedef'd kind enums, `DW_STATIC_ASSERT` on every struct sizeof, two-call length-then-fill for every variable-length buffer. `DW_ABI_VERSION` is bumped on any breaking change; additive changes do not bump it.
 - `extension/` — C++ GDExtension shim. 1:1 forwarding from ABI functions to a Godot class. No game logic; no state other than the `dw_world` storage and transient marshalling scratch.
 - `game/` — Godot / GDScript. Scenes, UI, input, save-slot orchestration, translated display strings. Never imports Mojo directly; never duplicates core state; never computes game rules. Where `<script id="ui">` (`index.html:1081-1710`) ends up.
 
 Mojo LOC target at parity: `>=43%` of non-vendor non-generated LOC, matching the Zig ratio in `~/git/jumpnbump/`.
 
+**The pinned Mojo toolchain (1.1.0, `MOJO_VERSION` in `taskfiles/core.yml`) cannot export a pointer parameter.** `@export` refuses any function with a `ref` parameter, and there is no reachable `address -> Pointer` constructor or `sizeof` intrinsic, so the opaque `dw_world *` seam cannot be crossed. That makes 35 of the 54 declarations in `include/dopewars.h` unexportable, including anything touching world state. `docs/mojo-1.1.0-abi-constraints.md` is the probe log behind each limitation — read it before trying to work around one. `tools/check_abi_exports.py` treats those 35 as expected-absent (derived from pointer-ness, not a hand list) and everything else as a regression; `--strict` demands all 54, so a toolchain upgrade turns the gap into a failing build rather than a forgotten option.
+
 ### Build commands
 
-- `task check` — Mojo parity replay against the JS oracle fixtures, then the full four-layer build (Mojo core → static lib → C++ GDExtension → Godot), then a headless GDScript smoke test that asserts `DopeWarsWorld.new().abi_version() == DW_ABI_VERSION`. Non-zero exit on any failure.
+- `task check` — the whole gate set: Mojo parity replay against the JS oracle fixtures, the static ABI gates, both conformance tiers, the bridge test, the full build, and the headless Godot smoke test. Non-zero exit on any failure. Wrap anything that launches Godot in `timeout` when running it by hand — a scene whose `_ready()` aborts on a script error prints the error and keeps spinning the main loop forever rather than exiting.
+- `task abi:check` — the three static gates: only `core/src/abi.mojo` declares `@export` symbols, Tier-C conformance tests do not import core modules or drive the Mojo toolchain, and `include/dopewars.h` parses with unique declarations.
+- `task abi:conformance` — Tier-C: `core/abitest/abi_conformance_test.py` (ctypes, prototypes derived from the header) plus `core/abitest/abi_header_check.c` (compile-time proof the header is self-consistent as C11).
+- `task bridge:test` — Godot → C++ → Mojo integration (`game/godot_tests/bridge_test.gd`), asserting against `game/bridge_expectations.gd`, which is generated from the header. Runs the staleness check first.
+- `task gen:bridge-expectations` / `:check` — regenerate / verify `game/bridge_expectations.gd`. Never hand-edit that file; it reads `DW_ABI_VERSION` and `DW_NUM_*` out of the header so the constants have one definition.
 - `task run` — build the full stack and launch the game interactively.
 - `task build` — build only, no smoke test.
 - `task core:build` — build `core/build-output/lib/libdopewars.a` from `core/src/abi.mojo`, the only file declaring `@export` symbols.
