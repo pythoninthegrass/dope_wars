@@ -1,0 +1,132 @@
+# ABI contract
+
+This document specifies the conventions that govern `include/dopewars.h`, the
+frozen C ABI between the Mojo simulation core (`core/`) and every consumer
+(the C++ GDExtension shim in `extension/`, any future native binding, and the
+conformance tests). It is the discipline document; the header is the concrete
+worked example. Modeled on `~/git/jumpnbump/include/jumpnbump.h` and its
+companion `~/git/jumpnbump/backlog/tasks/task-012.01`.
+
+## Ownership
+
+- All state lives inside a caller-owned opaque handle: `dw_world`. The type is
+  declared but never defined in the header; callers only ever hold a pointer.
+- The caller allocates `dw_world_size()` bytes aligned to `dw_world_align()`
+  and passes that storage to `dw_world_init(world, config)`. Nothing on the
+  Mojo side of the ABI allocates on the caller's behalf.
+- There is deliberately no `dw_world_destroy`. Adding a destroy function later
+  is additive; removing one later is not, so the ABI does not commit to one
+  until the core requires cleanup that plain `free()` on the caller's storage
+  cannot express.
+- No pointer returned from the ABI outlives the call that produced it, and no
+  buffer the caller passes in is retained past the call. Every cross-boundary
+  buffer is either fully copied out (two-call length-then-fill, below) or
+  fully consumed on the way in.
+
+## Error model
+
+- Every fallible function returns `dw_result`, a `typedef int32_t`. Never a
+  bare C `enum` — a C enum's underlying integer width is unspecified, which
+  is exactly the ambiguity a cross-language ABI cannot afford.
+- Result codes are anonymous-enum constants (`DW_OK = 0`, `DW_ERR_*`) whose
+  integer values are frozen from ABI v1 onward. New error codes are only ever
+  appended; existing values are never renumbered.
+- Kind enums that appear inside structs (arrival event kind, price event
+  kind, finances action) are `typedef uint8_t` for the same reason — fixed
+  width, named constants, no bare C enum.
+- Precondition failures (unknown drug id, malformed handle, `abi_version`
+  mismatch) return an error code without mutating world state.
+
+## Buffer contract
+
+Every variable-length output uses the two-call length-then-fill convention:
+
+1. Call with `out_buf == NULL` (or `out_capacity == 0`) to learn the required
+   length via `*out_required`. No data is written.
+2. Allocate at least `*out_required` slots and call again with the real
+   buffer. Data is written; `*out_required` is set to the actual length.
+
+If a real buffer is passed but is too small, the function returns
+`DW_ERR_BUFFER_TOO_SMALL` and still sets `*out_required` to the actual length
+so the caller can retry. Nothing partial is written in the too-small case.
+
+Fixed-length buffers (dimensional constants like `DW_NUM_LOCATIONS` or fixed
+serialization sizes reported by `dw_world_dump_len()`) skip the length query
+and return `DW_ERR_INVALID_ARGUMENT` on a wrong-sized buffer.
+
+## Struct discipline
+
+Every ABI struct:
+
+- Uses only fixed-width types (`uint8_t`, `int32_t`, `uint32_t`, etc.) and
+  fixed-size char arrays. No `int`, no `size_t` inside structs, no pointers.
+- Names every padding slot `_pad0`, `_pad1`, ... and specifies that its value
+  is zero. The Mojo side writes zero; the C++ side does not read padding.
+- Has a `DW_STATIC_ASSERT(sizeof(T) == N, "...")` immediately after the
+  struct definition. Any accidental layout change breaks the build on the
+  first `#include`.
+- Is a plain C struct — no bitfields, no unions, no flexible array members.
+
+## String handling
+
+- No heap-owned strings cross the ABI in either direction.
+- Fixed-size UTF-8 char arrays inside structs carry short identifiers
+  (location id, drug id, highscore name). The array is null-terminated within
+  the buffer; content past the terminator is unspecified.
+- Human-readable messages are **not** part of the ABI. The engine emits
+  structured payloads (event kind + drug index + quantity + amount) and the
+  GDScript presentation layer formats display strings from those. This keeps
+  translation, punctuation, and copy edits out of the frozen contract.
+
+## RNG exposure
+
+- The core uses mulberry32 with a `uint32_t` state, the same PRNG the JS
+  prototype at `index.html:624-635` uses.
+- The ABI exposes `dw_mulberry32_seed`, `dw_mulberry32_next_u32`, and
+  `dw_rand_int` as free-standing functions. These are exposed **only** so the
+  JS oracle in `tests/engine.test.mjs` (see subtask TASK-001.02) can be
+  compared against the Mojo core with identical seeds and identical draw
+  order.
+- The `dw_world` handle owns its own RNG stream, seeded from `dw_config`.
+  Turn-driving functions (`dw_generate_prices`, `dw_travel`,
+  `dw_roll_arrival_event`, chase/combat rolls, dealer offers) draw from that
+  stream; callers do not pass an RNG.
+- The RNG state is included in the canonical dump so a saved game replays
+  bit-for-bit on load.
+
+## Versioning
+
+- `DW_ABI_VERSION` is a `#define` starting at `1u`.
+- `dw_config.abi_version` is checked on every `dw_world_init` call; mismatch
+  returns `DW_ERR_ABI_VERSION_MISMATCH` before any other validation.
+- Additive changes (new functions, new anonymous-enum constants, new
+  dimensional `#define`s that don't invalidate existing struct sizes) do
+  **not** bump the version.
+- Any of the following bumps the version and requires every binding to
+  rebuild and relink:
+  - Change to any exported function's signature or calling convention.
+  - Change to any struct's layout (including `_pad` renames).
+  - Renumbering an existing anonymous-enum constant.
+  - Change to the observable semantics of an existing function (including
+    RNG draw order for a given seed).
+
+## Serialization
+
+- `dw_world_dump_len()` reports the exact byte count `dw_world_dump` will
+  write. The count is fixed for a given ABI version.
+- `dw_world_dump` writes the canonical byte sequence: `dw_state_view` scalars,
+  full inventory (`DW_NUM_DRUGS` slots, zero-padded), full price table
+  (`DW_NUM_DRUGS` slots, zero for untraded), RNG state, and any live chase
+  state. Deterministic little-endian encoding, no compression, no framing.
+- `dw_world_load` accepts exactly the byte sequence `dw_world_dump` produced
+  at the same `DW_ABI_VERSION` and rehydrates the world in place.
+  Bit-for-bit round-trip is a requirement, not an optimization.
+
+### Divergence from jumpnbump
+
+`~/git/jumpnbump/include/jumpnbump.h` deliberately omits a load/deserialize
+function because the ported Zig core only implements `dumpTo()`. Dope Wars
+differs: `index.html:1033-1047` round-trips through JSON with
+`serializeState`/`deserializeState` and the game's save-slot feature depends
+on that round-trip. The Mojo port must therefore implement both directions
+from day one, and `dw_world_load` is part of the frozen ABI.

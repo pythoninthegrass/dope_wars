@@ -37,6 +37,17 @@ The test file extracts `<script id="engine">` from `index.html` and runs it in `
 
 **Important distinction preserved throughout the docs**: Beermat Software's "Dope Wars for Windows" 1.2.0.0 (1999) — the version most familiar to pythoninthegrass — is a separate, closed-source codebase whose exact numbers are *not* derivable from `benmwebb/dopewars`. Don't conflate the two when citing mechanics; `gameplay.md` says explicitly which implementation each fact comes from.
 
+## Target architecture (Godot port, TASK-001)
+
+The Godot reference implementation is a four-layer stack, one direction of dependency, modeled on `~/git/jumpnbump/` (Zig core / C ABI / C++ GDExtension / GDScript game) with Mojo swapped in for Zig. See `docs/abi-contract.md` for the ABI conventions and `docs/layer-boundaries.md` for what each layer is and is not allowed to do.
+
+- `core/` — Mojo simulation. Pure sim: RNG, pricing, trading, events, combat, scoring, serialization. Zero Godot imports, zero FFI imports, no file I/O, no global mutable state outside the `dw_world` handle. Where `<script id="engine">` (`index.html:609-1079`) ends up.
+- `include/dopewars.h` — the frozen C ABI. The only cross-language contract. Opaque caller-owned `dw_world` handle, `dw_result` = `int32_t`, `uint8_t`-typedef'd kind enums, `DW_STATIC_ASSERT` on every struct sizeof, two-call length-then-fill for every variable-length buffer. `DW_ABI_VERSION` is bumped on any breaking change; additive changes do not bump it.
+- `extension/` — C++ GDExtension shim. 1:1 forwarding from ABI functions to a Godot class. No game logic; no state other than the `dw_world` storage and transient marshalling scratch.
+- `game/` — Godot / GDScript. Scenes, UI, input, save-slot orchestration, translated display strings. Never imports Mojo directly; never duplicates core state; never computes game rules. Where `<script id="ui">` (`index.html:1081-1710`) ends up.
+
+Mojo LOC target at parity: `>=43%` of non-vendor non-generated LOC, matching the Zig ratio in `~/git/jumpnbump/`.
+
 ## Conventions
 
 - Markdown is linted with `markdownlint-cli` using `.markdownlint.jsonc` (`markdownlint -f -c .markdownlint.jsonc .`); `.markdownlintignore` excludes `.claude/**` and `backlog/**`. Line length (MD013) is disabled — do not hard-wrap prose.
