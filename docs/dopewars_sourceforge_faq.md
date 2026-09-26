@@ -8,32 +8,33 @@ author:
 # Frequently-Asked Questions
 
 > ## Excerpt
+>
 > Main Index *
-  News *
+  News*
   Documentation *
-  FAQ *
+  FAQ*
   Download *
-  Screenshots *
+  Screenshots*
   Active servers *
-  SourceForge project page *
+  SourceForge project page*
   GitHub
 
 ---
 [Main Index](https://dopewars.sourceforge.io/) \* [News](https://dopewars.sourceforge.io/news.html) \* [Documentation](https://dopewars.sourceforge.io/docs/) \* FAQ \* [Download](https://dopewars.sourceforge.io/download.html) \* [Screenshots](https://dopewars.sourceforge.io/screenshots/) \* [Active servers](https://dopewars.sourceforge.io/metaserver.php?getlist=2) \* [SourceForge project page](https://sourceforge.net/projects/dopewars/) \* [GitHub](https://github.com/benmwebb/dopewars)
 
--   [What operating systems is dopewars available for?](https://dopewars.sourceforge.io/faq.html#os)
--   [What other packages do I need to install dopewars?](https://dopewars.sourceforge.io/faq.html#depend)
--   [I want to help out. What can I do?](https://dopewars.sourceforge.io/faq.html#help)
--   [I can't download the Windows version!](https://dopewars.sourceforge.io/faq.html#windows)
--   [Is dopewars available for my platform and operating system?](https://dopewars.sourceforge.io/faq.html#platform)
--   [I thought this game was called "Dope Wars 2.0" or "Dopewars 2000" or "Drug Wars" - what's going on?](https://dopewars.sourceforge.io/faq.html#others)
--   [All of a sudden the game just stops for no reason, and I have to restart. What's going on?](https://dopewars.sourceforge.io/faq.html#days)
--   [31 turns isn't long enough. How do I get a longer game?](https://dopewars.sourceforge.io/faq.html#moredays)
--   [The game could do with some sounds or extra graphics - can you add them?](https://dopewars.sourceforge.io/faq.html#sounds)
--   [The game segfaults all the time when I try to page or talk to other players! I'm using the latest RPM.](https://dopewars.sourceforge.io/faq.html#segfault)
--   [Do I _really_ need GLib to build dopewars from the source code? I just want to use the text-mode client.](https://dopewars.sourceforge.io/faq.html#glib)
--   [I've found a bug! Fix it please.](https://dopewars.sourceforge.io/faq.html#bug)
--   [Can you add _<feature>_ ?.](https://dopewars.sourceforge.io/faq.html#feature)
+- [What operating systems is dopewars available for?](https://dopewars.sourceforge.io/faq.html#os)
+- [What other packages do I need to install dopewars?](https://dopewars.sourceforge.io/faq.html#depend)
+- [I want to help out. What can I do?](https://dopewars.sourceforge.io/faq.html#help)
+- [I can't download the Windows version!](https://dopewars.sourceforge.io/faq.html#windows)
+- [Is dopewars available for my platform and operating system?](https://dopewars.sourceforge.io/faq.html#platform)
+- [I thought this game was called "Dope Wars 2.0" or "Dopewars 2000" or "Drug Wars" - what's going on?](https://dopewars.sourceforge.io/faq.html#others)
+- [All of a sudden the game just stops for no reason, and I have to restart. What's going on?](https://dopewars.sourceforge.io/faq.html#days)
+- [31 turns isn't long enough. How do I get a longer game?](https://dopewars.sourceforge.io/faq.html#moredays)
+- [The game could do with some sounds or extra graphics - can you add them?](https://dopewars.sourceforge.io/faq.html#sounds)
+- [The game segfaults all the time when I try to page or talk to other players! I'm using the latest RPM.](https://dopewars.sourceforge.io/faq.html#segfault)
+- [Do I _really_ need GLib to build dopewars from the source code? I just want to use the text-mode client.](https://dopewars.sourceforge.io/faq.html#glib)
+- [I've found a bug! Fix it please.](https://dopewars.sourceforge.io/faq.html#bug)
+- [Can you add _&lt;feature&gt;_ ?.](https://dopewars.sourceforge.io/faq.html#feature)
 
 **What operating systems is dopewars available for?**
 
@@ -59,27 +60,27 @@ As [stated above](https://dopewars.sourceforge.io/faq.html#os), dopewars works o
 
 dopewars is based loosely on "Drug Wars", a game written by John E. Dell back in the 1980's. It draws more closely on the MS-DOS rewrite, titled "Dopewars". (In fact, the "antique" mode of dopewars follows the MS-DOS program particularly closely.) There are many other programs based on "Drug Wars" available on the net; some of these are listed below. Please note that these programs are not all free software, and are not compatible with "dopewars" from this site (for example, you cannot connect to a dopewars server with Beermat's Windows program - if you want a Windows or Mac OS X version of "this" dopewars, check out the download page.)
 
--   [Dope Wars for Windows](http://www.beermatsoftware.com/dopewars/) (Beermat Software). By far the most popular dopewars-like game. Only available for Windows, only supports single-player games, and is not free; however, a free trial version is available, and high scores can be posted on Beermat's website.
--   [Dopewars 2000](http://www.dopewars2000.co.uk/). Also Windows-only. Freeware.
--   [WinDealer](http://www.umr.edu/~schuette/windealer.html). An incomplete Windows version.
--   [Chronic 2005](http://www.chronic2005.com/). Another Windows version, with graphics.
--   [DrugWarz](http://www.geocities.com/drugwarz/drugwarz.htm). A Windows version written in Visual Basic, and set in St. Louis. Source code available on request.
--   [DopeWars for MacOS](http://www.likelysoft.com/dopewars/) (Likely Software). Available for MacOS 8, 9, and OS X. Shareware; registration required.
--   [The original MS-DOS Dopewars](http://www.abandonkeep.com/games.php?GameID=268) (Happy Hacker Foundation).
--   [Drug Wars](http://www.angelfire.com/ca/Dopewars/). John Dell's original MS-DOS game.
--   [Drug Lord](http://aw.localhost.ee/aw/view/573.html). An old MS-DOS version.
--   [Drug Lord 2.1](http://www.geekhideout.com/druglord2.shtml). A free Windows version.
--   [DopeWars for PalmOS](http://pdaguy.com/dopewars/). Matt Lee's classic PalmOS version. Freeware, with source code.
--   [Dopewars for PocketPC](http://dopewars.scum.dk/). Freeware, with source code.
--   [Dopewars for Blackberry](http://dopewarsbb.sourceforge.net/).
--   [Dopewars for Psion](http://www.palmanac.co.uk/) (Palmanac Software). Available for the Psion Series 5 or Series 7.
--   [Dope Mart](http://www.dopemart.com/). An online version of the game.
--   [Java Dope Wars](http://www.cs.helsinki.fi/u/iizuka/games/dopewars/index.html). Another online version.
--   [eDrugTrader](http://www.edrugtrader.com/). Online multi-player version.
--   [Online dopewars](http://www.drunkmenworkhere.org/185.php). Another online multi-player version, which is closely based on the dopewars from this site.
--   [Dope Wars for MIDP](http://www.redteam.co.uk/dopewars/) (RedTeam). For playing dopewars on your mobile phone.
--   [DopeWars for the Amiga](http://www.amidev.50megs.com/dopewars.html)
--   [dopewars in Perl](http://opop.nols.com/proggie.html)
+- [Dope Wars for Windows](http://www.beermatsoftware.com/dopewars/) (Beermat Software). By far the most popular dopewars-like game. Only available for Windows, only supports single-player games, and is not free; however, a free trial version is available, and high scores can be posted on Beermat's website.
+- [Dopewars 2000](http://www.dopewars2000.co.uk/). Also Windows-only. Freeware.
+- [WinDealer](http://www.umr.edu/~schuette/windealer.html). An incomplete Windows version.
+- [Chronic 2005](http://www.chronic2005.com/). Another Windows version, with graphics.
+- [DrugWarz](http://www.geocities.com/drugwarz/drugwarz.htm). A Windows version written in Visual Basic, and set in St. Louis. Source code available on request.
+- [DopeWars for MacOS](http://www.likelysoft.com/dopewars/) (Likely Software). Available for MacOS 8, 9, and OS X. Shareware; registration required.
+- [The original MS-DOS Dopewars](http://www.abandonkeep.com/games.php?GameID=268) (Happy Hacker Foundation).
+- [Drug Wars](http://www.angelfire.com/ca/Dopewars/). John Dell's original MS-DOS game.
+- [Drug Lord](http://aw.localhost.ee/aw/view/573.html). An old MS-DOS version.
+- [Drug Lord 2.1](http://www.geekhideout.com/druglord2.shtml). A free Windows version.
+- [DopeWars for PalmOS](http://pdaguy.com/dopewars/). Matt Lee's classic PalmOS version. Freeware, with source code.
+- [Dopewars for PocketPC](http://dopewars.scum.dk/). Freeware, with source code.
+- [Dopewars for Blackberry](http://dopewarsbb.sourceforge.net/).
+- [Dopewars for Psion](http://www.palmanac.co.uk/) (Palmanac Software). Available for the Psion Series 5 or Series 7.
+- [Dope Mart](http://www.dopemart.com/). An online version of the game.
+- [Java Dope Wars](http://www.cs.helsinki.fi/u/iizuka/games/dopewars/index.html). Another online version.
+- [eDrugTrader](http://www.edrugtrader.com/). Online multi-player version.
+- [Online dopewars](http://www.drunkmenworkhere.org/185.php). Another online multi-player version, which is closely based on the dopewars from this site.
+- [Dope Wars for MIDP](http://www.redteam.co.uk/dopewars/) (RedTeam). For playing dopewars on your mobile phone.
+- [DopeWars for the Amiga](http://www.amidev.50megs.com/dopewars.html)
+- [dopewars in Perl](http://opop.nols.com/proggie.html)
 
 **All of a sudden the game just stops for no reason, and I have to restart. What's going on?**
 
@@ -105,12 +106,11 @@ I'm afraid so. It's true that GLib was originally developed as part of the GTK+ 
 
 [Open an issue](https://github.com/benmwebb/dopewars/issues). Make sure you leave details of the dopewars version you're using (e.g. 1.5.2) and your system (e.g. RedHat Linux 7.2, Windows 10). The more details you can give about how and when the bug occurred, the more likely that it can be fixed. necessary.
 
-**Can you add _<feature>_ ?.**
+**Can you add _&lt;feature&gt;_ ?.**
 
 dopewars is open source software, so there's nothing to stop you from getting the source code, adding the feature yourself, then submitting a [pull request](https://github.com/benmwebb/dopewars/pulls). Alternatively, [open an issue](https://github.com/benmwebb/dopewars/issues) so that developers can keep track of all desired new features.
 
 [Main Index](https://dopewars.sourceforge.io/) : FAQ
 
- [![Valid CSS](https://dopewars.sourceforge.io/valid-css.png)](https://jigsaw.w3.org/css-validator/validator?uri=https://dopewars.sourceforge.io/faq.html)[![Valid XHTML 1.1](https://dopewars.sourceforge.io/valid-xhtml11.png) ](https://validator.w3.org/check?uri=https://dopewars.sourceforge.io/faq.html)[![Fast, secure and Free Open Source software downloads](https://sflogo.sourceforge.net/sflogo.php?group_id=11128&type=12) ](https://sourceforge.net/projects/dopewars)[Edit on GitHub](https://github.com/benmwebb/dopewars-website/blob/main/faq.php) Written by [Ben Webb](mailto:benwebb@users.sf.net)  
+ [![Valid CSS](https://dopewars.sourceforge.io/valid-css.png)](https://jigsaw.w3.org/css-validator/validator?uri=https://dopewars.sourceforge.io/faq.html)[![Valid XHTML 1.1](https://dopewars.sourceforge.io/valid-xhtml11.png)](https://validator.w3.org/check?uri=https://dopewars.sourceforge.io/faq.html)[![Fast, secure and Free Open Source software downloads](https://sflogo.sourceforge.net/sflogo.php?group_id=11128&type=12)](https://sourceforge.net/projects/dopewars)[Edit on GitHub](https://github.com/benmwebb/dopewars-website/blob/main/faq.php) Written by [Ben Webb](mailto:benwebb@users.sf.net)  
 This page last updated: Mon Jun 27 6:51:47 UTC 2022
-
