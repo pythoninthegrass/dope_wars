@@ -286,3 +286,15 @@ __marimo__/
 # INCLUDE
 !**/.gitkeep
 !**/*.example
+
+# TASK-001.03 build outputs
+.task/
+core/.venv/
+core/build-output/
+extension/.sconsign*.dblite
+extension/src/*.os
+game/.godot/
+game/bin/libdopewars.*
+third_party/godot-cpp/bin/
+third_party/godot-cpp/gen/**/*.os
+third_party/godot-cpp/.sconsign*.dblite

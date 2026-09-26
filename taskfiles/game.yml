@@ -1,0 +1,28 @@
+# yaml-language-server: $schema=https://taskfile.dev/schema.json
+
+version: "3.0"
+
+tasks:
+  run:
+    desc: "Launch the game/ project in Godot"
+    cmds:
+      - godot --path game
+
+  import:
+    desc: "Headless Godot import of the game/ project (populates .godot/ cache)"
+    deps: [":extension:build"]
+    dir: game
+    cmds:
+      - |
+        for i in 1 2 3 4 5; do
+          godot --headless --frame-delay 800 --path . --import && exit 0
+          echo "game:import attempt $i/5 crashed (see godotengine/godot#111048); retrying..." >&2
+        done
+        exit 1
+
+  smoke-test:
+    desc: "Boot the game headlessly and verify the GDScript smoke test exits 0"
+    deps: [":game:import"]
+    dir: game
+    cmds:
+      - godot --headless --path .

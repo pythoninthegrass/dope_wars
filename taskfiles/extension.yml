@@ -1,0 +1,23 @@
+# yaml-language-server: $schema=https://taskfile.dev/schema.json
+
+version: "3.0"
+
+tasks:
+  build:
+    desc: "Build the GDExtension shim for the current platform (template_debug)"
+    deps: [":submodules", ":core:build"]
+    dir: extension
+    cmds:
+      - cmd: scons target=template_debug platform=linux
+        platforms: [linux]
+      - cmd: scons target=template_debug platform=macos arch=arm64
+        platforms: [darwin]
+
+  build-macos:
+    desc: "Build both template_debug and template_release macOS framework bundles"
+    platforms: [darwin/arm64]
+    deps: [":submodules", ":core:build"]
+    dir: extension
+    cmds:
+      - scons platform=macos arch=arm64 target=template_debug
+      - scons platform=macos arch=arm64 target=template_release

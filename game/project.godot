@@ -1,0 +1,11 @@
+; Engine configuration file for the Dope Wars Godot project (TASK-001.03).
+; Minimal at this stage: enough to boot, load the GDExtension, and run
+; the smoke test scene.
+
+config_version=5
+
+[application]
+
+config/name="Dope Wars"
+config/features=PackedStringArray("4.7")
+run/main_scene="res://main.tscn"

@@ -1,0 +1,11 @@
+[configuration]
+
+entry_symbol = "dopewars_library_init"
+compatibility_minimum = "4.7"
+
+[libraries]
+
+linux.debug.x86_64 = "res://bin/libdopewars.linux.template_debug.x86_64.so"
+linux.release.x86_64 = "res://bin/libdopewars.linux.template_release.x86_64.so"
+macos.debug = "res://bin/libdopewars.macos.template_debug.framework"
+macos.release = "res://bin/libdopewars.macos.template_release.framework"

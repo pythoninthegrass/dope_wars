@@ -1,0 +1,47 @@
+# yaml-language-server: $schema=https://taskfile.dev/schema.json
+
+version: "3.0"
+
+set: ['e', 'u', 'pipefail']
+shopt: ['globstar']
+
+vars:
+  MISE_SHIMS: "{{.HOME}}/.local/share/mise/shims"
+
+env:
+  PATH: "{{.MISE_SHIMS}}:{{.PATH}}"
+
+includes:
+  core: taskfiles/core.yml
+  extension: taskfiles/extension.yml
+  game: taskfiles/game.yml
+
+tasks:
+  default:
+    desc: "List available tasks"
+    cmds:
+      - task --list
+
+  submodules:
+    desc: "Fetch git submodules (third_party/godot-cpp) if any aren't checked out yet"
+    cmds:
+      - git submodule update --init --recursive
+    status:
+      - test -z "$(git submodule status | grep '^-')"
+
+  build:
+    desc: "Build the full stack: Mojo core -> GDExtension shim"
+    cmds:
+      - task: core:build
+      - task: extension:build
+
+  check:
+    desc: "Full build + Godot headless smoke test; non-zero exit on any failure"
+    cmds:
+      - task: game:smoke-test
+
+  run:
+    desc: "Build the full stack and launch the game (interactive)"
+    cmds:
+      - task: build
+      - task: game:run

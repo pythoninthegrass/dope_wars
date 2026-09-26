@@ -1,0 +1,27 @@
+# yaml-language-server: $schema=https://taskfile.dev/schema.json
+
+version: "3.0"
+
+tasks:
+  _install-venv:
+    internal: true
+    desc: "Create the uv venv and install Mojo (nightly channel) if not present"
+    dir: core
+    cmds:
+      - uv venv --python 3.13
+      - uv pip install mojo --index https://whl.modular.com/nightly/simple/ --prerelease allow
+    status:
+      - test -x {{.ROOT_DIR}}/core/.venv/bin/mojo
+
+  build:
+    desc: "Build core/build-output/lib/libdopewars.a from the Mojo sources"
+    deps: [_install-venv]
+    dir: core
+    cmds:
+      - mkdir -p build-output/lib
+      - .venv/bin/mojo build src/dopewars.mojo --emit object -o build-output/dopewars.o
+      - ar rcs build-output/lib/libdopewars.a build-output/dopewars.o
+    sources:
+      - "src/**/*.mojo"
+    generates:
+      - build-output/lib/libdopewars.a

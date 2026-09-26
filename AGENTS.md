@@ -37,7 +37,7 @@ The test file extracts `<script id="engine">` from `index.html` and runs it in `
 
 **Important distinction preserved throughout the docs**: Beermat Software's "Dope Wars for Windows" 1.2.0.0 (1999) — the version most familiar to pythoninthegrass — is a separate, closed-source codebase whose exact numbers are *not* derivable from `benmwebb/dopewars`. Don't conflate the two when citing mechanics; `gameplay.md` says explicitly which implementation each fact comes from.
 
-## Target architecture (Godot port, TASK-001)
+## Target architecture (Godot port)
 
 The Godot reference implementation is a four-layer stack, one direction of dependency, modeled on `~/git/jumpnbump/` (Zig core / C ABI / C++ GDExtension / GDScript game) with Mojo swapped in for Zig. See `docs/abi-contract.md` for the ABI conventions and `docs/layer-boundaries.md` for what each layer is and is not allowed to do.
 
@@ -47,6 +47,17 @@ The Godot reference implementation is a four-layer stack, one direction of depen
 - `game/` — Godot / GDScript. Scenes, UI, input, save-slot orchestration, translated display strings. Never imports Mojo directly; never duplicates core state; never computes game rules. Where `<script id="ui">` (`index.html:1081-1710`) ends up.
 
 Mojo LOC target at parity: `>=43%` of non-vendor non-generated LOC, matching the Zig ratio in `~/git/jumpnbump/`.
+
+### Build commands
+
+- `task check` — full four-layer build (Mojo core → static lib → C++ GDExtension → Godot) plus a headless GDScript smoke test that asserts `DopeWarsWorld.new().abi_version() == DW_ABI_VERSION`. Non-zero exit on any failure.
+- `task run` — build the full stack and launch the game interactively.
+- `task build` — build only, no smoke test.
+- `task core:build` — build `core/build-output/lib/libdopewars.a` from Mojo sources.
+- `task extension:build` — build the GDExtension shim (`game/bin/libdopewars.*`).
+- `task game:import` / `task game:smoke-test` — headless Godot import and smoke test in isolation.
+
+Toolchain: `godot`, `uv`, `scons`, `task`, `python` are pinned in `.tool-versions` and resolve via mise. Mojo lives in `core/.venv`, created by `uv pip install mojo` against the Modular nightly index — see `taskfiles/core.yml`. `third_party/godot-cpp` is pinned via git submodule (SHA in `.gitmodules` history).
 
 ## Conventions
 

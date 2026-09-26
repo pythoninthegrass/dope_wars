@@ -1,0 +1,66 @@
+#!/usr/bin/env python
+
+# extension/SConstruct - GDExtension shim build (TASK-001.03).
+#
+# Structurally mirrors ~/git/jumpnbump/extension/SConstruct: SConscript
+# into third_party/godot-cpp's own SConstruct, pinning api_version to
+# Godot 4.7. Links the Mojo-built static library (core/build-output/lib/
+# libdopewars.a) as an env.File(...) so a rebuilt core lib triggers a
+# relink here.
+#
+# SConscript()-included scripts run with Python's cwd changed to their
+# own directory, so custom.py has to be passed by absolute path via
+# godot-cpp's own `customs` export hook.
+
+customs = [File("custom.py").srcnode().abspath]
+env = SConscript("../third_party/godot-cpp/SConstruct", {"api_version": "4.7", "customs": customs})
+
+# Wrap the compiler in ccache when present. Same env object godot-cpp
+# just returned, so this lands on its ~200 binding sources too.
+ccache = env.WhereIs("ccache")
+if ccache:
+    env["CC"] = "{} {}".format(ccache, env["CC"])
+    env["CXX"] = "{} {}".format(ccache, env["CXX"])
+
+# Linux: godot-cpp's static lib assembles a giant `ar rcs` command line
+# that can exceed MAX_ARG_STRLEN. Route ARCOM through a response file.
+if env["platform"] == "linux":
+    from SCons.Platform import TempFileMunge
+
+    env["TEMPFILE"] = TempFileMunge
+    env["ARCOM"] = "${TEMPFILE('%s')}" % env["ARCOM"]
+
+env.Append(CPPPATH=["src/", "../include"])
+sources = Glob("src/*.cpp")
+
+# Link core/build-output/lib/libdopewars.a as env.File(...) rather than
+# a bare -ldopewars: SCons only tracks the .a as a real input this way,
+# so a rebuilt core lib triggers a relink here.
+core_lib = env.File("../core/build-output/lib/libdopewars.a")
+env.Append(LIBS=[core_lib])
+
+# macOS: Apple's newer default linker (ld-prime, Xcode 26+) enforces
+# 8-byte alignment on Mach-O archive members. `ar` from Command Line
+# Tools produces archives that don't always satisfy this; the older
+# ld_classic linker (still shipped, deprecated but functional) links
+# them cleanly. Same workaround as ~/git/jumpnbump/extension/SConstruct.
+#
+# .gdextension's [libraries] entry for macOS names a *.framework
+# directory (no arch suffix) containing one flat Mach-O binary. Build
+# it directly here -- no Contents/Info.plist nesting required for a
+# GDExtension's own primary library.
+if env["platform"] == "macos":
+    env.Append(LINKFLAGS=["-Wl,-ld_classic"])
+    bundle_name = "libdopewars.macos.{}.framework".format(env["target"])
+    library = env.SharedLibrary(
+        "../game/bin/{}/{}".format(bundle_name, bundle_name.removesuffix(".framework")),
+        source=sources,
+    )
+else:
+    library = env.SharedLibrary(
+        "../game/bin/libdopewars{}{}".format(env["suffix"], env["SHLIBSUFFIX"]),
+        source=sources,
+    )
+env.Depends(library, core_lib)
+
+Default(library)
