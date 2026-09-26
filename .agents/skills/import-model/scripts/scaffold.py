@@ -1,0 +1,751 @@
+# ===----------------------------------------------------------------------=== #
+# Copyright (c) 2026, Modular Inc. All rights reserved.
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions:
+# https://llvm.org/LICENSE.txt
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ===----------------------------------------------------------------------=== #
+"""Generate a custom-arch port skeleton by subclassing a MAX donor architecture.
+
+Default mode (recommended): produces a small subclass skeleton (~30 lines per
+file) that inherits the donor's behavior and exposes the three deltas you
+typically need to override — config, graph, weight adapter. After scaffold,
+edit only the spots marked ``TODO`` for your model's actual divergences.
+
+Legacy mode (``--full-copy``): copy every donor file verbatim and sed-rename
+slug/class references. Use only when the port truly needs a new graph (Gemma3,
+Llama4 — fundamentally different shape from any donor). Most ports do not.
+
+Usage:
+    pixi run python scaffold.py <HF_MODEL_ID> --start-from llama3 --output-dir <output_dir>/
+    pixi run python scaffold.py <HF_MODEL_ID> --start-from llama3 --output-dir <output_dir>/ --full-copy
+"""
+
+from __future__ import annotations
+
+import argparse
+import ast
+import re
+import sys
+from collections.abc import Iterator
+from dataclasses import dataclass
+from pathlib import Path
+
+try:
+    from .hub_config import architecture_class, load_hub_config
+    from .max_arch_paths import _read_arch_name, find_arch_dir
+except ImportError:
+    # Standalone invocation: `python /path/to/scaffold.py ...`
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from hub_config import (  # type: ignore[no-redef]
+        architecture_class,
+        load_hub_config,
+    )
+    from max_arch_paths import (  # type: ignore[no-redef]
+        _read_arch_name,
+        find_arch_dir,
+    )
+
+
+def slug_from_hf_id(hf_id: str) -> str:
+    return hf_id.split("/")[-1].lower().replace(".", "_").replace("-", "_")
+
+
+def short_name(arch_name: str) -> str:
+    """Strip common HF arch suffixes to get a short camel name.
+
+    ``MiniCPMForCausalLM`` -> ``MiniCPM``
+    ``LlamaForCausalLM``   -> ``Llama``
+    ``Phi3ForCausalLM``    -> ``Phi3``
+    """
+    for suffix in (
+        "ForCausalLM",
+        "ForConditionalGeneration",
+        "ForSequenceClassification",
+        "Model",
+    ):
+        if arch_name.endswith(suffix):
+            return arch_name[: -len(suffix)]
+    return arch_name
+
+
+@dataclass(frozen=True)
+class DonorClasses:
+    graph: str
+    model: str
+    config: str
+
+
+_HELPER_SUFFIXES = (
+    "Inputs",
+    "Outputs",
+    "Mixin",
+    "Base",
+    "Layer",
+    "Block",
+    "Norm",
+    "Embedding",
+)
+
+
+def introspect_donor(donor_dir: Path, donor_slug: str) -> DonorClasses:
+    """Find the donor's main graph / model / config class names via AST."""
+
+    def classes_in(path: Path) -> list[str]:
+        if not path.is_file():
+            return []
+        tree = ast.parse(path.read_text(encoding="utf-8", errors="replace"))
+        return [n.name for n in tree.body if isinstance(n, ast.ClassDef)]
+
+    def pick_graph(classes: list[str]) -> str | None:
+        # Drop helper classes; prefer one that matches the donor slug capitalization.
+        candidates = [c for c in classes if not c.endswith(_HELPER_SUFFIXES)]
+        return candidates[-1] if candidates else None
+
+    def pick_ending(classes: list[str], suffix: str) -> str | None:
+        # `Llama3ModelBase` ends in `Model` too; exclude `<X>Base` and `<X>Mixin`.
+        matches = [
+            c
+            for c in classes
+            if c.endswith(suffix) and not c.endswith(("Base", "Mixin"))
+        ]
+        return matches[-1] if matches else None
+
+    graph = pick_graph(classes_in(donor_dir / f"{donor_slug}.py"))
+    model = pick_ending(classes_in(donor_dir / "model.py"), "Model")
+    config = pick_ending(classes_in(donor_dir / "model_config.py"), "Config")
+
+    missing = [
+        name
+        for name, val in [
+            ("graph", graph),
+            ("model", model),
+            ("config", config),
+        ]
+        if not val
+    ]
+    if missing:
+        sys.exit(
+            f"Could not introspect donor classes in {donor_dir}: missing {missing}. "
+            f"Use --full-copy mode if the donor doesn't follow the standard layout."
+        )
+    return DonorClasses(graph=graph, model=model, config=config)  # type: ignore[arg-type]
+
+
+def _arch_py_imports(tree: ast.Module, donor_slug: str) -> dict[str, str]:
+    """Map every name imported by the donor's arch.py to its absolute module."""
+    base = f"max.pipelines.architectures.{donor_slug}"
+    imports: dict[str, str] = {}
+    for node in tree.body:
+        if not isinstance(node, ast.ImportFrom):
+            continue
+        if node.level == 0:
+            module = node.module or ""
+        else:
+            package = base.split(".")[
+                0 : len(base.split(".")) - (node.level - 1)
+            ]
+            prefix = ".".join(package)
+            module = f"{prefix}.{node.module}" if node.module else prefix
+        for alias in node.names:
+            imports[alias.asname or alias.name] = module
+    return imports
+
+
+def _supported_architecture_calls(tree: ast.Module) -> Iterator[ast.Call]:
+    """Yield every ``SupportedArchitecture(...)`` call in the donor's arch.py."""
+    for node in ast.walk(tree):
+        if (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "SupportedArchitecture"
+        ):
+            yield node
+
+
+def find_donor_adapter(
+    donor_dir: Path, donor_slug: str
+) -> tuple[str, str] | None:
+    """Resolve the donor arch's safetensors adapter to (module, function).
+
+    Parses the donor's ``arch.py``: finds the ``WeightsFormat.safetensors``
+    entry in the ``SupportedArchitecture(weight_adapters={...})`` call and
+    follows the import that brought the referenced name into scope.
+    """
+    arch_py = donor_dir / "arch.py"
+    if not arch_py.is_file():
+        return None
+    tree = ast.parse(arch_py.read_text(encoding="utf-8", errors="replace"))
+    imports = _arch_py_imports(tree, donor_slug)
+
+    for node in _supported_architecture_calls(tree):
+        for kw in node.keywords:
+            if kw.arg != "weight_adapters" or not isinstance(
+                kw.value, ast.Dict
+            ):
+                continue
+            for key, value in zip(kw.value.keys, kw.value.values, strict=True):
+                if not (
+                    isinstance(key, ast.Attribute) and key.attr == "safetensors"
+                ):
+                    continue
+                if isinstance(value, ast.Attribute) and isinstance(
+                    value.value, ast.Name
+                ):
+                    # e.g. weight_adapters.convert_safetensor_state_dict
+                    module = imports.get(value.value.id)
+                    if module:
+                        return f"{module}.{value.value.id}", value.attr
+                elif isinstance(value, ast.Name):
+                    # e.g. convert_safetensor_state_dict imported directly
+                    module = imports.get(value.id)
+                    if module:
+                        return module, value.id
+    return None
+
+
+def _root_name(node: ast.expr) -> ast.Name | None:
+    """Return the leftmost ``Name`` of a dotted/called expression, if any.
+
+    ``PagedMemoryPlanner`` -> ``PagedMemoryPlanner``;
+    ``memory_planner.PagedMemoryPlanner`` -> ``memory_planner``;
+    ``PagedMemoryPlanner.with_activation_reservation(...)`` ->
+    ``PagedMemoryPlanner``. That leftmost name is the one an import brought
+    into scope, so it is the only name the port needs to import.
+    """
+    while True:
+        if isinstance(node, ast.Name):
+            return node
+        if isinstance(node, ast.Attribute):
+            node = node.value
+        elif isinstance(node, ast.Call):
+            node = node.func
+        else:
+            return None
+
+
+@dataclass(frozen=True)
+class DonorPlanner:
+    """How the donor's ``arch.py`` declares ``memory_planner``.
+
+    ``status`` is one of:
+
+    ``resolved``
+        The donor declares a planner and the import was followed; render
+        ``expr`` verbatim and import ``root_name`` from ``module``.
+    ``absent``
+        The donor declares no planner at all. Correct for architectures that
+        do their own memory estimation (diffusion, embedding), so the port
+        should omit the field rather than invent one.
+    ``unresolved``
+        The donor declares a planner but the import could not be followed
+        (e.g. plain ``import x.y`` rather than ``from x import y``). Needs a
+        human; guessing a default would silently change memory estimation.
+    """
+
+    status: str
+    root_name: str = ""
+    module: str = ""
+    expr: str = ""
+
+
+def find_donor_memory_planner(donor_dir: Path, donor_slug: str) -> DonorPlanner:
+    """Resolve how the donor's ``arch.py`` declares ``memory_planner``.
+
+    Parses the donor's ``arch.py`` for the ``memory_planner`` keyword in the
+    ``SupportedArchitecture(...)`` call and follows the import that brought
+    the referenced name into scope. The keyword's source text is preserved
+    verbatim, so configured planners such as
+    ``PagedMemoryPlanner.with_activation_reservation(0)`` carry their
+    arguments across to the port instead of decaying to the bare class.
+    """
+    arch_py = donor_dir / "arch.py"
+    if not arch_py.is_file():
+        return DonorPlanner(status="absent")
+    source = arch_py.read_text(encoding="utf-8", errors="replace")
+    tree = ast.parse(source)
+    imports = _arch_py_imports(tree, donor_slug)
+
+    declared = False
+    for node in _supported_architecture_calls(tree):
+        for kw in node.keywords:
+            if kw.arg != "memory_planner":
+                continue
+            declared = True
+            root = _root_name(kw.value)
+            expr = ast.get_source_segment(source, kw.value)
+            if root is None or expr is None:
+                continue
+            module = imports.get(root.id)
+            if not module:
+                continue
+            # Multi-line values keep the donor's indentation verbatim: the
+            # donor's keyword sits at the same depth inside its own
+            # SupportedArchitecture call, so the text transfers as-is.
+            return DonorPlanner(
+                status="resolved",
+                root_name=root.id,
+                module=module,
+                expr=expr,
+            )
+    return DonorPlanner(status="unresolved" if declared else "absent")
+
+
+# --- Subclass-skeleton templates -------------------------------------------------
+
+
+_GENERATED_HEADER = (
+    "# Generated by scaffold.py. Edit the TODOs as you discover deltas.\n"
+)
+
+
+def render_init(slug: str) -> str:
+    return f'''{_GENERATED_HEADER}"""Custom-arch entry point. ``max serve --custom-architectures <path>`` reads
+``ARCHITECTURES`` from this module.
+"""
+
+from .arch import {slug}_arch
+
+ARCHITECTURES = [{slug}_arch]
+'''
+
+
+def _render_imports(extra: tuple[str, str] | None) -> str:
+    """Render the ``max`` import block, isort-ordered, with ``extra`` merged.
+
+    ``extra`` is an optional ``(module, name)`` pair. Sorting the whole block
+    matters because a donor's planner can live anywhere (for example
+    ``max.pipelines.architectures.deepseekV3.memory_planner``), and splicing
+    it at a fixed position leaves the generated file failing ruff's I001.
+    """
+    modules = [
+        ("max.graph.weights", "WeightsFormat"),
+        ("max.pipelines.context", "TextContext"),
+        ("max.pipelines.lib", "SupportedArchitecture, TextTokenizer"),
+        ("max.pipelines.modeling.types", "PipelineTask"),
+    ]
+    if extra is not None:
+        modules.append(extra)
+    lines = []
+    for module, names in sorted(modules, key=lambda pair: pair[0].lower()):
+        line = f"from {module} import {names}"
+        if len(line) > 80:
+            line = f"from {module} import (\n    {names},\n)"
+        lines.append(line)
+    return "\n".join(lines)
+
+
+def render_arch(
+    *,
+    slug: str,
+    arch_name: str,
+    short: str,
+    hf_id: str,
+    donor_planner: DonorPlanner,
+) -> str:
+    if donor_planner.status == "resolved":
+        planner_import = (donor_planner.module, donor_planner.root_name)
+        planner_field = f"""    # KV-cache models need a planner; without one MAX budgets no activation
+    # memory. Inherited from the donor; override if the port diverges.
+    memory_planner={donor_planner.expr},
+"""
+    else:
+        planner_import = None
+        if donor_planner.status == "unresolved":
+            print(
+                "WARNING: the donor's arch.py sets memory_planner, but "
+                "scaffold.py could not follow the import that defines it. "
+                "Copy the donor's memory_planner= line into arch.py by hand: "
+                "leaving it unset makes MAX budget no activation memory and "
+                "skip max_batch_size inference.",
+                file=sys.stderr,
+            )
+            todo = (
+                "# TODO(port): the donor sets memory_planner but scaffold.py\n"
+                "    # could not resolve it. Copy the donor's memory_planner=\n"
+                "    # line here; without it MAX budgets no activation memory."
+            )
+        else:
+            todo = (
+                "# TODO(port): the donor sets no memory_planner, which is\n"
+                "    # correct only for architectures that do their own memory\n"
+                "    # estimation (diffusion, embedding). If this port uses a\n"
+                "    # KV cache, add memory_planner=PagedMemoryPlanner."
+            )
+        planner_field = f"    {todo}\n"
+    return f'''{_GENERATED_HEADER}"""Registration for ``{arch_name}`` — subclasses {short}Model / {short}Config."""
+
+{_render_imports(planner_import)}
+
+from . import weight_adapters
+from .model import {short}Model
+from .model_config import {short}Config
+
+{slug}_arch = SupportedArchitecture(
+    name="{arch_name}",
+    example_repo_ids=["{hf_id}"],
+    default_encoding="bfloat16",
+    supported_encodings={{"bfloat16"}},
+    pipeline_model={short}Model,
+    tokenizer=TextTokenizer,
+    context_type=TextContext,
+    default_weights_format=WeightsFormat.safetensors,
+    weight_adapters={{
+        WeightsFormat.safetensors: weight_adapters.convert_safetensor_state_dict,
+    }},
+    task=PipelineTask.TEXT_GENERATION,
+    config={short}Config,
+{planner_field})
+'''
+
+
+def render_config(
+    *, donor_slug: str, donor_classes: DonorClasses, short: str
+) -> str:
+    return f'''{_GENERATED_HEADER}"""Config for the {short} port.
+
+Inherits {donor_classes.config} from the {donor_slug} donor. Override
+``initialize_from_config`` only for config keys that don't exist on the
+donor (MuP scalars, custom RoPE fields, novel attention params, …).
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+
+from max.pipelines.architectures.{donor_slug}.model_config import {donor_classes.config}
+
+
+@dataclass(kw_only=True)
+class {short}Config({donor_classes.config}):
+    @classmethod
+    def initialize_from_config(
+        cls, pipeline_config, huggingface_config, model_config=None, *, max_seq_len
+    ):
+        cfg = super().initialize_from_config(
+            pipeline_config, huggingface_config, model_config, max_seq_len=max_seq_len
+        )
+        # TODO: read novel HF config fields and set them on `cfg`. Examples:
+        #   cfg.embedding_multiplier = huggingface_config.scale_emb       # MuP
+        #   cfg.residual_multiplier = (
+        #       huggingface_config.scale_depth / huggingface_config.num_hidden_layers ** 0.5
+        #   )
+        #   cfg.logits_scaling = huggingface_config.hidden_size / huggingface_config.dim_model_base
+        return cfg
+'''
+
+
+def render_model(
+    *, donor_slug: str, donor_classes: DonorClasses, short: str
+) -> str:
+    return f'''{_GENERATED_HEADER}"""Pipeline model for the {short} port.
+
+Inherits {donor_classes.model} from the {donor_slug} donor. Override
+``_build_graph`` only if you need to swap in a custom graph class (most
+llama3-derived ports do, because ``{donor_classes.model}._build_graph``
+hardcodes the ``{donor_classes.graph}`` graph class).
+"""
+
+from __future__ import annotations
+
+from max.pipelines.architectures.{donor_slug}.model import {donor_classes.model}
+
+
+class {short}Model({donor_classes.model}):
+    # TODO: if your `<slug>.py` defines a custom graph class, override
+    # `_build_graph` here to instantiate it instead of {donor_classes.graph}.
+    # Otherwise the inherited behavior is fine.
+    pass
+'''
+
+
+def render_graph(
+    *, slug: str, donor_slug: str, donor_classes: DonorClasses, short: str
+) -> str:
+    return f'''{_GENERATED_HEADER}"""Graph for the {short} port.
+
+Inherits {donor_classes.graph} from the {donor_slug} donor. Override
+``__init__`` (or ``__call__``) for structural deltas (norm variants, RoPE
+tweaks, MuP scalars wired through {donor_classes.graph}'s constructor params).
+For a 1:1 port, no overrides are needed.
+"""
+
+from __future__ import annotations
+
+from max.pipelines.architectures.{donor_slug}.{donor_slug} import {donor_classes.graph}
+
+from .model_config import {short}Config
+
+
+class {short}({donor_classes.graph}):
+    def __init__(self, config: {short}Config) -> None:
+        super().__init__(config)
+        # TODO: apply structural deltas not covered by config-level overrides.
+'''
+
+
+def render_weight_adapter(
+    *, donor_slug: str, donor_adapter: tuple[str, str] | None
+) -> str:
+    if donor_adapter is None:
+        print(
+            f"WARNING: could not find a safetensors adapter in the "
+            f"{donor_slug} donor's arch.py; generating a pass-through that "
+            f"likely leaves weights unbound. Check the donor's weight_adapters "
+            f"and wire it in manually."
+        )
+        return f'''{_GENERATED_HEADER}"""Weight adapter. Default is a pass-through.
+
+WARNING: no donor adapter was found at scaffold time. A pass-through leaves
+HF-prefixed keys (``model.…``) unbound and the model generates garbage.
+Find the donor's adapter and delegate to it (or copy its mapping here).
+"""
+
+from __future__ import annotations
+
+from max.graph.weights import WeightData, Weights
+from max.pipelines.lib import PipelineConfig
+from transformers import AutoConfig
+
+
+def convert_safetensor_state_dict(
+    state_dict: dict[str, Weights],
+    huggingface_config: AutoConfig,
+    pipeline_config: PipelineConfig,
+    **unused_kwargs,
+) -> dict[str, WeightData]:
+    """Pass-through. Edit if HF keys do not match the donor's parameter names."""
+    # TODO: strip a common prefix or remap fused/unfused QKV here if needed.
+    return {{k: v.data() for k, v in state_dict.items()}}
+'''
+
+    module, fn = donor_adapter
+    import_line = f"from {module} import {fn} as _donor_convert"
+    if len(import_line) > 80:
+        import_line = f"from {module} import (\n    {fn} as _donor_convert,\n)"
+    return f'''{_GENERATED_HEADER}"""Weight adapter. Delegates to the {donor_slug} donor's adapter.
+
+The donor adapter strips HF key prefixes and casts to the serving encoding;
+a pass-through would leave those weights unbound and the model would
+generate garbage. Copy the donor's mapping into this file and edit it only
+when your checkpoint's keys diverge from the donor's (see
+references/rename-weights.md).
+"""
+
+from __future__ import annotations
+
+from max.graph.weights import WeightData, Weights
+{import_line}
+from max.pipelines.lib import PipelineConfig
+from transformers import AutoConfig
+
+
+def convert_safetensor_state_dict(
+    state_dict: dict[str, Weights],
+    huggingface_config: AutoConfig,
+    pipeline_config: PipelineConfig,
+    **unused_kwargs,
+) -> dict[str, WeightData]:
+    # TODO: if HF keys diverge from the donor's, copy the donor's mapping
+    # here and rewrite instead of delegating.
+    return _donor_convert(
+        state_dict, huggingface_config, pipeline_config, **unused_kwargs
+    )
+'''
+
+
+# --- Legacy copy-and-sed mode ----------------------------------------------------
+
+
+def rewrite_text(
+    text: str, from_slug: str, to_slug: str, to_arch_name: str
+) -> str:
+    text = re.sub(rf"\b{re.escape(from_slug)}\b", to_slug, text)
+    camel = "".join(p.capitalize() for p in from_slug.split("_"))
+    text = re.sub(rf"\b{re.escape(camel)}\b", to_arch_name, text)
+    return text
+
+
+def write_full_copy(
+    *,
+    src: Path,
+    dst: Path,
+    donor_slug: str,
+    slug: str,
+    arch_name: str,
+    donor_arch_name: str | None,
+) -> None:
+    print(f"Copying {src} -> {dst}  (--full-copy mode)")
+    for entry in src.iterdir():
+        if entry.is_dir() or entry.name.startswith("__pycache__"):
+            continue
+        if entry.suffix not in {".py", ".md", ".yaml", ".json", ".toml"}:
+            continue
+        new_name = entry.name
+        if entry.stem == donor_slug:
+            new_name = f"{slug}{entry.suffix}"
+        target = dst / new_name
+        text = entry.read_text()
+        text = rewrite_text(text, donor_slug, slug, arch_name)
+        if entry.name == "arch.py" and donor_arch_name and arch_name:
+            text = text.replace(
+                f'name="{donor_arch_name}"', f'name="{arch_name}"', 1
+            )
+        target.write_text(text)
+        print(f"  wrote {target.name}")
+
+
+# --- Main ------------------------------------------------------------------------
+
+
+def add_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("hf_id", help="HuggingFace model ID")
+    parser.add_argument(
+        "--start-from",
+        required=True,
+        help="Donor slug under max.pipelines.architectures (e.g. llama3, qwen3)",
+    )
+    parser.add_argument(
+        "--output-dir",
+        type=Path,
+        required=True,
+        help="Directory to create the new arch under",
+    )
+    parser.add_argument(
+        "--slug",
+        help="Slug for the new arch (default: derived from HF model ID)",
+    )
+    parser.add_argument(
+        "--arch-name",
+        help="HF architectures[0] for arch.py::name (default: from config.json)",
+    )
+    parser.add_argument(
+        "--full-copy",
+        action="store_true",
+        help="Legacy: copy every donor file verbatim and sed-rename. "
+        "Use only if the port truly needs a new graph (Gemma3, Llama4 shapes).",
+    )
+
+
+def main(args: argparse.Namespace) -> int:
+    cfg = load_hub_config(args.hf_id)
+    try:
+        arch_from_config = architecture_class(cfg)
+    except ValueError:
+        arch_from_config = None
+    if not arch_from_config and not args.arch_name:
+        sys.exit(
+            f"{args.hf_id} config.json has no architectures[0]; pass --arch-name explicitly."
+        )
+
+    slug = args.slug or slug_from_hf_id(args.hf_id)
+    arch_name = args.arch_name or arch_from_config
+
+    src = find_arch_dir(args.start_from)
+    donor_arch_name = _read_arch_name(src / "arch.py")
+    dst = args.output_dir / slug
+    if dst.exists():
+        sys.exit(f"Output already exists: {dst}")
+
+    dst.mkdir(parents=True)
+
+    if args.full_copy:
+        write_full_copy(
+            src=src,
+            dst=dst,
+            donor_slug=args.start_from,
+            slug=slug,
+            arch_name=arch_name,
+            donor_arch_name=donor_arch_name,
+        )
+    else:
+        donor_classes = introspect_donor(src, args.start_from)
+        donor_adapter = find_donor_adapter(src, args.start_from)
+        donor_planner = find_donor_memory_planner(src, args.start_from)
+        short = short_name(arch_name)
+        files = {
+            "__init__.py": render_init(slug),
+            "arch.py": render_arch(
+                slug=slug,
+                arch_name=arch_name,
+                short=short,
+                hf_id=args.hf_id,
+                donor_planner=donor_planner,
+            ),
+            "model_config.py": render_config(
+                donor_slug=args.start_from,
+                donor_classes=donor_classes,
+                short=short,
+            ),
+            "model.py": render_model(
+                donor_slug=args.start_from,
+                donor_classes=donor_classes,
+                short=short,
+            ),
+            f"{slug}.py": render_graph(
+                slug=slug,
+                donor_slug=args.start_from,
+                donor_classes=donor_classes,
+                short=short,
+            ),
+            "weight_adapters.py": render_weight_adapter(
+                donor_slug=args.start_from,
+                donor_adapter=donor_adapter,
+            ),
+        }
+        print(f"Scaffolding subclass skeleton at {dst}")
+        print(
+            f"  donor classes: graph={donor_classes.graph}, "
+            f"model={donor_classes.model}, config={donor_classes.config}"
+        )
+        for name, content in files.items():
+            (dst / name).write_text(content)
+            print(f"  wrote {name}")
+
+    print()
+    print(f"Scaffold created at: {dst}")
+    print()
+    print("Next:")
+    if args.full_copy:
+        print(f"  1. Open {dst}/model_config.py — wire every config.json key")
+        print(f"  2. Open {dst}/weight_adapters.py — map your checkpoint keys")
+        print(
+            f"  3. Open {dst}/{slug}.py — implement every delta (not the donor graph)"
+        )
+        print(
+            f"  4. Open {dst}/arch.py — verify name={arch_name!r} and default_encoding"
+        )
+    else:
+        print(
+            "  1. Inspect the HF reference modeling code; record deltas vs the donor."
+        )
+        print(
+            f"  2. Open {dst}/model_config.py — set novel HF fields in initialize_from_config"
+        )
+        print(
+            f"  3. Open {dst}/{slug}.py — override __init__ if structural deltas exist"
+        )
+        print(
+            f"  4. Open {dst}/weight_adapters.py — add rewrites if HF keys differ"
+        )
+        print(f"  5. Open {dst}/arch.py — verify encoding, repo_ids")
+    print()
+    print("Do not serve until the smoke gate passes.")
+    print(f"  port_dir: {dst.resolve()}")
+    print("Then:")
+    print(
+        f"  pixi run max serve --model-path {args.hf_id} "
+        f"--custom-architectures {dst.resolve()}"
+    )
+    return 0
+
+
+if __name__ == "__main__":
+    p = argparse.ArgumentParser(description=__doc__)
+    add_arguments(p)
+    sys.exit(main(p.parse_args()) or 0)
