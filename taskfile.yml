@@ -104,6 +104,7 @@ tasks:
 
   lint:
     desc: "markdownlint over the repo plus a boundary gate on core/src"
+    deps: [core:_install-markdownlint]
     cmds:
       - markdownlint -c .markdownlint.jsonc .
       - ./scripts/check-core-boundaries.sh

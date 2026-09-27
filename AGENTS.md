@@ -52,7 +52,7 @@ Mojo LOC target at parity: `>=43%` of non-vendor non-generated LOC, matching the
 
 ### Build commands
 
-- `task check` — the whole gate set: Mojo parity replay against the JS oracle fixtures, the static ABI gates, all conformance drivers, both bridge tests, the full build, and the headless Godot smoke test. Non-zero exit on any failure. Wrap anything that launches Godot in `timeout` when running it by hand — a scene whose `_ready()` aborts on a script error prints the error and keeps spinning the main loop forever rather than exiting.
+- `task check` — the whole gate set: Mojo parity replay against the JS oracle fixtures, the static ABI gates, all conformance drivers, both bridge tests, the full build, and the headless Godot smoke test. Non-zero exit on any failure. See "Headless Godot runs" before running any of these steps by hand.
 - `task abi:check` — the three static gates: only `core/src/abi.mojo` declares `@export` symbols, Tier-C conformance tests do not import core modules or drive the Mojo toolchain, and `include/dopewars.h` parses with unique declarations.
 - `task abi:conformance` — Tier-C, three drivers: `core/abitest/abi_conformance_test.py` (ctypes, prototypes derived from the header), `core:abitest:mojo` (`core/abitest/abitest.mojo`, a std-only `external_call` driver built against the static library), and `core/abitest/abi_header_check.c` (compile-time proof the header is self-consistent as C11).
 - `task bridge:test` — Godot → C++ → Mojo integration (`game/godot_tests/bridge_test.gd`), value-checking the generated pointer-free surface against `game/bridge_expectations.gd`, which is generated from the header. Runs the staleness check first.
@@ -65,9 +65,14 @@ Mojo LOC target at parity: `>=43%` of non-vendor non-generated LOC, matching the
 - `task extension:build` — build the GDExtension shim (`game/bin/libdopewars.*`).
 - `task game:import` / `task game:smoke-test` — headless Godot import and smoke test in isolation.
 - `task loc` — non-vendor, non-generated SLOC by language and the resulting Mojo share, split into `core/` and the parity harness.
-- `task lint` — markdownlint plus the `core/src` boundary gate (no Godot/FFI imports, no I/O, no global mutable state, no logging).
+- `task lint` — markdownlint plus the `core/src` boundary gate (no Godot/FFI imports, no I/O, no global mutable state, no logging). Installs the pinned `markdownlint-cli` via npm on demand (`core:_install-markdownlint`) when it is missing or the wrong version, so `task lint` never fails with "command not found".
 
-Toolchain: `godot`, `uv`, `scons`, `task`, `python` are pinned in `.tool-versions` and resolve via mise. Mojo is pinned to an exact version in `taskfiles/core.yml` (`MOJO_VERSION`) and installed from PyPI into `core/.venv`; the venv task's `status:` check is version-aware, so a stale venv is rebuilt rather than silently used. `third_party/godot-cpp` is pinned via git submodule (SHA in `.gitmodules` history). The Mojo ABI's use of `List`/`Error` pulls in the Mojo runtime (`KGEN_CompilerRT_*`): `extension/SConstruct` and `task core:abi:shared-lib` locate `libKGENCompilerRTShared.{so,dylib}` under `core/.venv` and link it with an rpath — a dev-build dependency; TASK-002 covers vendoring it for distribution.
+### Headless Godot runs
+
+- Any `godot` invocation not wrapped by a Taskfile target must run under `timeout` (e.g. `timeout 300 godot --headless --path game ...`). A scene whose `_ready()` aborts on a script error prints the error and then keeps spinning the main loop forever — it never exits on its own, and a plain hang gives you no output to debug (godotengine/godot#111048 is the related import-crash case; `task game:import` already wraps its retry loop).
+- Every test scene must call `get_tree().quit(0)` / `quit(1)` on *every* path and print a one-line result summary. A test that exits 0 having run zero assertions is a false pass — assert a floor derived from the surface size (see `game/godot_tests/bridge_test.gd`'s minimum-assertion check).
+
+Toolchain: `godot`, `uv`, `scons`, `task`, `python` are pinned in `.tool-versions` and resolve via mise. Mojo is pinned to an exact version in `taskfiles/core.yml` (`MOJO_VERSION`) and installed from PyPI into `core/.venv`; the venv task's `status:` check is version-aware, so a stale venv is rebuilt rather than silently used. `markdownlint-cli` is pinned as `MARKDOWNLINT_VERSION` in the same file and installed globally on demand by `task lint`. `third_party/godot-cpp` is pinned via git submodule (SHA in `.gitmodules` history). The Mojo ABI's use of `List`/`Error` pulls in the Mojo runtime (`KGEN_CompilerRT_*`): `extension/SConstruct` and `task core:abi:shared-lib` locate `libKGENCompilerRTShared.{so,dylib}` under `core/.venv` and link it with an rpath — a dev-build dependency; TASK-002 covers vendoring it for distribution.
 
 `mojo test` does not exist. Mojo tests are `def test_*() raises` functions run through `TestSuite.discover_tests[__functions_in_module()]().run()` in a `main()` that `mojo run` executes.
 

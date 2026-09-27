@@ -4,6 +4,7 @@ version: "3.0"
 
 vars:
   MOJO_VERSION: "1.1.0"
+  MARKDOWNLINT_VERSION: "0.49.1"
 
 tasks:
   _install-venv:
@@ -16,6 +17,15 @@ tasks:
     status:
       - test -x {{.ROOT_DIR}}/core/.venv/bin/mojo
       - .venv/bin/mojo --version 2>/dev/null | grep -q "Mojo {{.MOJO_VERSION}} "
+
+  _install-markdownlint:
+    internal: true
+    desc: "Install the pinned markdownlint-cli globally via npm when missing or stale (task lint prerequisite)"
+    cmds:
+      - npm install -g "markdownlint-cli@{{.MARKDOWNLINT_VERSION}}"
+    status:
+      - command -v markdownlint
+      - markdownlint --version | grep -qx "{{.MARKDOWNLINT_VERSION}}"
 
   build:
     desc: "Build core/build-output/lib/libdopewars.a from the Mojo sources"
