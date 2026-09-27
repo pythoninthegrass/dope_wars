@@ -1,9 +1,10 @@
 ---
 id: TASK-001.08
 title: Unblock stateful dw_world ABI surface (Mojo pointer-param limit)
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-27 21:28'
+updated_date: '2026-09-27 22:15'
 labels:
   - mojo
   - ffi
@@ -16,7 +17,6 @@ references:
   - TASK-001.05
 parent_task_id: TASK-001
 priority: high
-type: spike
 ordinal: 8000
 ---
 
@@ -33,3 +33,13 @@ This blocks the premise of TASK-001.06+ (UI calling stateful sim). Decide and ex
 
 Do not weaken `check_abi_exports.py`, the purity gate, or the header contract as a workaround.
 <!-- SECTION:DESCRIPTION:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Resolved without a toolchain bump, ABI restructure, or re-scope (options 1-3): the premise was wrong. `@export` on the pinned Mojo 1.1.0 accepts `OptionalPointer[T, origin=MutUntrackedOrigin]` (out/inout params) and `ImmUntrackedOrigin` (in params) — an explicitly-bound untracked origin is not parametric, and the Optional wrapper matches the header's NULL-rejection discipline. `size_of[T]()`/`align_of[T]()` from `std.sys` replace the supposedly missing sizeof/alignof intrinsics. The three reviewer probes that 'confirmed' the blocker tested parametric/unbound spellings only.
+
+Outcome: all 54/54 declarations of include/dopewars.h are exported from `core/src/abi.mojo` (gate: '54/54 declared dw_* exported, 0 blocked, 0 leaked' on both .a and .so). `tools/check_abi_exports.py` `NON_POINTER_BLOCKED` is now an empty set; the strict gate that this task wired is what proves the lift. No gate or header contract was weakened — the blocked-surface conformance test was inverted to assert all-declared-exported.
+
+Evidence: merge 0352fdb; probe log amended at docs/mojo-1.1.0-abi-constraints.md ('The spelling that works', 2026-09-27); `task check` exit 0 including both bridge tiers (scene + script) exercising init/step/dump/load through Godot -> C++ -> Mojo.
+<!-- SECTION:FINAL_SUMMARY:END -->
