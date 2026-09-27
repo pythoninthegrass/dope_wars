@@ -1,7 +1,7 @@
 ---
 id: TASK-001.05
 title: Implement ABI conformance and bridge integration tests
-status: Blocked
+status: In Progress
 assignee: []
 created_date: '2026-09-26 04:34'
 labels:
