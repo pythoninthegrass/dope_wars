@@ -99,4 +99,7 @@ def generate_prices(mut game: world.World) raises -> List[world.PriceEvent]:
             False,
         )
 
-    return game.price_events.copy()
+    var produced = List[world.PriceEvent]()
+    for i in range(game.price_events_len):
+        produced.append(game.price_events[i].copy())
+    return produced^

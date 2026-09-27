@@ -101,16 +101,17 @@ def _apply_set_field(mut game: world.World, ref rec: record.Record) raises:
 # order) and buy one unit of the first drug that is affordable and fits.
 def _apply_buy_cheapest(mut game: world.World, ref rec: record.Record) raises:
     var order = game.price_order.copy()
+    var count = game.price_count()
     # Stable insertion sort by price.
-    for i in range(1, len(order)):
+    for i in range(1, count):
         var key = order[i]
         var j = i
         while j > 0 and game.price_value[Int(order[j - 1])] > game.price_value[Int(key)]:
             order[j] = order[j - 1]
             j -= 1
         order[j] = key
-    for entry in order:
-        var index = Int(entry)
+    for i in range(count):
+        var index = Int(order[i])
         var outcome = trade.buy(game, index, 1)
         if outcome.ok():
             assert_equal(rec.ret.string_at("drug"), rules.drugs()[index].id)

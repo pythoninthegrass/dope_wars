@@ -59,6 +59,11 @@ extern "C" {
  * do NOT bump this. See `docs/abi-contract.md` for the full policy. */
 #define DW_ABI_VERSION 1u
 
+/* Runtime accessor for DW_ABI_VERSION. Additive (does not bump the version):
+ * lets a binding assert the version of the core it actually linked against,
+ * rather than the one it compiled its own copy of the header from. */
+uint32_t dw_abi_version(void);
+
 /* Frozen simulation dimensions, mirroring `index.html:641-681`'s RULES.
  * Every ABI struct below is sized against these. */
 #define DW_NUM_LOCATIONS 6u

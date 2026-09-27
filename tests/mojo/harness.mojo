@@ -96,7 +96,10 @@ def _string_in(ref pairs: List[record.Pair], path: String) raises -> String:
 
 
 def assert_price_events_match(ref game: world.World, ref expected: record.Group) raises:
-    assert_price_event_list_match(game.price_events, expected.children("priceEvents"))
+    var events = List[world.PriceEvent]()
+    for i in range(game.price_events_len):
+        events.append(game.price_events[i].copy())
+    assert_price_event_list_match(events, expected.children("priceEvents"))
 
 
 def assert_state_matches(ref game: world.World, ref expected: record.Group) raises:

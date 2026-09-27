@@ -36,10 +36,12 @@ tasks:
       - task: extension:build
 
   check:
-    desc: "Mojo parity tests + full build + Godot headless smoke test; non-zero exit on any failure"
+    desc: "Mojo parity tests + ABI conformance + full build + Godot smoke and bridge tests; non-zero exit on any failure"
     cmds:
       - task: core:test
+      - task: core:abitest
       - task: game:smoke-test
+      - task: game:bridge-test
 
   run:
     desc: "Build the full stack and launch the game (interactive)"
@@ -53,8 +55,11 @@ tasks:
       - ./scripts/loc.sh
 
   lint:
-    desc: "markdownlint over the repo plus a boundary gate on core/src"
+    desc: "markdownlint, the core/src boundary gate, and the ABI exporter/purity/symbol gates"
     cmds:
       - markdownlint -c .markdownlint.jsonc .
       - ./scripts/check-core-boundaries.sh
+      - uv run tools/validate_abi_exporter.py
+      - uv run tools/validate_abi_test_purity.py
+      - uv run tools/validate_abi_symbols.py core/build-output/lib/libdopewars.a
 

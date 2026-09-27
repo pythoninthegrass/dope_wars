@@ -26,3 +26,14 @@ tasks:
     dir: game
     cmds:
       - godot --headless --path .
+
+  bridge-test:
+    desc: "Run the Godot -> C++ GDExtension -> Mojo bridge integration test headlessly"
+    summary: |
+      game/tests/test_bridge.gd exercises world lifecycle, a game step
+      sequence, and a serialize/deserialize round-trip through the full
+      Godot -> C++ -> Mojo call path. Exits non-zero on any failed assertion.
+    deps: [":game:import"]
+    dir: game
+    cmds:
+      - godot --headless --path . --script res://tests/test_bridge.gd

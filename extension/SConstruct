@@ -39,6 +39,27 @@ sources = Glob("src/*.cpp")
 core_lib = env.File("../core/build-output/lib/libdopewars.a")
 env.Append(LIBS=[core_lib])
 
+# The Mojo ABI uses List/Error, so the object file references the Mojo runtime
+# (KGEN_CompilerRT_*). `mojo build` links libKGENCompilerRTShared.dylib into
+# executables; a GDExtension has to do the same explicitly. The dylib lives in
+# the uv-managed venv, so link it by absolute path and bake that path into the
+# rpath. This is a dev-build dependency; a distributable bundle would copy the
+# dylib next to the framework instead.
+import glob
+import os
+
+_modular_libs = glob.glob(
+    os.path.join(
+        Dir(".").abspath, "..", "core", ".venv", "lib", "python*",
+        "site-packages", "modular", "lib",
+    )
+)
+if _modular_libs:
+    env.Append(LIBPATH=[_modular_libs[0]])
+    env.Append(LIBS=["KGENCompilerRTShared"])
+    env.Append(LINKFLAGS=["-Wl,-rpath," + _modular_libs[0]])
+
+
 # macOS: Apple's newer default linker (ld-prime, Xcode 26+) enforces
 # 8-byte alignment on Mach-O archive members. `ar` from Command Line
 # Tools produces archives that don't always satisfy this; the older

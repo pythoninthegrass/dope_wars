@@ -102,8 +102,10 @@ forced by `docs/layer-boundaries.md` or by the frozen ABI.
   the sentence. The harness maps the oracle's sentence back to a code.
 - **Scripted RNG is a first-class mode.** In JS, `rng` is an injected
   `() => float`. The Mojo `Rng` has the same two modes: seeded mulberry32 and a
-  caller-supplied float list. No ABI change was needed; TASK-001.05 decides
-  whether the C surface should expose it.
+  caller-supplied float list. The C ABI does **not** expose script mode
+  (TASK-001.05): `dw_config` carries only a `rng_seed`, and the world's stream
+  is always seeded. Script mode exists for the parity harness, which sets the
+  field directly; a game never needs to force a branch.
 - **Serialization is bytes, not JSON.** `serializeState`/`deserializeState`
   round-trip through JSON in JS. Core produces an opaque byte buffer, which is
   what `dw_world_dump`/`dw_world_load` hand to the game layer. Floats go through

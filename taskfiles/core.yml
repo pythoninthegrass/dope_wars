@@ -49,3 +49,22 @@ tasks:
     cmds:
       - node ../tests/fixtures/gen-mojo.mjs
       - git diff --exit-code -- ../tests/mojo/fixtures.mojo
+
+  abitest:
+    desc: "Build and run the Tier-C ABI conformance suite against the built static library"
+    summary: |
+      core/abitest/abitest.mojo reaches the compiled core exclusively through
+      include/dopewars.h via std.ffi.external_call, never by importing a core
+      module (checked separately by tools/validate_abi_test_purity.py). This is
+      the ABI surface's own conformance suite, distinct from the parity gate in
+      core:test.
+    deps: [build]
+    dir: core
+    cmds:
+      - .venv/bin/mojo build abitest/abitest.mojo -o build-output/abitest -Xlinker build-output/lib/libdopewars.a
+      - ./build-output/abitest
+    sources:
+      - "abitest/**/*.mojo"
+      - "src/**/*.mojo"
+    generates:
+      - build-output/abitest

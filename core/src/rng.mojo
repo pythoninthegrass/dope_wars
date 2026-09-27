@@ -21,6 +21,25 @@
 
 comptime _TWO_POW_32 = 4294967296.0
 comptime _MASK32 = UInt32(0xFFFFFFFF)
+comptime _INCREMENT = UInt32(0x6D2B79F5)
+
+
+# The raw mulberry32 draw for a given state, before the state advances. Free
+# functions so the C ABI's dw_mulberry32_next_u32 / dw_rand_int can drive a bare
+# uint32_t state without constructing an Rng (which can raise in script mode).
+def mulberry32_draw(state: UInt32) -> UInt32:
+    # a = (a + 0x6D2B79F5) | 0
+    var a = state + _INCREMENT
+    # t = Math.imul(a ^ (a >>> 15), 1 | a)
+    var t = (a ^ (a >> 15)) * (UInt32(1) | a)
+    # t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
+    t = (t + ((t ^ (t >> 7)) * (UInt32(61) | t))) ^ t
+    # ((t ^ (t >>> 14)) >>> 0)
+    return (t ^ (t >> 14)) & _MASK32
+
+
+def mulberry32_advance(state: UInt32) -> UInt32:
+    return state + _INCREMENT
 
 
 struct Rng:
@@ -64,14 +83,17 @@ struct Rng:
             var value = self._script[self._script_pos]
             self._script_pos += 1
             return value
-        # a = (a + 0x6D2B79F5) | 0
-        self.state = self.state + UInt32(0x6D2B79F5)
-        # t = Math.imul(a ^ (a >>> 15), 1 | a)
-        var t = (self.state ^ (self.state >> 15)) * (UInt32(1) | self.state)
-        # t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
-        t = (t + ((t ^ (t >> 7)) * (UInt32(61) | t))) ^ t
-        # ((t ^ (t >>> 14)) >>> 0) / 4294967296
-        return Float64((t ^ (t >> 14)) & _MASK32) / _TWO_POW_32
+        return Float64(self.next_u32()) / _TWO_POW_32
+
+    # The raw uint32_t draw, before normalization. dw_mulberry32_next_u32
+    # exposes exactly this so the JS oracle can be compared bit-for-bit.
+    # Scripted mode has no raw draw: a script supplies normalized floats.
+    def next_u32(mut self) raises -> UInt32:
+        if self.is_scripted():
+            raise Error("scripted Rng has no raw uint32 draw")
+        var draw = mulberry32_draw(self.state)
+        self.state = mulberry32_advance(self.state)
+        return draw
 
 
 # randInt(rng, min, max) -> min + floor(rng() * (max - min + 1))
