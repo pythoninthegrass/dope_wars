@@ -23,10 +23,26 @@ tasks:
     dir: core
     cmds:
       - mkdir -p build-output/lib
-      - .venv/bin/mojo build src/abi.mojo --emit object -o build-output/dopewars.o
+      - .venv/bin/mojo build src/abi.mojo --emit object -o build-output/dopewars-raw.o
+      # Mojo's `--emit object` output carries its runtime's symbols as
+      # globals. The ABI contract (docs/abi-contract.md, "The two sets are
+      # equal") says the archive's global defined set must be exactly the
+      # dw_* declarations in include/dopewars.h, so everything else is
+      # demoted to a local symbol here. The list is generated from the
+      # header, so the gate cannot drift from the contract.
+      - |
+        python3 ../tools/abi_symbols.py > build-output/dopewars.exports.txt
+        objcopy --keep-global-symbols=build-output/dopewars.exports.txt \
+          build-output/dopewars-raw.o build-output/dopewars.o
       - ar rcs build-output/lib/libdopewars.a build-output/dopewars.o
+      # AC#1 of TASK-001.05: the archive's global defined set must contain no
+      # non-dw_* symbol. Runs on the archive, so it needs no compiler.
+      - python3 ../tools/check_abi_exports.py build-output/lib/libdopewars.a
     sources:
       - "src/**/*.mojo"
+      - "../include/dopewars.h"
+      - "../tools/abi_symbols.py"
+      - "../tools/check_abi_exports.py"
     generates:
       - build-output/lib/libdopewars.a
 
@@ -42,6 +58,63 @@ tasks:
           .venv/bin/mojo run -I src -I ../tests/mojo "$f" || status=1
         done
         exit $status
+
+  # The static archive cannot be dlopen'd: it is not position-independent and
+  # ctypes needs a dynamic object. The conformance suite therefore runs against
+  # a throwaway shared object linked from the same archive, which is also where
+  # the Mojo runtime gets linked in explicitly -- the archive does not carry it
+  # and a plain `cc -shared` will not find it on its own.
+  abi:shared-lib:
+    desc: "Link a throwaway conformance .so from libdopewars.a so ctypes can dlopen it"
+    deps: [build]
+    dir: core
+    cmds:
+      - |
+        set -eu
+        rt_dir=$(.venv/bin/python -c \
+          'import pathlib,sys; print(next(p for p in pathlib.Path(sys.prefix).rglob("libKGENCompilerRTShared.so")).parent)')
+        mkdir -p build-output/lib
+        # --whole-archive: the archive's members are only pulled in on demand, so
+        # a plain link would drop every dw_* symbol nothing here references yet.
+        cc -shared -o build-output/lib/libdopewars.so \
+          -Wl,--whole-archive build-output/lib/libdopewars.a -Wl,--no-whole-archive \
+          -L"$rt_dir" -lKGENCompilerRTShared -Wl,-rpath,"$rt_dir"
+        # The gate runs against the .so too, since that is the artifact the C ABI
+        # is actually served from during conformance testing.
+        python3 ../tools/check_abi_exports.py build-output/lib/libdopewars.so
+    sources:
+      - build-output/lib/libdopewars.a
+    generates:
+      - build-output/lib/libdopewars.so
+
+  abi:header-check:
+    desc: "Compile core/abitest/abi_header_check.c: proves include/dopewars.h is self-consistent as C11"
+    dir: core
+    cmds:
+      - mkdir -p build-output/abi-header-check
+      - |
+        set -eu
+        rt_dir=$(.venv/bin/python -c \
+          'import pathlib,sys; print(next(p for p in pathlib.Path(sys.prefix).rglob("libKGENCompilerRTShared.so")).parent)')
+        cc -std=c11 -Wall -Wextra -Werror -I../include \
+          -o build-output/abi-header-check/abi_header_check \
+          abitest/abi_header_check.c \
+          build-output/lib/libdopewars.so \
+          -L"$rt_dir" -lKGENCompilerRTShared -Wl,-rpath,"$rt_dir"
+        build-output/abi-header-check/abi_header_check
+    deps: [abi:shared-lib]
+    sources:
+      - abitest/abi_header_check.c
+      - "../include/dopewars.h"
+    generates:
+      - build-output/abi-header-check/abi_header_check
+
+  abitest:
+    desc: "Tier-C ABI conformance (Python/ctypes) against the built library"
+    deps: [abi:shared-lib]
+    dir: core
+    cmds:
+      - python3 abitest/abi_conformance_test.py --lib build-output/lib/libdopewars.so
 
   test:check-generated:
     desc: "Fail if tests/mojo/fixtures.mojo is stale with respect to tests/fixtures/*.jsonl"

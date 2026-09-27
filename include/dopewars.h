@@ -59,6 +59,24 @@ extern "C" {
  * do NOT bump this. See `docs/abi-contract.md` for the full policy. */
 #define DW_ABI_VERSION 1u
 
+/* The value above, readable at runtime.
+ *
+ * A C consumer reads DW_ABI_VERSION as a #define and never needs this. It
+ * exists for consumers that link against the library without the header's
+ * preprocessor in the way — GDExtension's BIND_CONSTANT path, a scripting
+ * binding, or a shipped .so whose compile-time constant may predate the
+ * binary. A binding should compare dw_abi_version() against DW_ABI_VERSION and
+ * refuse to run on mismatch rather than trust that the header it was built
+ * with matches the library it is loading.
+ *
+ * Declared here so the exporter in core/src/abi.mojo has something to match:
+ * every dw_* symbol the library defines must be declared in this header, which
+ * is what tools/check_abi_exports.py enforces in both directions. Before this
+ * declaration existed, extension/src/dopewars_world.cpp had an ad-hoc
+ * `extern "C" uint32_t dw_abi_version(void);`, which is precisely the
+ * header-is-the-contract violation the gate is for. */
+uint32_t dw_abi_version(void);
+
 /* Frozen simulation dimensions, mirroring `index.html:641-681`'s RULES.
  * Every ABI struct below is sized against these. */
 #define DW_NUM_LOCATIONS 6u
@@ -410,6 +428,18 @@ uint32_t dw_rules_expensive_multiply(void);
  * out_capacity is smaller (still setting *out_required). */
 dw_result dw_rules_locations_copy(dw_location_view *out_locations, size_t out_capacity, size_t *out_required);
 dw_result dw_rules_drugs_copy(dw_drug_view *out_drugs, size_t out_capacity, size_t *out_required);
+
+/* Length queries for the two copies above, as free functions.
+ *
+ * Additive (does not bump DW_ABI_VERSION — see the policy at the top of this
+ * header). They exist because the required length of both buffers is a
+ * compile-time constant, so the first call of the two-call convention does not
+ * need an out-pointer to be answerable, and a caller that only has to size an
+ * allocation can do so without a world handle. The values are exactly
+ * DW_NUM_LOCATIONS and DW_NUM_DRUGS, and the conformance test asserts the
+ * functions, the macros, and dw_rules_*_copy's *out_required all agree. */
+uint32_t dw_rules_locations_len(void);
+uint32_t dw_rules_drugs_len(void);
 
 /* ---------------------------------------------------------------------- */
 /* RNG (mulberry32)                                                        */
