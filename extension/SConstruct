@@ -76,7 +76,7 @@ for candidate_python in (
             candidate_python,
             "-c",
             "import pathlib,sys; "
-            "print(next(p for p in pathlib.Path(sys.prefix).rglob('libKGENCompilerRTShared.so')).parent)",
+            "print(next(p for p in pathlib.Path(sys.prefix).rglob('libKGENCompilerRTShared.*')).parent)",
         ],
         text=True,
     ).strip()
@@ -86,7 +86,7 @@ for candidate_python in (
 
 if not mojo_runtime_dir:
     raise SCons.Errors.UserError(
-        "libKGENCompilerRTShared.so not found under core/.venv — run `task core:build` "
+        "libKGENCompilerRTShared.{so,dylib} not found under core/.venv — run `task core:build` "
         "(it provisions the venv) before building the extension."
     )
 

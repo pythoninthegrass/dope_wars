@@ -73,17 +73,14 @@ WIDTH_CLASS: dict[str, str] = {
 
 # ABI functions the shim does not forward, with the reason.
 #
-# dw_world_size is the one pointer-free declaration still blocked: it must
-# return sizeof(dw_world), and there is no Mojo-side layout for the opaque
-# handle to measure (docs/mojo-1.1.0-abi-constraints.md, "no sizeof"). It is
-# absent from the library too, so a bridge test asserting it would assert a
-# symbol that does not exist. Listing it here rather than skipping silently means
-# the gap is stated in the generated file, and means that when it does become
-# exportable the shim method must be added *and* this entry removed, or the
-# export-surface gate's non-strict list goes stale.
-NOT_FORWARDED: dict[str, str] = {
-    "dw_world_size": "blocked: no Mojo-side sizeof for the opaque dw_world",
-}
+# Currently empty. dw_world_size was listed here while Mojo 1.1.0's `@export`
+# was believed to make it unreachable; core/src/abi.mojo exports it via
+# size_of[World]() over the OptionalPointer/UntrackedOrigin spelling, so the
+# shim forwards it and the surface check requires it. Keep this dict as the
+# stated-gap mechanism: anything listed must also be absent from the library,
+# and adding a function here without removing the shim method fails the
+# surface check.
+NOT_FORWARDED: dict[str, str] = {}
 
 # ABI function -> the GDScript method name the shim binds.
 #
@@ -117,6 +114,7 @@ GD_NAMES: dict[str, str] = {
     "dw_rules_expensive_multiply": "rules_expensive_multiply",
     "dw_rules_locations_len": "rules_locations_len",
     "dw_rules_drugs_len": "rules_drugs_len",
+    "dw_world_size": "world_size",
     "dw_world_align": "world_align",
     "dw_world_dump_len": "world_dump_len",
 }
@@ -186,17 +184,22 @@ def render() -> str:
     lines.append("")
     lines.append("class_name BridgeExpectations")
     lines.append("")
-    lines.append("## Every ABI function reachable through the GDExtension shim, as the")
+    lines.append("## Every pointer-free ABI declaration the shim forwards, as the")
     lines.append(
-        "## GDScript-side method name the shim binds, plus the value the ABI contract"
+        "## GDScript-side method name plus the value the ABI contract pins for it."
     )
     lines.append(
-        "## pins for it. Only the pointer-free declarations appear: the rest of the"
+        "## Only pointer-free no-argument functions appear here because this table"
     )
     lines.append(
-        "## ABI is blocked on the Mojo 1.1.0 pointer-parameter limitation and the"
+        "## drives value and width-fidelity checks via a zero-arg call. The"
     )
-    lines.append("## bridge cannot expose a dw_world handle yet.")
+    lines.append(
+        "## pointer-argument side of the ABI is forwarded by the shim and covered"
+    )
+    lines.append(
+        "## behaviourally by res://tests/test_bridge.gd and the Tier-C suites."
+    )
     for abi_fn, why in sorted(NOT_FORWARDED.items()):
         lines.append(f"## Not forwarded: {abi_fn} — {why}")
     lines.append("")

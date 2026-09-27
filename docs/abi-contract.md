@@ -14,10 +14,15 @@ companion `~/git/jumpnbump/backlog/tasks/task-012.01`.
 - The caller allocates `dw_world_size()` bytes aligned to `dw_world_align()`
   and passes that storage to `dw_world_init(world, config)`. Nothing on the
   Mojo side of the ABI allocates on the caller's behalf.
+- The internal `World` is plain data: every field is a fixed-width scalar or a
+  fixed-size `Array`, with explicit length fields for the ordered maps. That is
+  what makes the caller-owned-storage model work — `dw_world_size()` is
+  `size_of[World]()`, the ABI placement-constructs a `World` into the caller's
+  buffer, and plain `free()` on that buffer is a complete teardown.
 - There is deliberately no `dw_world_destroy`. Adding a destroy function later
   is additive; removing one later is not, so the ABI does not commit to one
   until the core requires cleanup that plain `free()` on the caller's storage
-  cannot express.
+  cannot express. The plain-data `World` does not require any.
 - No pointer returned from the ABI outlives the call that produced it, and no
   buffer the caller passes in is retained past the call. Every cross-boundary
   buffer is either fully copied out (two-call length-then-fill, below) or
@@ -94,9 +99,27 @@ Every ABI struct:
 - The RNG state is included in the canonical dump so a saved game replays
   bit-for-bit on load.
 
+## Float projections
+
+The core keeps `cash`, `bank`, `debt` and `avg_price` as `Float64` because the
+JS oracle does (`bank` genuinely goes 5500 → 5610 → 5722.2). Several ABI view
+fields are integers, so they are a lossy **display** projection:
+
+- `dw_state_view.bank` / `.debt` (`int64_t`)
+- `dw_inventory_slot.avg_price_cents` (`int64_t`, dollars × 100)
+- `dw_finish_result.score` (`int64_t`)
+
+The rule is **truncate toward zero** for every float64 → int64 projection.
+Persistence is unaffected: `dw_world_dump` is opaque bytes and keeps the raw
+float64, so save/load stays bit-exact.
+
 ## Versioning
 
 - `DW_ABI_VERSION` is a `#define` starting at `1u`.
+- `dw_abi_version()` is a runtime accessor for it, so a binding can assert the
+  version of the core it actually linked against rather than the one it
+  compiled its own copy of the header from. Additive; does not bump the
+  version.
 - `dw_config.abi_version` is checked on every `dw_world_init` call; mismatch
   returns `DW_ERR_ABI_VERSION_MISMATCH` before any other validation.
 - Additive changes (new functions, new anonymous-enum constants, new
@@ -113,14 +136,22 @@ Every ABI struct:
 ## Serialization
 
 - `dw_world_dump_len()` reports the exact byte count `dw_world_dump` will
-  write. The count is fixed for a given ABI version.
-- `dw_world_dump` writes the canonical byte sequence: `dw_state_view` scalars,
-  full inventory (`DW_NUM_DRUGS` slots, zero-padded), full price table
-  (`DW_NUM_DRUGS` slots, zero for untraded), RNG state, and any live chase
-  state. Deterministic little-endian encoding, no compression, no framing.
+  write. The count is fixed for a given ABI version (766 bytes at v1) and does
+  not depend on inventory occupancy or price-table content.
+- `dw_world_dump` writes the canonical byte sequence produced by
+  `core/src/serialize.mojo`: the scalar state (seed, RNG state, day, num_days,
+  cash, debt, bank, start_cash, health, coat capacity, guns, location, dead,
+  last-day-warned), then each ordered map as a live count followed by all
+  `DW_NUM_DRUGS` order slots (zero-padded past the live count) and all
+  `DW_NUM_DRUGS` dense slots, then the price-event list as a count followed by
+  `MAX_PRICE_EVENTS` slots. Floats are stored as an exact
+  (sign, exponent, mantissa) decomposition, so a save/load cycle is bit-exact.
+  Deterministic little-endian encoding, no compression, no framing.
 - `dw_world_load` accepts exactly the byte sequence `dw_world_dump` produced
-  at the same `DW_ABI_VERSION` and rehydrates the world in place.
-  Bit-for-bit round-trip is a requirement, not an optimization.
+  at the same `DW_ABI_VERSION` and rehydrates the world in place. It validates
+  the length and every location/drug index in the payload; on any
+  inconsistency it returns `DW_ERR_SERIALIZATION_FAILED` and leaves the world
+  unchanged. Bit-for-bit round-trip is a requirement, not an optimization.
 
 ### Divergence from jumpnbump
 
@@ -130,3 +161,24 @@ differs: `index.html:1033-1047` round-trips through JSON with
 `serializeState`/`deserializeState` and the game's save-slot feature depends
 on that round-trip. The Mojo port must therefore implement both directions
 from day one, and `dw_world_load` is part of the frozen ABI.
+
+## Conformance and gates
+
+Three gates keep the ABI honest, all wired into `task lint` / `task check`:
+
+- `tools/validate_abi_exporter.py` — fails if any `core/src/*.mojo` file other
+  than `abi.mojo` declares an `@export("dw_...")`. Source-level single-exporter
+  discipline.
+- `tools/validate_abi_symbols.py` — runs `nm -g --defined-only` on the built
+  `libdopewars.a` and fails if any defined global symbol is not `dw_`-prefixed.
+  Post-link, catches every symbol regardless of source file.
+- `tools/validate_abi_test_purity.py` — fails if any `core/abitest/*.mojo`
+  imports a non-`std` module, so the conformance tier cannot silently become a
+  second copy of the parity suite.
+
+`core/abitest/abitest.mojo` is the Tier-C conformance suite: it reaches the
+compiled library exclusively through this header via `std.ffi.external_call`
+(Mojo 1.1.0 has no `@cImport`), and asserts the struct sizes above against the
+header's `DW_STATIC_ASSERT` values. `game/tests/test_bridge.gd` is the bridge
+integration test: it drives the same ABI through the C++ GDExtension shim from
+GDScript.

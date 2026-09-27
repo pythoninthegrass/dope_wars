@@ -1,18 +1,23 @@
 #pragma once
 
-// extension/src/dopewars_world.hpp — GDExtension shim.
+// extension/src/dopewars_world.hpp — the GDExtension shim over
+// include/dopewars.h (TASK-001.05).
 //
-// TASK-001.03 brought up one forwarded method (abi_version) to prove the
-// Godot -> C++ -> C ABI -> Mojo path links at all. TASK-001.05 widens it to
-// cover the whole *currently exported* ABI surface, because a single
-// void->uint32 hop proves nothing about the parts of the bridge that do fail:
-// signed vs unsigned 32-bit, the 64-bit money types, and size_t. Each of those
-// can truncate or re-sign silently while abi_version() still returns 1.
+// Every method here forwards to exactly one dw_* call; no simulation logic is
+// reimplemented. core/src/ (via core/src/abi.mojo) remains the only place game
+// rules live. Structured results come back as Dictionaries so GDScript never
+// sees a raw ABI struct.
 //
-// Boundary (docs/layer-boundaries.md): this class forwards 1:1 and holds no
-// state. It computes no rules and caches nothing from the core.
+// Modeled on ~/git/jumpnbump/extension/src/jumpnbump_world.hpp.
+
+#include <cstdint>
+#include <vector>
 
 #include <godot_cpp/classes/ref_counted.hpp>
+#include <godot_cpp/variant/array.hpp>
+#include <godot_cpp/variant/dictionary.hpp>
+#include <godot_cpp/variant/packed_byte_array.hpp>
+#include <godot_cpp/variant/string.hpp>
 
 #include "dopewars.h"
 
@@ -28,42 +33,84 @@ public:
 	DopeWarsWorld() = default;
 	~DopeWarsWorld() override = default;
 
-	// --- ABI identity ------------------------------------------------------
+	// Lifecycle
+	int init(int rng_seed, int num_days = 0, int start_cash = -1);
+	int reset();
+	bool is_ready() const { return world_ != nullptr; }
 
-	// Forwards to dw_abi_version().
+	// The linked core's DW_ABI_VERSION, for a binding to assert at runtime.
 	uint32_t abi_version() const;
 
-	// --- RULES constants: the pointer-free ABI surface ---------------------
-	//
-	// Named without the dw_rules_ prefix: in GDScript these read as properties
-	// of a rules object, and the prefix carries no meaning once the class name
-	// already says where they come from. The mapping is mechanical and
-	// documented in the .cpp so a reviewer can check it against the header one
-	// column at a time.
+	// Size/alignment of the opaque dw_world, straight from the linked core.
+	static int64_t world_size();
+	static int64_t world_align();
 
-	uint32_t rules_default_num_days() const;
-	int32_t rules_default_start_cash() const;
-	int64_t rules_default_start_debt() const;
-	int32_t rules_default_start_health() const;
-	int32_t rules_default_start_coat_capacity() const;
-	int32_t rules_default_start_location_index() const;
-	uint32_t rules_gun_damage() const;
-	uint32_t rules_gun_space() const;
-	uint32_t rules_player_armor() const;
-	uint32_t rules_debt_interest_bp() const;
-	uint32_t rules_bank_interest_bp() const;
-	uint32_t rules_bank_purchase_fee_bp() const;
-	uint32_t rules_cheap_divide() const;
-	uint32_t rules_expensive_multiply() const;
-	uint32_t rules_locations_len() const;
-	uint32_t rules_drugs_len() const;
+	// Live-state queries
+	Dictionary state_get();
+	Dictionary coat_used();
+	Array prices_copy();
+	Array inventory_copy();
+	Dictionary find_drug_index(const String &id);
+	Dictionary find_location_index(const String &id);
 
-	// size_t on purpose: Godot binds int64_t as `int`, and GDScript integers are
-	// 64-bit signed, so a size_t here arrives intact on every platform this
-	// project builds for. Documented because it is the one place the shim's C++
-	// signature and the GDScript-side `int` typing need a note.
-	uint64_t world_align() const;
-	uint64_t world_dump_len() const;
+	// Turn actions
+	int generate_prices();
+	Array price_events_drain();
+	int buy(int drug_index, int qty);
+	int sell(int drug_index, int qty);
+	int travel(int dest_location_index);
+	Dictionary finances(int action, int64_t amount);
+
+	// Arrival / dealer events
+	Dictionary roll_arrival_event();
+	Dictionary roll_coat_dealer_offer();
+	Dictionary accept_coat_offer(int pockets, int price);
+	Dictionary roll_gun_dealer_offer();
+	Dictionary accept_gun_offer(int price, int damage, int space);
+
+	// Chase / combat
+	Dictionary should_start_chase();
+	Dictionary start_chase();
+	Dictionary get_fight_ratings();
+	Dictionary run_from_chase(int deputies, bool is_aggressor);
+	Dictionary fight(int deputies);
+	Dictionary apply_damage(int amount);
+
+	// Endgame
+	Dictionary finish();
+	Dictionary insert_highscore(const Array &scores, const Dictionary &entry);
+
+	// Serialization
+	int world_dump_len();
+	Dictionary world_dump();
+	int world_load(const PackedByteArray &bytes);
+
+	// Rules
+	Array rules_locations();
+	Array rules_drugs();
+	static int rules_default_num_days();
+	static int rules_default_start_cash();
+	static int64_t rules_default_start_debt();
+	static int rules_default_start_health();
+	static int rules_default_start_coat_capacity();
+	static int rules_default_start_location_index();
+	static int rules_gun_damage();
+	static int rules_gun_space();
+	static int rules_player_armor();
+	static int rules_debt_interest_bp();
+	static int rules_bank_interest_bp();
+	static int rules_bank_purchase_fee_bp();
+	static int rules_cheap_divide();
+	static int rules_expensive_multiply();
+	static int64_t rules_locations_len();
+	static int64_t rules_drugs_len();
+
+private:
+	// storage_ is over-allocated by dw_world_align() - 1 bytes so an aligned
+	// dw_world* can be carved out of it manually; std::vector's own default
+	// alignment is not guaranteed to satisfy whatever dw_world_align() reports.
+	std::vector<uint8_t> storage_;
+	dw_world *world_ = nullptr;
 };
 
 } // namespace godot

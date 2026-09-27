@@ -248,15 +248,17 @@ def test_dump_len_is_a_fixed_positive_size(abi: Abi, report: Report) -> None:
     value is asserted exactly: a silent dump-format change then fails here rather
     than truncating saved games at runtime.
 
-    The floor is the size of one dw_state_view (56B) plus the 12 price slots
-    (12B each) plus the 12 inventory slots (16B each) plus the RNG state:
-    56 + 144 + 192 + 4 = 396. The pinned 665 additionally carries the prev-price
-    table, the three order lists and the price events, all of which the contract
-    says are dumped fully.
+    The floor is the scalar block plus the three ordered maps and the price
+    events: seed/rng/day/num_days (24B), cash/debt/bank/start_cash as exact
+    float decompositions (4x17B), health/coat/guns/location (4x8B), two flags,
+    then each order list as count+DW_NUM_DRUGS slots (3x16B), the price/prev/inv
+    dense slots (12x10B, 12x9B, 12x26B), and 3 price-event slots (4+3x16B) =
+    766. core/src/serialize.mojo pins the same number as DUMP_LEN and asserts
+    it at runtime, so the format and this test move together or not at all.
     """
     got = abi.call("dw_world_dump_len")
     report.expect("dw_world_dump_len() >= 396", got >= 396, f"got {got}")
-    report.expect("dw_world_dump_len() == 665", got == 665, f"got {got}")
+    report.expect("dw_world_dump_len() == 766", got == 766, f"got {got}")
 
 
 def test_world_align_is_a_power_of_two(abi: Abi, report: Report) -> None:
@@ -322,44 +324,27 @@ def test_header_struct_sizes_are_sane(abi: Abi, report: Report) -> None:
 def test_blocked_surface_is_reported_not_forgotten(abi: Abi, report: Report) -> None:
     """Every declared-but-unexported function is accounted for.
 
-    This test turns the known-blocked set into an explicit expectation, so the
-    suite distinguishes "still blocked on the toolchain" from "someone deleted an
-    export". When the toolchain lifts the restriction, this is the test that fails
-    first and tells you the blocked list is stale.
+    The OptionalPointer/UntrackedOrigin export spelling (see
+    docs/mojo-1.1.0-abi-constraints.md) made the whole declared surface
+    exportable on Mojo 1.1.0, so nothing is expected blocked: any absent export
+    is a regression, not a toolchain limitation. The shape of the check is kept
+    so a future toolchain downgrade that re-blocks a signature fails loudly here
+    with the count of what went missing, rather than as a call-time symbol error.
     """
     declared = set(declared_symbols(HEADER.read_text(encoding="utf-8")))
-    # The functions this tier can reach with today's exporter: the header's
-    # pointer-free declarations.
-    implemented = {
-        "dw_abi_version",
-        *EXPECTED_RULES,
-        "dw_rules_locations_len",
-        "dw_rules_drugs_len",
-        "dw_world_align",
-        "dw_world_dump_len",
-    }
-    expected_blocked = declared - implemented
+    expected_blocked: set[str] = set()
 
-    # Anything expected to be blocked that the library does export means the
-    # blocked list in core/src/abi.mojo is stale (good news, filed badly).
-    newly_available = sorted(n for n in expected_blocked if abi.has(n))
-    report.expect(
-        "blocked surface is still blocked (else update the blocked list)",
-        not newly_available,
-        "now exported, update core/src/abi.mojo and this test: "
-        + ", ".join(newly_available),
-    )
     # Anything not exported that we did NOT expect to be blocked is a real
-    # regression: a pointer-free function silently stopped being built.
+    # regression: a declared function silently stopped being built.
     unexpectedly_missing = sorted(set(abi.missing) - expected_blocked)
     report.expect(
-        "every pointer-free declaration is exported",
+        "every declared function is exported",
         not unexpectedly_missing,
         "regression, no longer exported: " + ", ".join(unexpectedly_missing),
     )
     report.note(
-        f"{len(expected_blocked)} of {len(declared)} declared functions remain blocked "
-        f"on Mojo 1.1.0 pointer params (docs/mojo-1.1.0-abi-constraints.md)"
+        f"all {len(declared)} declared functions exported "
+        "(no declarations blocked on the toolchain)"
     )
 
 

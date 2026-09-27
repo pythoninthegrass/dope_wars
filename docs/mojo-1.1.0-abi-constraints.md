@@ -6,6 +6,15 @@ caller-visible behaviour, by linking the produced object against a real C
 driver. This is the reason the ABI seam in `core/src/abi.mojo` is shaped the
 way it is; read this before trying to "just add a pointer parameter".
 
+**Amended 2026-09-27.** The probe results below stand, but the original
+"net consequence" (pointer-shaped exports impossible on 1.1.0) was wrong: the
+probe never tried `OptionalPointer` with an explicitly bound *untracked* origin,
+nor the lowercase `size_of[T]()` / `align_of[T]()` intrinsics (it probed only
+`sizeof`/`alignof`). `core/src/abi.mojo` now exports all 54 declarations of
+`include/dopewars.h` on the pinned toolchain. The spelling that works is in
+"The spelling that works" below; everything above it documents the dead ends,
+which are real dead ends.
+
 ## What `@export(...) abi("C")` can express
 
 | Shape | Works? | Evidence |
@@ -46,12 +55,14 @@ the identical message. Consequences:
 - The free RNG functions (`dw_mulberry32_seed(uint32_t *, …)`) cannot be
   written directly either.
 
-### Pointer types are not reachable as `@export` parameters
+### Bare `Pointer` / `UnsafePointer` are not reachable as `@export` parameters
 
 `Pointer[T]` / `UnsafePointer[T]` carry an `origin` parameter. Binding it with
 `origin=_` still counts as parametric and is refused. Leaving it unbound is a
-hard error ("failed to infer parameter 'origin'"). So there is no spelling of
-a pointer-typed exported function at all.
+hard error ("failed to infer parameter 'origin'"). There is no spelling of a
+*bare*-pointer-typed exported function — but see "The spelling that works":
+`OptionalPointer` with an explicit untracked origin is accepted, and that is
+what the whole ABI is built on.
 
 ### Mojo cannot synthesise a pointer from an integer
 
@@ -73,6 +84,19 @@ The reverse direction is missing too: `Pointer` exposes no `address`, `bits`,
 `as_int`, `to_int`, `get_address` (or any comparable member), so Mojo cannot
 even publish the address of memory it owns.
 
+Two amendments from the merged implementation:
+
+- The `sizeof` row above probed the wrong spellings. Mojo 1.1.0 has
+  `size_of[T]()` and `align_of[T]()` (from `std.sys`), and they are usable in
+  `@export` bodies: `dw_world_size` / `dw_world_align` return
+  `size_of[World]()` / `align_of[World]()`. (`offset_of` / `address_of` remain
+  absent.)
+- No int→pointer constructor turned out to be needed. The contract's pointers
+  enter through `OptionalPointer` parameters (below), which carry the caller's
+  address across without Mojo ever spelling an integer-to-pointer conversion.
+  On the calling side of an FFI probe, `Pointer(to=value)` materialises a
+  pointer to a Mojo-owned value, which is all the conformance drivers need.
+
 `std.builtin`, `std.memory`, `std.ffi`, `std.os`, `std.sys` were enumerated by
 probing each candidate name; the only members that exist among the ones that
 matter here are `Pointer`, `UnsafePointer`, `OpaquePointer`, `AddressSpace`
@@ -87,28 +111,54 @@ var g_store: List[Int] = []
 ```
 
 So the world handle cannot live in a Mojo-side static; it has to be threaded
-through caller-supplied memory, which is exactly what the header specifies and
-what we cannot do without the int→pointer constructor above.
+through caller-supplied memory, which is exactly what the header specifies.
 
-## Net consequence
+## The spelling that works
 
-On Mojo 1.1.0, an exported function can only receive and return *values*.
-The frozen contract in `include/dopewars.h` is pointer-shaped throughout
-(opaque handle in, out-params everywhere). Those two facts are irreconcilable
-inside `core/src/abi.mojo` alone, which is why TASK-001.05 is blocked on this
-toolchain rather than merely unfinished.
+`OptionalPointer[T, origin=MutUntrackedOrigin]` (mutable out-parameters) and
+`OptionalPointer[T, origin=ImmUntrackedOrigin]` (const in-parameters) are
+accepted by `@export(...) abi("C")` as parameters. The origin is bound to a
+concrete (untracked) origin, so the function is not parametric; the Optional
+wrapper gives NULL a first-class representation, which matches the header's
+NULL-rejection discipline exactly:
 
-The two ways out, in order of preference:
+```mojo
+@export("dw_state_get")
+def dw_state_get(
+    world: OptionalPointer[world_mod.World, origin=ImmUntrackedOrigin],
+    out_view: OptionalPointer[StateView, origin=MutUntrackedOrigin],
+) abi("C") -> Int32:
+    if not world or not out_view:
+        return DW_ERR_INVALID_ARGUMENT
+    ...
+    out_view.value().unsafe_write(StateView(...))
+    return DW_OK
+```
 
-1. **Upgrade Mojo** past the version where `@export` accepts an unbound
-   `origin`/`ref` parameter (or exposes an int→pointer constructor). The whole
-   frozen header then becomes directly exportable with no contract change.
-2. **Hand-written assembly trampolines** in a separate translation unit
-   compiled by `cc`/`as`, which read the pointer arguments per System V and
-   call into Mojo with struct-by-value shims. This keeps the header intact but
-   puts real ABI code outside `core/src/abi.mojo`, which violates the
-   single-exporter discipline in `docs/abi-contract.md` and is the kind of
-   thing that rots.
+Inside the body, `.value()[]` reads/writes the pointee, `.value()[i]` indexes
+arrays, and `.unsafe_write(v)` placement-constructs — which is what the
+caller-owned-storage contract needs: `dw_world_init` builds the `World` and
+writes it into the caller's buffer, and `World` is plain data (fixed
+`Array` + length fields, no heap) so the whole lifecycle crosses the seam
+without a Mojo-side allocation the caller cannot free.
 
-Option 1 is the recommendation; option 2 is viable but should be a deliberate
-trade, not a silent workaround.
+Evidence this is not a paper claim: `check_abi_exports.py` reports 54/54
+declarations exported from `core/build-output/lib/libdopewars.a` with 0 leaked,
+`core/abitest/` drives the pointer-shaped functions through ctypes and through
+`std.ffi.external_call`, and both bridge tests cross them under Godot — all on
+`mojo==1.1.0`.
+
+One caveat the conformance suite records in `core/abitest/README.md`: an
+`external_call` site cannot mix `Pointer` and `OptionalPointer` spellings for
+the same symbol (signature conflict), so the Mojo driver passes every ABI
+pointer argument as `OptionalPointer` and the NULL-guard paths are exercised
+only by the ctypes tier and code inspection.
+
+## Net consequence (corrected)
+
+On Mojo 1.1.0 an exported function cannot take `ref` parameters or *bare*
+`Pointer`/`UnsafePointer` parameters, but it can take `OptionalPointer` with an
+explicit untracked origin — and that covers every pointer shape
+`include/dopewars.h` declares. The frozen contract is exportable in full on the
+pinned toolchain; the earlier conclusion that it was not was a probe gap, not a
+toolchain limit.

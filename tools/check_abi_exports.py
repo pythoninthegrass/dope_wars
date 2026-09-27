@@ -15,30 +15,22 @@ Sets compared:
 Anything in exported but not declared is a leak -- unconditionally an error, and
 the half of this gate that is fully enforceable today.
 
-Anything in declared but not exported is a missing definition. While the Mojo
-1.1.0 pointer-parameter limitation stands (docs/mojo-1.1.0-abi-constraints.md),
-35 of the 54 declarations cannot be emitted by any Mojo source, so a build that
-fails on them would be red for a reason no commit can fix. This gate therefore
-distinguishes the two, using the same objective criterion the exporter is written
-against: a declaration whose signature takes a pointer, or returns one, is
-*blocked* -- exactly the declarations Mojo 1.1.0 cannot express -- and is expected
-absent. A declaration with a pointer-free signature that is nonetheless absent is
-a regression, and fails.
+Anything in declared but not exported is a missing definition. The gate
+distinguishes two kinds via the same objective criterion the exporter is written
+against: a declaration whose signature takes a pointer, or returns one, was
+*blocked* on Mojo 1.1.0 -- the version pinned when this gate was written. The
+OptionalPointer[T, origin=UntrackedOrigin] spelling documented in
+docs/mojo-1.1.0-abi-constraints.md exports them all, so the blocked set is
+derived rather than believed: it exists to keep a downgrade-visible regression
+from failing the build for a reason no commit can fix, and it subtracts nothing
+while every declaration is exported. A pointer-free signature that is absent is
+always a regression and fails.
 
-That rule is derived from the header, not hand-maintained, so it cannot go stale
-in the direction that matters: when the toolchain lifts the limit, nothing about
-the header changes, and the newly-buildable functions must then appear or the
-gate fails. The blocked set only ever shrinks by toolchain upgrade, never by
-editing a list here.
-
-One declaration (dw_world_size) has a pointer-free signature and is still not
-exportable, because it must report the size of the opaque dw_world and Mojo 1.1.0
-has no `sizeof` reachable from an exported function (see the "no sizeof" row of
-docs/mojo-1.1.0-abi-constraints.md). Deriving "blocked" purely from pointer
-signatures would misclassify it, so it is listed in NON_POINTER_BLOCKED below.
-That list is the one hand-maintained part of this gate, and it is deliberately
-small and self-critical: a name in it that *does* get exported is reported as
-stale, so the list cannot quietly grow to absorb unrelated regressions.
+dw_world_size was the one non-pointer-signature declaration listed as blocked
+(no reachable sizeof for the opaque handle); core/src/abi.mojo exports it via
+size_of[World](), so NON_POINTER_BLOCKED is now empty. Keep the mechanism for a
+future non-pointer blockage, and record the constraint doc reference in the same
+commit if anything is ever added.
 
 Usage:
   check_abi_exports.py <artifact> [<artifact>...]
@@ -65,14 +57,9 @@ from abi_symbols import (  # noqa: E402
 
 # Declarations blocked for a reason other than a pointer in the signature. Each
 # entry must name the constraint that blocks it, in
-# docs/mojo-1.1.0-abi-constraints.md, in the same commit.
-NON_POINTER_BLOCKED: frozenset[str] = frozenset(
-    {
-        # Must return sizeof(dw_world), and dw_world is opaque with no Mojo-side
-        # layout to measure: "No sizeof / offset_of / address_of intrinsics".
-        "dw_world_size",
-    }
-)
+# docs/mojo-1.1.0-abi-constraints.md, in the same commit. Empty: dw_world_size,
+# the last entry, became exportable via size_of[World]().
+NON_POINTER_BLOCKED: frozenset[str] = frozenset()
 
 
 def blocked_declarations(header_text: str) -> set[str]:
@@ -136,7 +123,10 @@ def global_defined_symbols(artifact: Path, nm: str) -> set[str]:
             (parts[0], parts[1]) if len(parts) == 2 else (parts[1], parts[2])
         )
         if sym_type in _DEFINED_TYPES and sym_type not in _WEAK_TYPES:
-            names.add(name)
+            # Mach-O prefixes C symbols with an underscore; ELF does not. The
+            # header's names are the contract, so normalize artifact symbols to
+            # that spelling before comparing.
+            names.add(name[1:] if name.startswith("_") else name)
     return names
 
 

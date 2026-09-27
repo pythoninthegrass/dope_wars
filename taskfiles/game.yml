@@ -44,3 +44,14 @@ tasks:
     dir: game
     cmds:
       - timeout 300 godot --headless --path . --scene res://godot_tests/bridge_test.tscn
+
+  # The script-driven companion to bridge-test: drives the full forwarded ABI
+  # (lifecycle, buy/sell/travel/finances, dump->load->dump) through
+  # godot --script, while the scene test above value-checks the generated
+  # pointer-free surface. Same timeout rationale as bridge-test.
+  bridge-test-script:
+    desc: "Script-driven bridge integration test over the full forwarded ABI"
+    deps: [":game:import"]
+    dir: game
+    cmds:
+      - timeout 300 godot --headless --path . --script res://tests/test_bridge.gd

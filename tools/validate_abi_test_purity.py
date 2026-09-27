@@ -2,21 +2,26 @@
 """Conformance-test purity gate (TASK-001.05 AC#2/#3).
 
 Tier-C ABI conformance tests must reach the simulation *only* through the C ABI
-in include/dopewars.h — via ctypes against the linked library, or via a C
-translation unit that `#include`s the header. If a conformance test were allowed
-to `import rules` (or `from world import World`, or to shell out to
-`mojo run`), it would silently degrade into a second copy of the Tier-A parity
-suite in tests/mojo/ and stop proving anything about the boundary.
+in include/dopewars.h — via ctypes against the linked library, via a C
+translation unit that `#includes` the header, or via a Mojo driver that imports
+nothing but `std` and reaches the library through `external_call["dw_..."]` on
+the exported C symbols. If a conformance test were allowed to `import rules`
+(or `from world import World`, or to shell out to `mojo run`), it would silently
+degrade into a second copy of the Tier-A parity suite in tests/mojo/ and stop
+proving anything about the boundary.
 
 Enforced here:
 
 1. No import of a core module (the modules under core/src, or `src.`/`core.src`
    dotted forms).
-2. No Mojo subprocess. ctypes is the sanctioned mechanism; spawning the Mojo
-   toolchain from a conformance test is a purity escape hatch.
+2. No Mojo subprocess. ctypes/external_call are the sanctioned mechanisms;
+   spawning the Mojo toolchain from a conformance test is a purity escape hatch.
 3. Every Python conformance test must actually name the shared library it loads
    and must name include/dopewars.h somewhere, so "it imports nothing" cannot be
    satisfied by a test that does nothing at all.
+4. Every Mojo conformance driver must import only `std.*` and must contain at
+   least one `external_call["dw_..."]` — the same boundary, crossed from the
+   other language.
 
 Scanned: core/abitest/**. That is where Tier-C lives; tests/mojo/** is Tier-A
 and is intentionally allowed to import core modules directly.
@@ -149,6 +154,34 @@ def scan_c(path: Path) -> list[str]:
     return problems
 
 
+# The Mojo driver's proof of life: it reaches the library by naming a dw_* C
+# symbol to external_call, not by importing anything that could compute it.
+_MOJO_FFI_RE = re.compile(r'external_call\[\s*"dw_')
+
+
+def scan_mojo(path: Path) -> list[str]:
+    """A Mojo conformance driver is a pure std.* consumer reaching the library
+    through external_call on dw_* symbols -- the same C boundary the ctypes tier
+    crosses, approached from the other language."""
+    text = strip_noise(path.read_text(encoding="utf-8"))
+    problems: list[str] = []
+
+    for m in _IMPORT_RE.finditer(text):
+        leaf = m.group("leaf")
+        if leaf != "std":
+            lineno = text[: m.start()].count("\n") + 1
+            problems.append(f"{path}:{lineno}: imports non-std module '{leaf}'")
+
+    for m in _MOJO_SUBPROCESS_RE.finditer(text):
+        lineno = text[: m.start()].count("\n") + 1
+        problems.append(f"{path}:{lineno}: drives the Mojo toolchain ({m.group(1)})")
+
+    if not _MOJO_FFI_RE.search(text):
+        problems.append(f'{path}: never calls external_call["dw_..."]')
+
+    return problems
+
+
 def find_violations(abitest_dir: Path = ABITEST_DIR) -> list[str]:
     problems: list[str] = []
     if not abitest_dir.is_dir():
@@ -162,11 +195,7 @@ def find_violations(abitest_dir: Path = ABITEST_DIR) -> list[str]:
         return [f"{abitest_dir}: no conformance test files found"]
     for path in files:
         if path.suffix == ".mojo":
-            # A .mojo file in Tier-C is only legitimate as the ctypes-side
-            # library-under-test, which purity forbids calling directly.
-            problems.append(
-                f"{path}: .mojo file in the conformance tier (must reach the ABI via C)"
-            )
+            problems.extend(scan_mojo(path))
         elif path.suffix == ".py":
             problems.extend(scan_python(path))
         elif path.suffix == ".c":
@@ -186,7 +215,8 @@ def main() -> int:
             print(f"  {p}", file=sys.stderr)
         print(
             "\nTier-C reaches the library exclusively through include/dopewars.h "
-            "(ctypes or a C TU). Core modules are tested by Tier-A in tests/mojo/.",
+            "(ctypes, a C TU, or a std-only Mojo external_call driver). Core "
+            "modules are tested by Tier-A in tests/mojo/.",
             file=sys.stderr,
         )
         return 1

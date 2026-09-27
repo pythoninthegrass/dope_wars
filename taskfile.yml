@@ -46,9 +46,10 @@ tasks:
       - python3 tools/abi_symbols.py --check
 
   abi:conformance:
-    desc: "Tier-C ABI conformance: ctypes suite + the C header self-consistency check"
+    desc: "Tier-C ABI conformance: ctypes suite, Mojo external_call suite, C header check"
     cmds:
       - task: core:abitest
+      - task: core:abitest:mojo
       - task: core:abi:header-check
 
   # Generates game/bridge_expectations.gd, the expected bridge surface derived
@@ -74,14 +75,20 @@ tasks:
       - task: gen:bridge-expectations:check
       - task: game:bridge-test
 
+  bridge:test:script:
+    desc: "Script-driven bridge test over the full forwarded ABI (res://tests/test_bridge.gd)"
+    cmds:
+      - task: game:bridge-test-script
+
   check:
-    desc: "Mojo parity + ABI gates/conformance + bridge test + Godot smoke test; non-zero exit on any failure"
+    desc: "Mojo parity + ABI gates/conformance + bridge tests + Godot smoke test; non-zero exit on any failure"
     cmds:
       - task: core:test
       - task: abi:check
       - task: abi:conformance
       # bridge:test runs the staleness check itself, so it is not repeated here.
       - task: bridge:test
+      - task: bridge:test:script
       - task: game:smoke-test
 
   run:

@@ -24,17 +24,28 @@ tasks:
     cmds:
       - mkdir -p build-output/lib
       - .venv/bin/mojo build src/abi.mojo --emit object -o build-output/dopewars-raw.o
-      # Mojo's `--emit object` output carries its runtime's symbols as
-      # globals. The ABI contract (docs/abi-contract.md, "The two sets are
-      # equal") says the archive's global defined set must be exactly the
-      # dw_* declarations in include/dopewars.h, so everything else is
-      # demoted to a local symbol here. The list is generated from the
-      # header, so the gate cannot drift from the contract.
+      # On ELF, Mojo's `--emit object` output carries its runtime's symbols as
+      # globals, so everything outside the dw_* set is demoted to local here.
+      # The ABI contract (docs/abi-contract.md, "The two sets are equal") says
+      # the archive's global defined set must be exactly the dw_* declarations
+      # in include/dopewars.h; the keep list is generated from the header, so
+      # the gate cannot drift from the contract. On Mach-O the object already
+      # satisfies the contract and no objcopy exists; check_abi_exports.py is
+      # the enforcement either way.
       - |
+        set -eu
         python3 ../tools/abi_symbols.py > build-output/dopewars.exports.txt
-        objcopy --keep-global-symbols=build-output/dopewars.exports.txt \
-          build-output/dopewars-raw.o build-output/dopewars.o
-      - ar rcs build-output/lib/libdopewars.a build-output/dopewars.o
+        if command -v objcopy >/dev/null 2>&1; then
+          objcopy --keep-global-symbols=build-output/dopewars.exports.txt \
+            build-output/dopewars-raw.o build-output/dopewars.o
+        else
+          # objcopy is absent on macOS. Nothing to demote there: mojo's Mach-O
+          # object defines only the dw_* globals and leaves the runtime symbols
+          # undefined for the final link. Either way, check_abi_exports.py
+          # below is the contract, not this step.
+          cp build-output/dopewars-raw.o build-output/dopewars.o
+        fi
+        ar rcs build-output/lib/libdopewars.a build-output/dopewars.o
       # AC#1 of TASK-001.05: the archive's global defined set must contain no
       # non-dw_* symbol. Runs on the archive, so it needs no compiler.
       - python3 ../tools/check_abi_exports.py build-output/lib/libdopewars.a
@@ -72,12 +83,18 @@ tasks:
       - |
         set -eu
         rt_dir=$(.venv/bin/python -c \
-          'import pathlib,sys; print(next(p for p in pathlib.Path(sys.prefix).rglob("libKGENCompilerRTShared.so")).parent)')
+          'import pathlib,sys; print(next(p for p in pathlib.Path(sys.prefix).rglob("libKGENCompilerRTShared.*")).parent)')
         mkdir -p build-output/lib
         # --whole-archive: the archive's members are only pulled in on demand, so
         # a plain link would drop every dw_* symbol nothing here references yet.
+        # ld64 spells the same thing -force_load with the archive attached.
+        if [ "$(uname)" = "Darwin" ]; then
+          whole='-Wl,-force_load,build-output/lib/libdopewars.a'
+        else
+          whole='-Wl,--whole-archive build-output/lib/libdopewars.a -Wl,--no-whole-archive'
+        fi
         cc -shared -o build-output/lib/libdopewars.so \
-          -Wl,--whole-archive build-output/lib/libdopewars.a -Wl,--no-whole-archive \
+          $whole \
           -L"$rt_dir" -lKGENCompilerRTShared -Wl,-rpath,"$rt_dir"
         # The gate runs against the .so too, since that is the artifact the C ABI
         # is actually served from during conformance testing.
@@ -95,7 +112,7 @@ tasks:
       - |
         set -eu
         rt_dir=$(.venv/bin/python -c \
-          'import pathlib,sys; print(next(p for p in pathlib.Path(sys.prefix).rglob("libKGENCompilerRTShared.so")).parent)')
+          'import pathlib,sys; print(next(p for p in pathlib.Path(sys.prefix).rglob("libKGENCompilerRTShared.*")).parent)')
         cc -std=c11 -Wall -Wextra -Werror -I../include \
           -o build-output/abi-header-check/abi_header_check \
           abitest/abi_header_check.c \
@@ -122,3 +139,23 @@ tasks:
     cmds:
       - node ../tests/fixtures/gen-mojo.mjs
       - git diff --exit-code -- ../tests/mojo/fixtures.mojo
+
+  abitest:mojo:
+    desc: "Tier-C ABI conformance (Mojo external_call) built against the static library"
+    summary: |
+      core/abitest/abitest.mojo reaches the compiled core exclusively through
+      include/dopewars.h via std.ffi.external_call, never by importing a core
+      module (checked separately by tools/validate_abi_test_purity.py). This is
+      the second Tier-C driver, alongside the ctypes suite in core:abitest;
+      it reaches the library through a different FFI mechanism, so a binding
+      bug in one driver does not hide in the other.
+    deps: [build]
+    dir: core
+    cmds:
+      - .venv/bin/mojo build abitest/abitest.mojo -o build-output/abitest -Xlinker build-output/lib/libdopewars.a
+      - ./build-output/abitest
+    sources:
+      - "abitest/**/*.mojo"
+      - "src/**/*.mojo"
+    generates:
+      - build-output/abitest

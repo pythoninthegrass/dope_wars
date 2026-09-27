@@ -8,12 +8,12 @@
 
 class_name BridgeExpectations
 
-## Every ABI function reachable through the GDExtension shim, as the
-## GDScript-side method name the shim binds, plus the value the ABI contract
-## pins for it. Only the pointer-free declarations appear: the rest of the
-## ABI is blocked on the Mojo 1.1.0 pointer-parameter limitation and the
-## bridge cannot expose a dw_world handle yet.
-## Not forwarded: dw_world_size — blocked: no Mojo-side sizeof for the opaque dw_world
+## Every pointer-free ABI declaration the shim forwards, as the
+## GDScript-side method name plus the value the ABI contract pins for it.
+## Only pointer-free no-argument functions appear here because this table
+## drives value and width-fidelity checks via a zero-arg call. The
+## pointer-argument side of the ABI is forwarded by the shim and covered
+## behaviourally by res://tests/test_bridge.gd and the Tier-C suites.
 
 # method name -> { "value": pinned value, "c_type": C return type,
 #                          "width": "uint32" | "int32" | "int64" | "size" }
@@ -40,6 +40,7 @@ const ABI = {
 	"rules_expensive_multiply": {"value": 4, "c_type": "uint32_t", "width": "uint32"},
 	"rules_locations_len": {"value": 6, "c_type": "uint32_t", "width": "uint32"},
 	"rules_drugs_len": {"value": 12, "c_type": "uint32_t", "width": "uint32"},
+	"world_size": {"c_type": "size_t", "width": "size"},
 	"world_align": {"c_type": "size_t", "width": "size"},
 	"world_dump_len": {"c_type": "size_t", "width": "size"},
 }

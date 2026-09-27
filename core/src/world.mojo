@@ -14,6 +14,13 @@
 # explicit order list of drug indices. The order list is the source of truth for
 # iteration; the dense slots are the source of truth for value.
 #
+# The order lists are fixed-size `Array`s with an explicit length rather than
+# `List`s. That is what lets the whole World live in caller-owned storage with
+# no hidden heap allocation: `dw_world_size()` is `size_of[World]()`, the ABI
+# placement-constructs a World into the caller's buffer, and plain `free()` on
+# that buffer is a complete teardown (docs/abi-contract.md). A `List` field
+# would leak its backing store with no `dw_world_destroy` to release it.
+#
 # `price_was_event` records whether a price came from a cheap/expensive event
 # roll rather than the normal min..max band. The JS engine does not track it,
 # but dw_price_slot exposes it, so it is captured here where the information is
@@ -24,13 +31,16 @@ import rules
 import rng as rng_mod
 
 
+comptime MAX_PRICE_EVENTS = 3
+
+
 struct PriceEvent(Copyable, Movable):
     # kind is one of PRICE_EVENT_CHEAP / PRICE_EVENT_EXPENSIVE. The JS event
     # also carries a presentation `message`, which core deliberately drops.
     var kind: Int
     var drug_index: Int
 
-    def __init__(out self, kind: Int, drug_index: Int):
+    def __init__(out self, kind: Int = 0, drug_index: Int = 0):
         self.kind = kind
         self.drug_index = drug_index
 
@@ -45,6 +55,10 @@ struct World:
     var day: Int64
     var num_days: Int64
     var cash: Float64
+    # The resolved starting cash, retained so dw_world_reset can rebuild the
+    # same fresh game without the caller re-supplying the config. Never mutated
+    # after construction.
+    var start_cash: Float64
     var debt: Float64
     var bank: Float64
     var health: Int64
@@ -58,22 +72,26 @@ struct World:
     var price_value: Array[Int64, rules.NUM_DRUGS]
     var price_present: Array[UInt8, rules.NUM_DRUGS]
     var price_was_event: Array[UInt8, rules.NUM_DRUGS]
-    var price_order: List[UInt8]
+    var price_order: Array[UInt8, rules.NUM_DRUGS]
+    var price_order_len: Int
 
     # The previous turn's prices, kept for the UI's price-delta display.
     var prev_price_value: Array[Int64, rules.NUM_DRUGS]
     var prev_price_present: Array[UInt8, rules.NUM_DRUGS]
-    var prev_price_order: List[UInt8]
+    var prev_price_order: Array[UInt8, rules.NUM_DRUGS]
+    var prev_price_order_len: Int
 
     # Inventory, keyed by drug index.
     var inv_qty: Array[Int64, rules.NUM_DRUGS]
     var inv_avg_price: Array[Float64, rules.NUM_DRUGS]
     var inv_present: Array[UInt8, rules.NUM_DRUGS]
-    var inv_order: List[UInt8]
+    var inv_order: Array[UInt8, rules.NUM_DRUGS]
+    var inv_order_len: Int
 
     # Cheap/expensive events surfaced by the last generate_prices, in the order
     # the JS Set produced them.
-    var price_events: List[PriceEvent]
+    var price_events: Array[PriceEvent, MAX_PRICE_EVENTS]
+    var price_events_len: Int
 
     def __init__(out self, seed: UInt32, num_days: Int64, start_cash: Float64):
         self.seed = seed
@@ -81,6 +99,7 @@ struct World:
         self.day = 1
         self.num_days = num_days
         self.cash = start_cash
+        self.start_cash = start_cash
         self.debt = Float64(rules.START_DEBT)
         self.bank = 0.0
         self.health = rules.START_HEALTH
@@ -93,26 +112,30 @@ struct World:
         self.price_value = Array[Int64, rules.NUM_DRUGS]()
         self.price_present = Array[UInt8, rules.NUM_DRUGS]()
         self.price_was_event = Array[UInt8, rules.NUM_DRUGS]()
-        self.price_order = List[UInt8]()
+        self.price_order = Array[UInt8, rules.NUM_DRUGS]()
+        self.price_order_len = 0
 
         self.prev_price_value = Array[Int64, rules.NUM_DRUGS]()
         self.prev_price_present = Array[UInt8, rules.NUM_DRUGS]()
-        self.prev_price_order = List[UInt8]()
+        self.prev_price_order = Array[UInt8, rules.NUM_DRUGS]()
+        self.prev_price_order_len = 0
 
         self.inv_qty = Array[Int64, rules.NUM_DRUGS]()
         self.inv_avg_price = Array[Float64, rules.NUM_DRUGS]()
         self.inv_present = Array[UInt8, rules.NUM_DRUGS]()
-        self.inv_order = List[UInt8]()
+        self.inv_order = Array[UInt8, rules.NUM_DRUGS]()
+        self.inv_order_len = 0
 
-        self.price_events = List[PriceEvent]()
+        self.price_events = Array[PriceEvent, MAX_PRICE_EVENTS](fill=PriceEvent())
+        self.price_events_len = 0
 
     # ---- prices -----------------------------------------------------------
 
     def price_count(ref self) -> Int:
-        return len(self.price_order)
+        return self.price_order_len
 
     def prev_price_count(ref self) -> Int:
-        return len(self.prev_price_order)
+        return self.prev_price_order_len
 
     def has_price(ref self, drug_index: Int) -> Bool:
         return self.price_present[drug_index] != 0
@@ -130,33 +153,37 @@ struct World:
         for i in range(rules.NUM_DRUGS):
             self.price_present[i] = 0
             self.price_was_event[i] = 0
-        self.price_order = List[UInt8]()
+        self.price_order_len = 0
 
     def clear_prices(mut self):
         self.clear_price_roster()
-        self.price_events = List[PriceEvent]()
+        self.price_events_len = 0
 
     def set_price(mut self, drug_index: Int, value: Int64, was_event: Bool):
         if self.price_present[drug_index] == 0:
-            self.price_order.append(UInt8(drug_index))
+            self.price_order[self.price_order_len] = UInt8(drug_index)
+            self.price_order_len += 1
         self.price_present[drug_index] = 1
         self.price_value[drug_index] = value
         self.price_was_event[drug_index] = 1 if was_event else 0
 
     def add_price_event(mut self, kind: Int, drug_index: Int):
-        self.price_events.append(PriceEvent(kind, drug_index))
+        self.price_events[self.price_events_len] = PriceEvent(kind, drug_index)
+        self.price_events_len += 1
 
     # state.prevPrices = state.prices, before state.prices is replaced.
     def snapshot_prices_to_prev(mut self):
         for i in range(rules.NUM_DRUGS):
             self.prev_price_present[i] = self.price_present[i]
             self.prev_price_value[i] = self.price_value[i]
-        self.prev_price_order = self.price_order.copy()
+        for i in range(self.price_order_len):
+            self.prev_price_order[i] = self.price_order[i]
+        self.prev_price_order_len = self.price_order_len
 
     # ---- inventory --------------------------------------------------------
 
     def inv_count(ref self) -> Int:
-        return len(self.inv_order)
+        return self.inv_order_len
 
     def has_inventory(ref self, drug_index: Int) -> Bool:
         return self.inv_present[drug_index] != 0
@@ -172,7 +199,8 @@ struct World:
             self._drop_inventory(drug_index)
             return
         if self.inv_present[drug_index] == 0:
-            self.inv_order.append(UInt8(drug_index))
+            self.inv_order[self.inv_order_len] = UInt8(drug_index)
+            self.inv_order_len += 1
         self.inv_present[drug_index] = 1
         self.inv_qty[drug_index] = qty
         self.inv_avg_price[drug_index] = avg_price
@@ -183,11 +211,12 @@ struct World:
         self.inv_present[drug_index] = 0
         self.inv_qty[drug_index] = 0
         self.inv_avg_price[drug_index] = 0.0
-        var kept = List[UInt8]()
-        for entry in self.inv_order:
-            if Int(entry) != drug_index:
-                kept.append(entry)
-        self.inv_order = kept^
+        var write = 0
+        for i in range(self.inv_order_len):
+            if Int(self.inv_order[i]) != drug_index:
+                self.inv_order[write] = self.inv_order[i]
+                write += 1
+        self.inv_order_len = write
 
     # addToInventory: grant as much as fits, return the amount granted.
     def add_to_inventory(mut self, drug_index: Int, qty: Int64) -> Int64:
@@ -219,8 +248,8 @@ struct World:
     # coatUsed: every held unit plus GUN_SPACE slots per gun.
     def coat_used(ref self) -> Int64:
         var used: Int64 = 0
-        for entry in self.inv_order:
-            used += self.inv_qty[Int(entry)]
+        for i in range(self.inv_order_len):
+            used += self.inv_qty[Int(self.inv_order[i])]
         used += self.guns * rules.GUN_SPACE
         return used
 

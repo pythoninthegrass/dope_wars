@@ -4,10 +4,11 @@ extends Node
 #
 # Exercises the full Godot -> GDExtension(C++) -> C ABI -> Mojo path and asserts
 # the value that arrives in GDScript is the value the ABI contract specifies, for
-# every ABI function the shim forwards. game/main.gd's smoke test proved this
-# path *links*; this proves it *translates*, which is where the failures actually
-# are: a uint32 bound through a signed hop, an int64 narrowed to 32 bits, a
-# method that silently stopped being bound.
+# every pointer-free function in the generated surface. The pointer-argument side
+# of the shim is covered by res://tests/test_bridge.gd. game/main.gd's smoke test
+# proved this path *links*; this proves it *translates*, which is where the
+# failures actually are: a uint32 bound through a signed hop, an int64 narrowed
+# to 32 bits, a method that silently stopped being bound.
 #
 # Expectations come from game/bridge_expectations.gd, generated from
 # include/dopewars.h by tools/gen_bridge_expectations.py. Nothing here hard-codes
@@ -100,9 +101,11 @@ func _load_expectations() -> Object:
 	return instance
 
 
-# The shim must expose exactly the generated surface: no missing method (a dropped
-# bind_method call), and no method the header never declared (a shim that invented
-# ABI, or kept forwarding something the header dropped).
+# The shim must expose at least the generated surface: no missing method (a dropped
+# bind_method call). The extra direction is deliberately not asserted: the shim
+# forwards the full ABI, while this table only pins the pointer-free no-arg subset
+# it can value-check, so bound methods outside the table are expected. The exact
+# export surface is the export-surface gate's job (tools/check_abi_exports.py).
 func _check_class_surface(world: Object) -> void:
 	var expected_names: Array = _expectations.ABI.keys()
 	var bound := _forwarded_method_names(world)
@@ -110,9 +113,6 @@ func _check_class_surface(world: Object) -> void:
 	for name in expected_names:
 		if not bound.has(name):
 			_fail("surface", "method '%s' is expected but not bound on DopeWarsWorld" % name)
-	for name in bound:
-		if not expected_names.has(name):
-			_fail("surface", "method '%s' is bound but not in the generated ABI surface" % name)
 
 	if expected_names.is_empty():
 		_fail("surface", "generated ABI surface is empty — generator or header is broken")
