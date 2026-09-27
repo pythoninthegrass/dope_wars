@@ -2,8 +2,10 @@
 id: TASK-001.05
 title: Implement ABI conformance and bridge integration tests
 status: In Progress
-assignee: []
+assignee:
+  - '@pi'
 created_date: '2026-09-26 04:34'
+updated_date: '2026-09-27 21:28'
 labels:
   - mojo
   - ffi
@@ -139,3 +141,14 @@ forgotten TODO.
   are asserted only for the pointer-free subset. The two-call machinery is in
   place and the harness distinguishes "blocked" from "wrong", but the pointer
   surface itself is untested until the toolchain moves.
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-09-27 21:28
+---
+Landed via PR #1 (squash f34aed4) from a gnhf unattended run (pi / aperture/qwen3.8-flash-next-iq4). ACs #1, #2, #3, #5 met and independently verified by review: task check rc=0, abitest 41/41, nm -g on libdopewars.a = 19 dw_* / 0 leaked, both validators fail planted violations, markdownlint rc=0.
+
+AC#4 remains open: Mojo 1.1.0 @export refuses pointer-parameter functions and offers no address->Pointer constructor, so the dw_world * seam is unexportable and the stateful surface (init/step/dump-load) is unreachable. Probe log in docs/mojo-1.1.0-abi-constraints.md; three independent reviewer probes confirmed it. Follow-up task tracks the decision (toolchain bump vs ABI restructure). Task intentionally left In Progress until AC#4 closes.
+---
+<!-- COMMENTS:END -->
