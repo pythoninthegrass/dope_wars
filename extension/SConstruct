@@ -13,6 +13,7 @@
 # godot-cpp's own `customs` export hook.
 
 import os
+import re
 import subprocess
 import sys
 
@@ -81,7 +82,7 @@ env.Append(LIBS=[core_lib])
 # so a Mojo version bump that moves the library changes nothing here. If the
 # library is missing, the build stops with a clear message rather than producing
 # an extension that cannot load.
-mojo_runtime_dir = None
+mojo_runtime_lib = None
 for candidate_python in (
     os.path.join("..", "core", ".venv", "bin", "python"),
     os.path.join("..", "core", ".venv", "bin", "python3"),
@@ -93,25 +94,25 @@ for candidate_python in (
             candidate_python,
             "-c",
             "import pathlib,sys; "
-            "print(next(p for p in pathlib.Path(sys.prefix).rglob('libKGENCompilerRTShared.*')).parent)",
+            "print(next(p for p in pathlib.Path(sys.prefix).rglob('libKGENCompilerRTShared.*')))",
         ],
         text=True,
     ).strip()
-    if located:
-        mojo_runtime_dir = located
+    if located and os.path.exists(located):
+        mojo_runtime_lib = located
     break
 
-if not mojo_runtime_dir:
+if not mojo_runtime_lib:
     raise SCons.Errors.UserError(
         "libKGENCompilerRTShared.{so,dylib} not found under core/.venv — run `task core:build` "
         "(it provisions the venv) before building the extension."
     )
+mojo_runtime_dir = os.path.dirname(mojo_runtime_lib)
 
+# Link the venv copy at build time; at runtime the extension resolves the
+# runtime through a vendored copy next to its own output (below) via a
+# self-relative rpath, so the venv path never reaches a load command.
 env.Append(LIBPATH=[mojo_runtime_dir], LIBS=["KGENCompilerRTShared"])
-if env["platform"] == "linux":
-    env.Append(RPATH=[mojo_runtime_dir])
-elif env["platform"] == "macos":
-    env.Append(LINKFLAGS=["-Wl,-rpath,{}".format(mojo_runtime_dir)])
 
 # macOS: Apple's newer default linker (ld-prime, Xcode 26+) enforces
 # 8-byte alignment on Mach-O archive members. `ar` from Command Line
@@ -130,11 +131,54 @@ if env["platform"] == "macos":
         "../game/bin/{}/{}".format(bundle_name, bundle_name.removesuffix(".framework")),
         source=sources,
     )
+    # @loader_path is the framework directory itself.
+    rpath = "@loader_path"
+    vendored_dir = "../game/bin/{}".format(bundle_name)
 else:
     library = env.SharedLibrary(
         "../game/bin/libdopewars{}{}".format(env["suffix"], env["SHLIBSUFFIX"]),
         source=sources,
     )
-env.Depends(library, core_lib)
+    # $ORIGIN is game/bin/, where the .so lands.
+    rpath = "$ORIGIN"
+    vendored_dir = "../game/bin"
+
+# Self-relative rpath: @loader_path on macOS, $ORIGIN on Linux.
+if env["platform"] == "linux":
+    env.Append(RPATH=[rpath])
+else:
+    env.Append(LINKFLAGS=["-Wl,-rpath,{}".format(rpath)])
+
+# The runtime references sibling libraries by @rpath (macOS install name) /
+# NEEDED soname (Linux), all in the same venv directory. Vendor the whole
+# closure next to the extension's output so the rpath above resolves it with
+# no reference to core/.venv left in the bundle.
+def _linked_shared_libs(lib):
+    if env["platform"] == "macos":
+        out = subprocess.check_output(["otool", "-L", lib], text=True)
+        return re.findall(r"^\t(\S+) \(compatibility", out, re.M)
+    out = subprocess.check_output(["readelf", "-d", lib], text=True)
+    return re.findall(r"\(NEEDED\)\s+Shared library: \[([^\]]+)\]", out)
+
+vendored = [mojo_runtime_lib]
+queue = [mojo_runtime_lib]
+while queue:
+    for dep in _linked_shared_libs(queue.pop()):
+        if os.path.isabs(dep):
+            continue  # system library, not part of the runtime
+        candidate = os.path.join(mojo_runtime_dir, os.path.basename(dep))
+        if candidate not in vendored and os.path.exists(candidate):
+            vendored.append(candidate)
+            queue.append(candidate)
+
+vendored_copy = env.Command(
+    [os.path.join(vendored_dir, os.path.basename(p)) for p in vendored],
+    [env.File(p) for p in vendored],
+    " && ".join(
+        "cp -f {} {}".format(p, os.path.join(vendored_dir, os.path.basename(p)))
+        for p in vendored
+    ),
+)
+env.Depends(library, [core_lib, vendored_copy])
 
 Default(library)

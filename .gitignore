@@ -299,3 +299,8 @@ game/translations/*.translation
 third_party/godot-cpp/bin/
 third_party/godot-cpp/gen/**/*.os
 third_party/godot-cpp/.sconsign*.dblite
+
+# TASK-002 vendored Mojo runtime (copied into game/bin by the extension build)
+libKGENCompilerRTShared.*
+libMSupportGlobals.*
+libAsyncRTRuntimeGlobals.*
