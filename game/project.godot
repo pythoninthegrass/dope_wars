@@ -2,7 +2,10 @@
 ;
 ; The window is sized to the prototype's 44rem design width (index.html:63) at
 ; 16px/rem, with canvas_items/keep so any other size letterboxes rather than
-; distorts the fixed Win95 chrome.
+; distorts the fixed Win95 chrome. Unlike the prototype, the game fills the
+; whole client area: there is no browser page around a 660px window, and no
+; in-window titlebar, because the OS draws both. The height is what the
+; prototype's 620px viewport needs to show all twelve drugs without scrolling.
 
 config_version=5
 

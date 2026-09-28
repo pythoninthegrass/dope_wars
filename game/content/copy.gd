@@ -16,7 +16,7 @@ extends RefCounted
 
 # --- chrome -----------------------------------------------------------------
 
-const TITLEBAR_DAY := "DOPE_WARS_TITLEBAR_DAY"
+const DAY_OF := "DOPE_WARS_DAY_OF"
 
 const MENU_FILE := "MENU_FILE"
 const MENU_SCORES := "MENU_SCORES"
@@ -177,9 +177,10 @@ static func money(value: float) -> String:
 # --- structured payloads -> sentences ----------------------------------------
 
 
-## "Dope Wars, Day 3 of 31" (index.html:1129).
-static func titlebar_day(day: int, num_days: int) -> String:
-	return t(TITLEBAR_DAY).format([day, num_days])
+## "Day 3 of 31" (index.html:1129, without the prototype's "Dope Wars,"
+## which the OS window title already carries).
+static func day_of(day: int, num_days: int) -> String:
+	return t(DAY_OF).format([day, num_days])
 
 
 ## "Subway from Bronx:" (index.html:562).

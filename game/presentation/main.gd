@@ -41,6 +41,11 @@ func _ready() -> void:
 	theme = Win95Theme.shared()
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 
+	# The HUD is the whole client area. The prototype draws a page around a
+	# 660px window because it lives in a browser tab; as a native app the OS
+	# owns the frame, so there is no page, no gutter, and no titlebar to fake
+	# -- the window title carries the game name and the HUD's menu strip
+	# carries the day (see Hud._build_day_readout).
 	_hud = Hud.new()
 	_hud.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(_hud)

@@ -1,8 +1,10 @@
 class_name Hud
 extends PanelContainer
 
-## The main game window (index.html:509-603): titlebar, menubar, the LED /
-## subway / finish top row, the action row, both tables, and the footer.
+## The main game window (index.html:509-603): the menubar, the LED / subway /
+## finish top row, the action row, both tables, and the footer. The
+## prototype's titlebar is a window decoration this app does not draw -- the
+## OS does -- so the day readout sits at the right of the menubar strip.
 ##
 ## This is pure rendering plus input forwarding. Every refresh re-reads the
 ## world, because `docs/layer-boundaries.md` forbids mirroring dw_world state
@@ -66,7 +68,7 @@ var _traded: Dictionary = {}
 
 func _init() -> void:
 	theme = Win95Theme.shared()
-	theme_type_variation = &"Panel"
+	theme_type_variation = &"WindowFace"
 	_build()
 
 
@@ -78,7 +80,7 @@ func refresh(world: SimWorld) -> void:
 	var num_days := int(state.get("num_days", 31))
 	var dead := bool(state.get("dead", false))
 
-	_title.text = Copy.titlebar_day(day, num_days)
+	_title.text = Copy.day_of(day, num_days)
 	_leds["cash"].text = Copy.fmt(state.get("cash", 0))
 	_leds["bank"].text = Copy.fmt(state.get("bank", 0))
 	_leds["debt"].text = Copy.fmt(state.get("debt", 0))
@@ -228,7 +230,6 @@ func _build() -> void:
 	column.add_theme_constant_override("separation", 0)
 	add_child(column)
 
-	column.add_child(_build_titlebar())
 	column.add_child(_build_menubar())
 
 	var content := MarginContainer.new()
@@ -256,22 +257,32 @@ func _build() -> void:
 	stack.add_child(_build_footer())
 
 
-func _build_titlebar() -> Control:
-	var bar := PanelContainer.new()
-	bar.name = "Titlebar"
-	bar.theme_type_variation = &"Titlebar"
+## The prototype's titlebar (index.html:66-76, :511) is a window decoration,
+## and a native app has one already -- Godot's, which Main keeps in sync with
+## the day. So the title text lives in the menubar strip instead, on the right
+## of the menus, where a Win95 status field would sit.
+func _build_day_readout() -> Control:
 	_title = Label.new()
-	_title.text = Copy.titlebar_day(1, 31)
-	_title.add_theme_color_override("font_color", Palette.TITLEBAR_TEXT)
+	_title.name = "DayReadout"
+	_title.text = Copy.day_of(1, 31)
+	_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_title.clip_text = true
-	bar.add_child(_title)
-	return bar
+	return _title
 
 
 func _build_menubar() -> Control:
+	# index.html:100-106: the strip is the window face with a hairline under
+	# it, so the entries sit on their own panel rather than on the content
+	# background.
+	var strip := PanelContainer.new()
+	strip.name = "MenubarStrip"
+	strip.theme_type_variation = &"MenubarStrip"
 	var bar := HBoxContainer.new()
 	bar.name = "Menubar"
-	bar.add_theme_constant_override("separation", 12)
+	# index.html:101: gap: 1rem.
+	bar.add_theme_constant_override("separation", 15)
+	strip.add_child(bar)
 	bar.add_child(_menu_button(Copy.MENU_FILE, [
 		[Copy.ITEM_NEW_GAME, "_on_new_game"],
 		[Copy.ITEM_EXIT, "_on_exit"],
@@ -285,18 +296,19 @@ func _build_menubar() -> Control:
 	bar.add_child(_menu_button(Copy.MENU_HELP, [
 		[Copy.ITEM_HOW_TO_PLAY, "_on_help"],
 	]))
-	return bar
+	bar.add_child(_build_day_readout())
+	return strip
 
 
 ## `items` is a list of [label_key, handler_method] pairs. An empty handler
 ## name lists an item that does nothing, which is how the Sounds menu renders
-## in the prototype.
+## in the prototype. The frame is the theme's, not Button's: index.html:109-118
+## draws these as bare text that highlights on hover.
 func _menu_button(label_key: String, items: Array, inert: bool = false) -> Control:
 	var root := MenuButton.new()
 	root.name = "Menu" + label_key
 	root.text = tr(label_key)
 	root.disabled = inert
-	root.flat = true
 
 	var popup := root.get_popup()
 	var handlers := {}
@@ -337,6 +349,8 @@ func _build_top_row() -> Control:
 	row.name = "TopRow"
 	row.add_theme_constant_override("separation", 8)
 
+	# index.html:159-164: .top-row { align-items: start }, so each panel is
+	# as tall as its own content rather than stretched to the tallest sibling.
 	row.add_child(_build_status_column())
 	row.add_child(_build_subway_panel())
 
@@ -344,13 +358,15 @@ func _build_top_row() -> Control:
 	_finish_panel.name = "FinishPanel"
 	_finish_panel.theme_type_variation = &"Outset"
 	_finish_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_finish_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_finish_panel.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	var finish := Button.new()
 	finish.name = "finishBtn"
 	finish.text = tr(Copy.BTN_FINISH)
 	finish.add_theme_font_size_override("font_size", 22)
+	# index.html:245-251: the Finish button fills its panel and is never
+	# shorter than 90px.
+	finish.custom_minimum_size = Vector2(0, 90)
 	finish.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	finish.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	finish.pressed.connect(func() -> void: finish_pressed.emit())
 	_finish_panel.add_child(finish)
 	row.add_child(_finish_panel)
@@ -363,6 +379,7 @@ func _build_status_column() -> Control:
 	column.add_theme_constant_override("separation", 4)
 	column.custom_minimum_size = Vector2(220, 0)
 	column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	column.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 
 	for led in [["cash", Copy.LED_CASH, &"LedCash"], ["bank", Copy.LED_BANK, &"LedBank"],
 			["debt", Copy.LED_DEBT, &"LedDebt"], ["guns", Copy.LED_GUNS, &"LedGuns"]]:
@@ -381,14 +398,17 @@ func _build_status_column() -> Control:
 	return column
 
 
-## `variation` names the inset frame the prototype gives this LED; the glow
-## text color is the same name with "Text" appended, which is how the theme
-## registers it.
+## `variation` names the inset frame the prototype gives this LED; the two text
+## variations are that name with "Label" and "Value" appended, which is how the
+## theme registers the dimmed label and the full-brightness value
+## (index.html:186).
 func _build_led(key: String, label_key: String, variation: StringName) -> Control:
 	var frame := PanelContainer.new()
 	frame.name = key.capitalize() + "Led"
 	frame.theme_type_variation = variation
-	frame.custom_minimum_size = Vector2(0, 26)
+	# index.html:189-191 plus the 2px inset frame around it: the prototype's
+	# LED is 29px tall at 17px of glowing text.
+	frame.custom_minimum_size = Vector2(0, 29)
 
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 8)
@@ -396,12 +416,12 @@ func _build_led(key: String, label_key: String, variation: StringName) -> Contro
 
 	var label := Label.new()
 	label.text = tr(label_key)
-	label.theme_type_variation = StringName(String(variation) + "Text")
+	label.theme_type_variation = StringName(String(variation) + "Label")
 	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(label)
 
 	var value := Label.new()
-	value.theme_type_variation = label.theme_type_variation
+	value.theme_type_variation = StringName(String(variation) + "Value")
 	value.name = "Value"
 	value.text = "0"
 	row.add_child(value)
@@ -413,6 +433,10 @@ func _build_subway_panel() -> Control:
 	_subway_panel = PanelContainer.new()
 	_subway_panel.name = "SubwayPanel"
 	_subway_panel.theme_type_variation = &"Outset"
+	_subway_panel.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	# index.html:160: the top row is a two-column 1fr 1fr grid, so the status
+	# LEDs and the subway panel split the window evenly.
+	_subway_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 
 	var stack := VBoxContainer.new()
 	stack.add_theme_constant_override("separation", 4)

@@ -31,6 +31,11 @@ func _init() -> void:
 	_label.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	# index.html:209: the percentage is yellow on the blue fill, and sits on
+	# top of the ProgressBar rather than inside it (show_percentage prints
+	# the value, not the rounded percentage).
+	_label.add_theme_color_override("font_color", Palette.LED_YELLOW)
+	_label.add_theme_font_size_override("font_size", Win95Theme.FONT_TABLE)
 	_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_label)
 

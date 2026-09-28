@@ -27,7 +27,6 @@ const LED_YELLOW_BG := Color("333300")
 ## naming in :root (`index.html:207`).
 const HEALTH_FILL := Color("0000c0")
 
-const PAGE_BG := Color("2b2b2b")
 const OVERLAY_SCRIM := Color(0, 0, 0, 0.35)
 
 ## Row states for a held drug that is not traded here (`index.html:336-339`).

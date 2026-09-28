@@ -81,8 +81,8 @@ func _run() -> void:
 # docs/layer-boundaries.md:113-114 puts every display string behind tr(). A key
 # with no row in translations/strings.csv renders as the key itself, which is
 # exactly the sort of failure that survives review because the code reads fine.
-# The first draft of the CSV hit it -- an unquoted "Dope Wars, Day {0} of {1}"
-# parsed as three columns, so the titlebar read "Dope Wars".
+# The first draft of the CSV hit the related one: an unquoted value with a comma
+# in it parsed as extra columns and the window title read "Dope Wars".
 func _test_translation_keys_resolve() -> void:
 	# A key constant in copy.gd is an ALL_CAPS identifier assigned to itself;
 	# the other consts in that file are display glyphs and prose.
@@ -123,8 +123,8 @@ func _test_new_game_boot() -> void:
 	var hud := _main.hud()
 
 	_assert(
-		hud.title_text() == "Dope Wars, Day %d of %d" % [state["day"], state["num_days"]],
-		"titlebar should read 'Dope Wars, Day 1 of 31', got '%s'" % hud.title_text()
+		hud.title_text() == "Day %d of %d" % [state["day"], state["num_days"]],
+		"the day readout should read 'Day 1 of 31', got '%s'" % hud.title_text()
 	)
 	_assert(hud.led_text("cash") == "2,000", "cash LED should be 2,000, got '%s'" % hud.led_text("cash"))
 	_assert(hud.led_text("bank") == "0", "bank LED should be 0, got '%s'" % hud.led_text("bank"))
@@ -154,7 +154,7 @@ func _test_new_game_boot() -> void:
 
 	# index.html:1177 -- no trend glyph on day 1, because nothing came before it.
 	_assert(
-		market.price_text(int(traded[0]["drug_index"])).find(Copy.TREND_UP) == -1,
+		market.trend_text(int(traded[0]["drug_index"])) == "",
 		"day 1 prices should carry no trend glyph"
 	)
 
@@ -293,8 +293,8 @@ func _test_travel_advances_day() -> void:
 	_assert(int(world.state_get()["day"]) == from_day + 1, "travel should advance the day")
 	_assert(int(world.state_get()["location_index"]) == destination, "travel should move the player")
 	_assert(
-		hud.title_text() == "Dope Wars, Day %d of 31" % (from_day + 1),
-		"the titlebar should show the new day, got '%s'" % hud.title_text()
+		hud.title_text() == "Day %d of 31" % (from_day + 1),
+		"the day readout should show the new day, got '%s'" % hud.title_text()
 	)
 	_assert(hud.selected_buy_drug == -1 and hud.selected_sell_drug == -1, "travel should clear both selections (index.html:1372-1373)")
 	_assert(hud.led_text("debt") == Copy.fmt(world.state_get()["debt"]), "the debt LED should show the compounded debt")
@@ -305,9 +305,9 @@ func _test_travel_advances_day() -> void:
 	_assert(traded.size() > 0, "the new borough should trade something")
 	var with_glyph := 0
 	for slot in traded:
-		if hud.market_table().price_text(int(slot["drug_index"])).contains(Copy.TREND_UP) \
-				or hud.market_table().price_text(int(slot["drug_index"])).contains(Copy.TREND_DOWN) \
-				or hud.market_table().price_text(int(slot["drug_index"])).contains(Copy.TREND_NEUTRAL):
+		if hud.market_table().trend_text(int(slot["drug_index"])) in [
+			Copy.TREND_UP, Copy.TREND_DOWN, Copy.TREND_NEUTRAL
+		]:
 			with_glyph += 1
 	_assert(with_glyph == traded.size(), "every day-2 price should carry a trend glyph")
 
@@ -536,7 +536,7 @@ func _test_new_game_dialog() -> void:
 	_assert(int(world.state_get()["num_days"]) == 7, "starting a new game should apply the day count")
 	_assert(int(world.state_get()["cash"]) == 5000, "starting a new game should apply the starting cash")
 	_assert(int(world.state_get()["day"]) == 1, "a new game should start on day 1")
-	_assert(_main.hud().title_text() == "Dope Wars, Day 1 of 7", "the titlebar should show the new game's length, got '%s'" % _main.hud().title_text())
+	_assert(_main.hud().title_text() == "Day 1 of 7", "the day readout should show the new game's length, got '%s'" % _main.hud().title_text())
 
 
 # --- harness ----------------------------------------------------------------

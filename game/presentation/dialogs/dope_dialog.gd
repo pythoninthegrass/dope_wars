@@ -26,6 +26,10 @@ var _cancel_key := ""
 func setup(title_key: String) -> void:
 	theme = Win95Theme.shared()
 	theme_type_variation = &"Outset"
+	# index.html:369: .dialog { width: min(100% - 2rem, 26rem) }. The cap is
+	# what makes the finances dialog wrap Close onto its own row, so it is
+	# load-bearing rather than cosmetic.
+	custom_minimum_size = Vector2(26.0 * 15.0, 0)
 
 	var frame := VBoxContainer.new()
 	frame.add_theme_constant_override("separation", 2)

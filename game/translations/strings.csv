@@ -1,6 +1,6 @@
 keys,en
 DOPE_WARS,Dope Wars
-DOPE_WARS_TITLEBAR_DAY,"Dope Wars, Day {0} of {1}"
+DOPE_WARS_DAY_OF,Day {0} of {1}
 MENU_FILE,File
 MENU_SCORES,Scores
 MENU_SOUNDS,Sounds
