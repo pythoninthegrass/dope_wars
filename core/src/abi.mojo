@@ -260,8 +260,8 @@ def _bytes_to_string[N: Int](arr: Array[UInt8, N]) -> String:
 def _cstr_to_string(ptr: Pointer[UInt8, origin=ImmUntrackedOrigin]) -> String:
     var bytes = List[UInt8]()
     var i = 0
-    while ptr[i] != 0:
-        bytes.append(ptr[i])
+    while ptr[unsafe_offset=i] != 0:
+        bytes.append(ptr[unsafe_offset=i])
         i += 1
     return String(StringSlice(unsafe_from_utf8=Span(bytes)))
 
@@ -435,7 +435,7 @@ def dw_rules_locations_copy(
         return DW_ERR_BUFFER_TOO_SMALL
     var table = rules.locations()
     for i in range(rules.NUM_LOCATIONS):
-        out_locations.value()[i] = LocationView(
+        out_locations.value()[unsafe_offset=i] = LocationView(
             _cstr_array[32](table[i].id),
             _cstr_array[32](table[i].name),
             UInt32(table[i].police),
@@ -462,7 +462,7 @@ def dw_rules_drugs_copy(
         return DW_ERR_BUFFER_TOO_SMALL
     var table = rules.drugs()
     for i in range(rules.NUM_DRUGS):
-        out_drugs.value()[i] = DrugView(
+        out_drugs.value()[unsafe_offset=i] = DrugView(
             _cstr_array[32](table[i].id),
             _cstr_array[32](table[i].name),
             Int32(table[i].min_price),
@@ -607,7 +607,7 @@ def dw_state_get(
             UInt8(1) if game.dead else UInt8(0),
             UInt8(1) if game.last_day_warned else UInt8(0),
             Array[UInt8, 2](fill=0),
-        )^
+        )
     )
     return DW_OK
 
@@ -641,7 +641,7 @@ def dw_prices_copy(
         return DW_ERR_BUFFER_TOO_SMALL
     for i in range(game.price_count()):
         var drug_index = Int(game.price_order[i])
-        out_prices.value()[i] = PriceSlot(
+        out_prices.value()[unsafe_offset=i] = PriceSlot(
             UInt32(drug_index),
             Int32(game.price_value[drug_index]),
             UInt8(1) if game.price_was_event[drug_index] != 0 else UInt8(0),
@@ -672,7 +672,7 @@ def dw_prev_prices_copy(
         return DW_ERR_BUFFER_TOO_SMALL
     for i in range(game.prev_price_count()):
         var drug_index = Int(game.prev_price_order[i])
-        out_prices.value()[i] = PriceSlot(
+        out_prices.value()[unsafe_offset=i] = PriceSlot(
             UInt32(drug_index),
             Int32(game.prev_price_value[drug_index]),
             UInt8(0),
@@ -699,7 +699,7 @@ def dw_inventory_copy(
         return DW_ERR_BUFFER_TOO_SMALL
     for i in range(game.inv_count()):
         var drug_index = Int(game.inv_order[i])
-        out_inventory.value()[i] = InventorySlot(
+        out_inventory.value()[unsafe_offset=i] = InventorySlot(
             UInt32(drug_index),
             UInt32(game.inv_qty[drug_index]),
             Int64(game.inv_avg_price[drug_index] * 100.0),
@@ -768,7 +768,7 @@ def dw_price_events_drain(
     if out_capacity < required:
         return DW_ERR_BUFFER_TOO_SMALL
     for i in range(game.price_events_len):
-        out_events.value()[i] = PriceEventView(
+        out_events.value()[unsafe_offset=i] = PriceEventView(
             UInt8(game.price_events[i].kind),
             Array[UInt8, 3](fill=0),
             UInt32(game.price_events[i].drug_index),
@@ -886,7 +886,7 @@ def dw_roll_arrival_event(
                 Int32(event.amount),
                 Int32(event.damage),
                 Int32(0),
-            )^
+            )
         )
         return DW_OK
     except:
@@ -902,7 +902,7 @@ def dw_roll_coat_dealer_offer(
         return DW_ERR_INVALID_ARGUMENT
     try:
         var offer = dealers.roll_coat_dealer_offer(world.value()[])
-        out_offer.value().unsafe_write(CoatOfferView(UInt32(offer.pockets), Int32(offer.price))^)
+        out_offer.value().unsafe_write(CoatOfferView(UInt32(offer.pockets), Int32(offer.price)))
         return DW_OK
     except:
         return DW_ERR_INVALID_ARGUMENT
@@ -923,7 +923,7 @@ def dw_accept_coat_offer(
             UInt8(1) if payment.used_bank else UInt8(0),
             Array[UInt8, 3](fill=0),
             Int32(payment.fee),
-        )^
+        )
     )
     return _map_purchase_code(payment.code)
 
@@ -938,7 +938,7 @@ def dw_roll_gun_dealer_offer(
     try:
         var offer = dealers.roll_gun_dealer_offer(world.value()[])
         out_offer.value().unsafe_write(
-            GunOfferView(Int32(offer.price), UInt32(offer.damage), UInt32(offer.space), UInt32(0))^
+            GunOfferView(Int32(offer.price), UInt32(offer.damage), UInt32(offer.space), UInt32(0))
         )
         return DW_OK
     except:
@@ -964,7 +964,7 @@ def dw_accept_gun_offer(
             UInt8(1) if payment.used_bank else UInt8(0),
             Array[UInt8, 3](fill=0),
             Int32(payment.fee),
-        )^
+        )
     )
     return _map_purchase_code(payment.code)
 
@@ -1020,7 +1020,7 @@ def dw_start_chase(
             UInt32(chase.deputies),
             UInt8(1) if game.guns > 0 else UInt8(0),
             Array[UInt8, 3](fill=0),
-        )^
+        )
     )
     return DW_OK
 
@@ -1034,7 +1034,7 @@ def dw_get_fight_ratings(
         return DW_ERR_INVALID_ARGUMENT
     var ratings = combat.get_fight_ratings(world.value()[])
     out_ratings.value().unsafe_write(
-        FightRatingsView(UInt32(ratings.attack), UInt32(ratings.defend))^
+        FightRatingsView(UInt32(ratings.attack), UInt32(ratings.defend))
     )
     return DW_OK
 
@@ -1058,7 +1058,7 @@ def dw_run_from_chase(
                 UInt8(1) if escaped else UInt8(0),
                 Array[UInt8, 3](fill=0),
                 Int32(damage),
-            )^
+            )
         )
         return DW_OK
     except:
@@ -1084,7 +1084,7 @@ def dw_fight(
                 UInt8(1) if outcome.won else UInt8(0),
                 UInt8(0),
                 Int32(outcome.damage),
-            )^
+            )
         )
         return DW_OK
     except:
@@ -1123,7 +1123,7 @@ def dw_finish(
             UInt32(outcome.day),
             UInt8(1) if outcome.dead else UInt8(0),
             Array[UInt8, 3](fill=0),
-        )^
+        )
     )
     return DW_OK
 
@@ -1142,10 +1142,10 @@ def dw_insert_highscore(
         return DW_ERR_BUFFER_TOO_SMALL
     var list = List[score.HighScore]()
     for i in range(Int(in_count)):
-        list.append(_highscore_from_view(scores.value()[i]))
+        list.append(_highscore_from_view(scores.value()[unsafe_offset=i]))
     score.insert_high_score(list, _highscore_from_view(entry.value()[]))
     for i in range(len(list)):
-        scores.value()[i] = _view_from_highscore(list[i])
+        scores.value()[unsafe_offset=i] = _view_from_highscore(list[i])
     out_count.value()[] = UInt(len(list))
     return DW_OK
 
@@ -1178,7 +1178,7 @@ def dw_world_dump(
     try:
         var bytes = serialize.dump(world.value()[])
         for i in range(Int(required)):
-            out_buf.value()[i] = bytes[i]
+            out_buf.value()[unsafe_offset=i] = bytes[i]
     except:
         return DW_ERR_SERIALIZATION_FAILED
     return DW_OK
@@ -1196,7 +1196,7 @@ def dw_world_load(
         return DW_ERR_SERIALIZATION_FAILED
     var bytes = List[UInt8]()
     for i in range(Int(buf_len)):
-        bytes.append(buf.value()[i])
+        bytes.append(buf.value()[unsafe_offset=i])
     try:
         var loaded = serialize.load(bytes)
         if not _validate_world(loaded):
