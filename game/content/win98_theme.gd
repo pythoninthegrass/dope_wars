@@ -158,6 +158,23 @@ static func build() -> Theme:
 	_outset(theme, "DialogIcon", Palette.WIN_FACE_LIGHT2)
 	_inset(theme, "Inset", Palette.WIN_FACE)
 	_inset(theme, "HealthTrack", Palette.LED_RED)
+	# index.html:297-305: `.table-wrap.inset` wraps the whole `<table>`,
+	# header row included -- the Tree draws its column titles as an opaque
+	# strip that would paint over its own "panel" bevel along the top edge,
+	# so the frame is owned by this wrapper instead and the Tree's own
+	# "panel" stays empty (see _tree()). PanelContainer only insets its child
+	# by a stylebox's *explicit* content_margin, never by
+	# BevelStyleBox._get_style_margin() (that override is a fallback for
+	# StyleBox.get_margin(), which only consults it when content_margin is
+	# left at its -1 "auto" default) -- so a bare `bevel()` call, which always
+	# sets content_margin to `pad` (zero here by default), leaves the Tree
+	# flush against the border and its opaque header paints over it. The pad
+	# has to be spelled out at exactly the border width for the frame to
+	# read as a frame instead of extra breathing room.
+	theme.set_type_variation("TableFrame", "PanelContainer")
+	theme.set_stylebox(
+		"panel", "TableFrame", bevel(Color.WHITE, false, Vector2i.ONE * BevelStyleBox.EDGE)
+	)
 	_menubar_strip(theme)
 
 	_button(theme)
@@ -412,7 +429,12 @@ static func _field(theme: Theme) -> void:
 ## 0.85rem, the gaps collapse, and the cells keep the prototype's 6px of
 ## side padding.
 static func _tree(theme: Theme) -> void:
-	theme.set_stylebox("panel", "Tree", bevel(Color.WHITE, false))
+	# The frame is drawn by the "TableFrame" PanelContainer the Tree is
+	# wrapped in (build(), above) rather than here: the Tree's own header
+	# strip is an opaque full-width fill that would paint over a border on
+	# this stylebox along the top edge, leaving only the body's three sides
+	# framed and the header looking like it floats above the table.
+	theme.set_stylebox("panel", "Tree", StyleBoxEmpty.new())
 	theme.set_stylebox("focus", "Tree", StyleBoxEmpty.new())
 	# index.html:310-316: a sticky window-face title row with a hairline
 	# under it, not the default theme's dark strip.

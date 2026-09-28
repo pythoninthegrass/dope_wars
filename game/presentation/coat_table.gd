@@ -50,7 +50,18 @@ func _init() -> void:
 	_tree.set_column_expand(0, true)
 	_tree.item_selected.connect(_on_item_selected)
 	_tree.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	add_child(_tree)
+
+	# index.html:297-305: `.table-wrap.inset` frames the whole table,
+	# header row included -- a PanelContainer around the Tree rather than a
+	# stylebox on the Tree itself, since the Tree's own header strip paints
+	# over any border along its top edge (Win98Theme._tree()).
+	var frame := PanelContainer.new()
+	frame.name = "Frame"
+	frame.theme = Win98Theme.shared()
+	frame.theme_type_variation = &"TableFrame"
+	frame.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	frame.add_child(_tree)
+	add_child(frame)
 
 
 func refresh(world: SimWorld, selected: int) -> void:
