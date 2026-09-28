@@ -50,7 +50,7 @@ The Godot reference implementation is a four-layer stack, one direction of depen
   - `game/simulation/` — `world.gd`, `class_name SimWorld`: the **only** `.gd` file allowed to name `DopeWarsWorld`. A complete pass-through (every bound method, all 31 `DW_*` constants re-exported), no logic, no caching.
   - `game/presentation/` — the window (`main.tscn` + `main.gd` is the only scene; the tree is assembled in code), the HUD, both tables, the dialog layer, and `arrival_flow.gd` (the post-travel sequence as an explicit queue rather than the prototype's recursive closure chain).
   - `game/platform/` — `input_router.gd` (keyboard → intent, `classify()` pure so the shortcut table is testable), `save_store.gd` (`user://dopewars.save`, the core's opaque dump), `highscore_store.gd` (`user://dopewars.highscores.json`).
-  - `game/content/` — palette, Win95 theme factory, and every `tr()` key. **Not** the drug/borough tables: those come from `SimWorld.rules_drugs()` / `rules_locations()`, and a second copy would be both a rule computation and a second source of truth.
+  - `game/content/` — palette, Win98 theme factory, and every `tr()` key. **Not** the drug/borough tables: those come from `SimWorld.rules_drugs()` / `rules_locations()`, and a second copy would be both a rule computation and a second source of truth.
 
   `game/README.md` documents the layer rules. `tools/validate_game_boundary.py` (wired into `task game:boundary-check`) fails if any script outside `game/simulation/` names `DopeWarsWorld`, with `ClassDB.class_exists("DopeWarsWorld")` as the only exemption; `tools/test_validate_game_boundary.py` self-checks that gate.
 
@@ -78,6 +78,10 @@ Mojo LOC target at parity: `>=43%` of non-vendor non-generated LOC, matching the
 - `task game:import` / `task game:smoke-test` — headless Godot import and boot in isolation. `smoke-test` is `--quit-after 2` rather than a hand-rolled `quit()`: the main scene is the game now, so it has no reason to exit on its own.
 - `task loc` — non-vendor, non-generated SLOC by language and the resulting Mojo share, split into `core/` and the parity harness.
 - `task lint` — markdownlint plus the `core/src` boundary gate (no Godot/FFI imports, no I/O, no global mutable state, no logging). Installs the pinned `markdownlint-cli` via npm on demand (`core:_install-markdownlint`) when it is missing or the wrong version, so `task lint` never fails with "command not found".
+
+### Live inspection with gda
+
+- `gda`/the `godot` MCP server need `GDA_GODOT` (path to the Godot binary) and `GDA_PROJECT=game` in the environment — without them `daemon start` fails with `project_not_found`, including when called through the MCP tool. Always pair `gda daemon start --windowed` with `gda daemon stop` + `gda daemon uninstall` when done; the start step writes an autoload into `game/project.godot` and `game/addons/gda_harness/`, and skipping the teardown leaves that dirty.
 
 ### Headless Godot runs
 
