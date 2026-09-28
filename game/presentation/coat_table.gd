@@ -132,6 +132,12 @@ func row_count() -> int:
 	return _items.size()
 
 
+## The Tree itself, for the ui_flow test's routed click. See the note on
+## MarketTable.tree().
+func tree() -> Tree:
+	return _tree
+
+
 ## The rows in the order they are shown, for the ui_flow test.
 func shown_drug_indices() -> Array[int]:
 	var out: Array[int] = []
@@ -157,7 +163,9 @@ static func _by_drug(world: SimWorld) -> Dictionary:
 ## Selects the row for `drug_index` the way a click does. Tree.set_selected
 ## emits item_selected, so this runs the real handler -- including the render()
 ## that index.html:1189 and :1210 end their click handlers with. A test that
-## called Hud.select_buy_drug directly would skip exactly that.
+## called Hud.select_buy_drug directly would skip exactly that. The render
+## itself is deferred out of the selection event, so a caller that wants the
+## post-render state has to give it a frame.
 func select_drug(drug_index: int) -> bool:
 	if not _items.has(drug_index):
 		return false
@@ -174,6 +182,11 @@ func _select_row(drug_index: int) -> void:
 		_tree.deselect_all()
 
 
+## A click rebuilds the table, the way the prototype's handler ends in a full
+## render() (index.html:1210) -- but a Tree refuses to clear itself or create
+## items while it is still inside its own mouse-selection event, so emitting
+## synchronously aborted the rebuild and left the table empty. Deferring puts
+## the refresh after the event, in the same frame.
 func _on_item_selected() -> void:
 	if _applying:
 		return
@@ -181,4 +194,6 @@ func _on_item_selected() -> void:
 	if item == null:
 		return
 	if item.has_meta(&"drug_index"):
-		drug_selected.emit(int(item.get_meta(&"drug_index")))
+		# The index is read now, while the clicked item is still the selected
+		# one; only the notify is deferred.
+		drug_selected.emit.call_deferred(int(item.get_meta(&"drug_index")))

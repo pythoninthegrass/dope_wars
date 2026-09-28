@@ -45,6 +45,7 @@ const CASES := [
 	"new_game_boot",
 	"keyboard_shortcuts",
 	"buy_sell_round_trip",
+	"click_rebuilds_table",
 	"travel_advances_day",
 	"persistence_round_trip",
 	"finances",
@@ -66,6 +67,8 @@ func _run() -> void:
 	_test_keyboard_shortcuts()
 	_case("buy_sell_round_trip")
 	await _test_buy_sell_round_trip()
+	_case("click_rebuilds_table")
+	await _test_click_rebuilds_table()
 	_case("travel_advances_day")
 	await _test_travel_advances_day()
 	_case("persistence_round_trip")
@@ -230,8 +233,11 @@ func _test_buy_sell_round_trip() -> void:
 	_assert(price > 0, "there should be a traded drug to buy")
 	_assert(int(floor(float(cash_before) / float(price))) >= 3, "the cheapest drug should be affordable for a 3-unit round trip")
 
-	# index.html:1186-1190 -- clicking a market row selects it for buying.
+	# index.html:1186-1190 -- clicking a market row selects it for buying. The
+	# click's notify is deferred out of the Tree's selection event, so the
+	# selection and its render land on the next frame, not on this line.
 	_main.hud().market_drug_pressed(drug_index)
+	await _idle()
 	_assert(hud.selected_buy_drug == drug_index, "clicking a market row should select it for buying")
 	_assert(hud.can_buy(), "Buy should be enabled for a traded drug (selected=%d, rows=%d)" % [hud.selected_buy_drug, hud.market_table().row_count()])
 
@@ -261,6 +267,7 @@ func _test_buy_sell_round_trip() -> void:
 	# Now sell it back at the same price, which is what a same-turn round trip
 	# is: the market has not regenerated.
 	_main.hud().coat_drug_pressed(drug_index)
+	await _idle()
 	_assert(hud.selected_sell_drug == drug_index, "clicking a coat row should select it for selling")
 	_assert(hud.can_sell(), "Sell should be enabled for a held, traded drug")
 	_main._do_sell()
@@ -277,6 +284,73 @@ func _test_buy_sell_round_trip() -> void:
 	_assert(int(world.state_get()["cash"]) == cash_before, "a same-price round trip should return the cash exactly")
 	_assert(hud.coat_table().row_count() == 0, "selling the last unit should empty the coat table")
 	_assert(hud.led_text("cash") == Copy.fmt(cash_before), "the cash LED should be back to where it started")
+
+
+# index.html:1186-1190 and :1207-1211. Both click handlers end in a full
+# render(), which rebuilds the very <tr> that was just clicked. A Tree refuses
+# to clear itself or create items while it is still inside its own
+# mouse-selection event, so the rebuild has to leave the event first -- and when
+# it does not, refresh() dies partway through and the table comes back empty.
+#
+# market_drug_pressed() cannot see this: it is a programmatic set_selected,
+# which never arms the guard. These clicks are pushed through the live
+# viewport, so the Tree's own gui_input does the selecting.
+func _test_click_rebuilds_table() -> void:
+	var world := _fresh(SEED)
+	var hud := _main.hud()
+	var market := hud.market_table()
+	var traded: Array = world.prices_copy()
+	var drug_index := int(traded[0]["drug_index"])
+	var price := _price_of(world, drug_index)
+	await _idle()
+
+	await _click_row(market.tree(), drug_index)
+
+	# The click has to have landed, or every assertion below is vacuous.
+	_assert(
+		hud.selected_buy_drug == drug_index,
+		"a routed click on a market row should select it (selected=%d, clicked=%d)" % [hud.selected_buy_drug, drug_index]
+	)
+	# index.html:1187-1188 -- the sell selection follows only if the drug is
+	# held, and nothing is held yet.
+	_assert(hud.selected_sell_drug == -1, "clicking an unheld market row should leave nothing selected to sell, got %d" % hud.selected_sell_drug)
+	_assert(
+		market.row_count() == traded.size(),
+		"the market table should still hold a row per traded drug after a click (%d vs %d)" % [market.row_count(), traded.size()]
+	)
+	_assert(
+		market.price_text(drug_index) == Copy.fmt(price),
+		"the clicked row should still read its price, got '%s'" % market.price_text(drug_index)
+	)
+	_assert(hud.can_buy(), "Buy should be enabled after clicking a traded drug")
+
+	# The coat table is the same click shape, so hold something first: an empty
+	# coat has no row to click.
+	_main._do_buy()
+	await _idle()
+	var dialog := _main.dialogs().current() as QuantityDialog
+	if dialog != null:
+		dialog.set_value(1)
+		_main.dialogs().confirm()
+	await _idle()
+	_assert(hud.coat_table().row_count() == 1, "the purchase should put one drug in the coat, got %d rows" % hud.coat_table().row_count())
+	if hud.coat_table().row_count() != 1:
+		return
+
+	await _click_row(hud.coat_table().tree(), drug_index)
+
+	_assert(
+		hud.selected_sell_drug == drug_index,
+		"a routed click on a coat row should select it for selling, got %d" % hud.selected_sell_drug
+	)
+	# index.html:1208-1209 -- no null-out on this side; the buy selection follows.
+	_assert(hud.selected_buy_drug == drug_index, "a coat click should carry the buy selection along, got %d" % hud.selected_buy_drug)
+	_assert(hud.coat_table().row_count() == 1, "the coat table should still hold its row after a click, got %d" % hud.coat_table().row_count())
+	_assert(
+		hud.coat_table().quantity_text(drug_index) == "1",
+		"the coat row should still read its quantity, got '%s'" % hud.coat_table().quantity_text(drug_index)
+	)
+	_assert(hud.can_sell(), "Sell should be enabled after clicking a held, traded drug")
 
 
 # index.html:1369-1376 plus the arrival queue at :1378-1470. Travel advances the
@@ -541,6 +615,52 @@ func _test_new_game_dialog() -> void:
 
 # --- harness ----------------------------------------------------------------
 
+
+
+## A real press-and-release over the rendered row, pushed through the viewport
+## so the click travels the same path a player's does -- Tree.gui_input does the
+## selecting, which is the only way to arm the mouse-selection guard. Press and
+## release are a frame apart, and a spare frame follows, so a rebuild that lands
+## between them has settled before the next assertion.
+##
+## The point comes from get_global_transform, so it is already in viewport
+## coordinates and push_input takes in_local_coords: a headless window is a
+## different size from the 704x620 viewport and stretch/aspect=keep rescales
+## between the two, which puts a window-coordinate click nowhere near the row.
+func _click_row(tree: Tree, drug_index: int) -> void:
+	var item := _row_item(tree, drug_index)
+	if item == null:
+		_fail("click", "no rendered row for drug %d" % drug_index)
+		return
+	var point: Vector2 = tree.get_global_transform() * tree.get_item_area_rect(item, 0).get_center()
+	var press := InputEventMouseButton.new()
+	press.button_index = MOUSE_BUTTON_LEFT
+	press.pressed = true
+	press.position = point
+	press.global_position = point
+	get_viewport().push_input(press, true)
+	await _idle()
+	var release := press.duplicate()
+	release.pressed = false
+	get_viewport().push_input(release, true)
+	await _idle()
+	await _idle()
+
+
+## The rendered row for `drug_index`, found by the metadata MarketTable and
+## CoatTable both stamp on their items. Walking the visible rows rather than
+## reaching into `_items` keeps this on the same side of the fence as a player:
+## what is on screen, not what the table believes it built.
+static func _row_item(tree: Tree, drug_index: int) -> TreeItem:
+	var root := tree.get_root()
+	if root == null:
+		return null
+	var item := root.get_first_child()
+	while item != null:
+		if item.has_meta(&"drug_index") and int(item.get_meta(&"drug_index")) == drug_index:
+			return item
+		item = item.get_next()
+	return null
 
 
 ## Every Label under `node`, flattened, so an assertion can read what a dialog
