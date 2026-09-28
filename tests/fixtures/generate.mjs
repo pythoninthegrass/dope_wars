@@ -262,6 +262,61 @@ const FIXTURES = [
       { call: 'finances', args: { action: 'bogus', amount: 100 } },
     ],
   },
+  {
+    name: '12-dealer-visits',
+    meta: { seed: 13, description: 'coat/gun dealer visit draws', mechanic: 'rollDealerVisits seeded stream, four scripted combinations, dead-player draw consumption, chase skip' },
+    steps: [
+      // A) Seeded stream: eight back-to-back calls. Seed 13 is chosen so the
+      //    first eight pairs are varied (coat-only, both, and five plain
+      //    misses) rather than eight identical false/false lines. Every line
+      //    pins the pair *and* rngState, so the draw count and the coat-then-gun
+      //    order are oracle facts: a core that drew once per call, or skipped a
+      //    draw when the pair came out false/false, would desync rngState from
+      //    this line onward, not just on the line it got wrong.
+      { call: 'newGame', args: { seed: 13 } },
+      ...Array.from({ length: 8 }, () => ({ call: 'rollDealerVisits' })),
+      // B) Scripted RNG: the four reported combinations, forced rather than
+      //    left to whichever way a seed falls. A script is injected for one
+      //    call and is not drawn from state.rng, so each of these lines records
+      //    rngState unchanged from the seeded run — scripted mode is not an
+      //    extra draw. The last two pin the 0.15 boundary itself: just under it
+      //    visits, exactly it does not.
+      { call: 'rollDealerVisits', rng: [0.1, 0.5] }, // coat only
+      { call: 'rollDealerVisits', rng: [0.5, 0.1] }, // gun only
+      { call: 'rollDealerVisits', rng: [0.1, 0.1] }, // both
+      { call: 'rollDealerVisits', rng: [0.5, 0.5] }, // neither
+      { call: 'rollDealerVisits', rng: [0.1499999999, 0.1499999999] },
+      { call: 'rollDealerVisits', rng: [0.15, 0.15] },
+      // C) The dead player draws anyway. `dead` is true, so this call reports
+      //    false/false -- and its post-call rngState is required to equal the
+      //    live twin's two steps below, which made the same two scripted draws
+      //    with `dead` false. Asserting only the false/false pair would also
+      //    pass an implementation that tested `dead` before drawing; the
+      //    rngState equality is the part that rules that out. The live twin's
+      //    pair here (coat, gun both true) is what makes the next line's
+      //    false/false a suppression rather than two losing draws.
+      { call: 'setField', args: { dead: true, health: 0 } },
+      { call: 'rollDealerVisits', rng: [0.1, 0.1] },
+      { call: 'setField', args: { dead: false, health: 100 } },
+      { call: 'rollDealerVisits', rng: [0.1, 0.1] },
+      // D) Chase: index.html:1382-1383 pushes the chase and the two dealer
+      //    draws in the else branch are never reached. The skip is stated as a
+      //    draw budget rather than inferred from an absent step: Manhattan
+      //    (police 90) makes shouldStartChase spend exactly one draw, so
+      //    repeating the identical roll must land on the same rngState. Had the
+      //    chase path also spent the two dealer draws, the second line would be
+      //    two draws further along.
+      { call: 'setField', args: { location: 'manhattan' } },
+      // 0.5 scales to floor(0.5 * 171) = 85 >= 50, so the chase fires.
+      { call: 'shouldStartChase', rng: [0.5] },
+      { call: 'shouldStartChase', rng: [0.5] },
+      // A live twin that *is* offered the dealers spends the two draws the chase
+      // path saved, so it lands two draws further along than the chase twin
+      // above.
+      { call: 'setField', args: { location: 'bronx' } },
+      { call: 'rollDealerVisits' },
+    ],
+  },
 ]
 
 const Engine = loadEngine()

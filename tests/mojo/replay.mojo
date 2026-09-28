@@ -203,6 +203,13 @@ def run_step(mut game: world.World, ref rec: record.Record) raises:
         )
         var outcome = dealers.accept_gun_offer(game, offer)
         harness.assert_purchase_matches(outcome, rec)
+    elif call == "rollDealerVisits":
+        # The oracle helper is index.html:1387-1388, which has no engine export.
+        # The pair is the whole return value; the two draws it spends are proved
+        # by the state snapshot the caller compares afterwards.
+        var visits = dealers.roll_dealer_visits(game)
+        assert_equal(visits.coat, rec.ret.bool_at("coat"))
+        assert_equal(visits.gun, rec.ret.bool_at("gun"))
     elif call == "shouldStartChase":
         assert_equal(combat.should_start_chase(game), rec.ret.bool_at("value"))
     elif call == "startChase":

@@ -27,9 +27,9 @@ Each `.jsonl` line is one engine call plus the expected result:
 Fields:
 
 - `step` — zero-based index; must match the line's position in the file.
-- `call` — one of the engine exports (`newGame`, `generatePrices`, `buy`, `sell`, `travel`, `finances`, `rollArrivalEvent`, `rollCoatDealerOffer`, `acceptCoatOffer`, `rollGunDealerOffer`, `acceptGunOffer`, `shouldStartChase`, `startChase`, `getFightRatings`, `applyDamage`, `runFromChase`, `fight`, `finish`) or a runner helper (`setPrices`, `setInventory`, `setField`, `buyCheapest`, `insertHighScores`, `serializeRoundTrip`).
+- `call` — one of the engine exports (`newGame`, `generatePrices`, `buy`, `sell`, `travel`, `finances`, `rollArrivalEvent`, `rollCoatDealerOffer`, `acceptCoatOffer`, `rollGunDealerOffer`, `acceptGunOffer`, `shouldStartChase`, `startChase`, `getFightRatings`, `applyDamage`, `runFromChase`, `fight`, `finish`) or a runner helper (`setPrices`, `setInventory`, `setField`, `buyCheapest`, `insertHighScores`, `serializeRoundTrip`, `rollDealerVisits`).
 - `args` — positional-arg bag; each dispatch case unpacks the fields it needs (see `run-step.mjs`).
-- `rng` — optional array of `[0,1)` floats for a scripted RNG. Used by fixtures that force specific arrival-event / combat branches. Full-run fixtures omit `rng` and let the engine consume the seeded `state.rng` (mulberry32) it was born with.
+- `rng` — optional array of `[0,1)` floats for a scripted RNG. Used by fixtures that force specific arrival-event / combat branches. Full-run fixtures omit `rng` and let the engine consume the seeded `state.rng` (mulberry32) it was born with. A scripted call draws from the array only, so it never advances `state.rng` and its snapshot records `rngState` unchanged; the scaling a call applies is part of the contract (`shouldStartChase` scales by `randInt`'s span, the dealer draws compare the raw float against `0.15`).
 - `expect.return` — deep-equal target for the call's return value.
 - `expect.state` — deep-equal target for the full state snapshot after the call. `state.rng` (a closure) is stripped and replaced with `rngState` (the mulberry32 integer), matching what `serializeState()` does.
 
@@ -60,6 +60,31 @@ Each `.meta.json` sidecar records:
 | `09-full-run-31day` | 31-day playthrough with deterministic policy (travel to `locations[day % 6]`, buy cheapest per stop) |
 | `10-rolls-and-helpers` | `shouldStartChase` police weighting (incl. the 49/50 threshold), `rollCoatDealerOffer` and `rollGunDealerOffer` range ends, `getFightRatings`, `applyDamage` |
 | `11-finances` | `finances` deposit/withdraw/payLoan, clamping to available cash/bank/debt, amount floor, unknown action |
+| `12-dealer-visits` | the `rollDealerVisits` helper: seeded stream over eight calls, all four scripted combinations + the 0.15 boundary, dead-player draw consumption, chase skip (`index.html:1382-1388`) |
+
+## Runner helpers
+
+`rollDealerVisits` is unlike the state-shaping helpers: it *consumes the RNG*.
+The coat/gun dealer visits have no engine export — the two `state.rng() < 0.15`
+draws live in the UI layer at `index.html:1387-1388`, inside `runArrivalSequence`,
+and only when `shouldStartChase` came back false (`index.html:1382-1383`).
+`index.html` is deleted at the end of TASK-001, so the `rollDealerVisits` case in
+`run-step.mjs` (which cites those lines) is the surviving statement of the
+prototype's semantics.
+
+The load-bearing detail is that **both draws are consumed before `dead` is
+consulted**. The prototype spells the guard `state.rng() < 0.15 && !state.dead`,
+so short-circuit evaluation has already advanced `state.rng` by the time the
+guard is tested: a dead player spends two draws and reports neither dealer. A
+helper (or port) that tested `dead` first would desync the stream for the rest of
+the run. `core/src/dealers.mojo::roll_dealer_visits` draws unconditionally for
+exactly this reason. The `12-dealer-visits` fixture proves it two ways: the
+dead-player step reports `false, false` yet its post-call `rngState` equals the
+live twin's for the same script, and the chase steps leave `rngState` unchanged
+across a repeated one-draw `shouldStartChase`, which is only consistent with the
+dealer draws never having been reached. A harness replaying these fixtures must
+implement the same helper — both draws, coat first, then the `dead` suppression
+applied to the reported pair only.
 
 ## Failure reasons and `dw_result`
 
