@@ -5,6 +5,7 @@ version: "3.0"
 tasks:
   run:
     desc: "Launch the game/ project in Godot"
+    deps: [":game:import"]
     cmds:
       # `task dev` restarts this via watchexec, which SIGTERMs the running
       # godot process on every rebuild -- task reports that as exit 143.
@@ -26,6 +27,15 @@ tasks:
           echo "game:import attempt $i/5 crashed (see godotengine/godot#111048); retrying..." >&2
         done
         exit 1
+    status:
+      # Once .godot/ exists, `godot --path game` handles incremental
+      # reimports on its own; skip the slow headless pass on every
+      # `task run`/`task dev` restart so the dev loop stays fast. A fresh
+      # checkout (no .godot/ yet) has never built the global class name
+      # cache, which crashes on first launch (script types like SimWorld
+      # unresolved) rather than just missing an asset -- hence deps here
+      # rather than only on game:smoke-test.
+      - test -d .godot
 
   smoke-test:
     desc: "Boot the real game headlessly and verify it comes up without script errors"
