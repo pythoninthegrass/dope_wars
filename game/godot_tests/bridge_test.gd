@@ -1,6 +1,7 @@
 extends Node
 
-# Bridge integration test (TASK-001.05 AC#4).
+# Bridge integration test (TASK-001.05 AC#4, reworked for TASK-001.06 to drive
+# SimWorld rather than DopeWarsWorld).
 #
 # Exercises the full Godot -> GDExtension(C++) -> C ABI -> Mojo path and asserts
 # the value that arrives in GDScript is the value the ABI contract specifies, for
@@ -25,14 +26,17 @@ const EXPECTATIONS_PATH := "res://bridge_expectations.gd"
 
 # Minimum assertions, derived from the generated surface rather than guessed, so
 # adding an ABI method raises the floor automatically and the floor cannot go stale
-# against the header. With S methods the four checks produce:
+# against the header. With P methods carrying a pinned value the four checks produce:
 #   surface      1   (the aggregate "N methods match" assertion; mismatches are
 #                     recorded as failures, so the pass path is one assertion)
 #   identity     1   (abi_version)
-#   values       S   (one per method carrying a pinned value)
+#   values       P   (one per method carrying a pinned value)
 #   width        2   (integer-ness + unsigned-ness aggregates)
-# Not every method carries a pinned value today, so the value pass is the honest
-# variable term and is counted generously as S.
+# P is not the row count: abi_version, world_size, world_align and world_dump_len
+# are checked by kind rather than against a pinned constant, so counting them as
+# value assertions sets a floor the pass path can never reach. That mistake was
+# latent until TASK-001.06 un-nested this check out of the skip loop, where it
+# had never been running.
 const MIN_ASSERTIONS_FROM_SURFACE := 4
 
 var _passed := 0
@@ -50,12 +54,15 @@ func _ready() -> void:
 	if not ClassDB.class_exists("DopeWarsWorld"):
 		_fail(
 			"GDExtension registration",
-			"DopeWarsWorld is not registered; the extension did not load (check game/bin/ and the Mojo runtime rpath)"
+			"the extension class is not registered; the extension did not load (check game/bin/ and the Mojo runtime rpath)"
 		)
 		_finish()
 		return
 
-	var world := DopeWarsWorld.new()
+	# SimWorld, not DopeWarsWorld: tools/validate_game_boundary.py forbids
+	# naming the GDExtension class outside game/simulation/, and going through
+	# the wrapper is the path the game actually takes.
+	var world := SimWorld.new()
 	_check_class_surface(world)
 	_check_abi_identity(world)
 	_check_forwarded_values(world)
@@ -101,10 +108,10 @@ func _load_expectations() -> Object:
 	return instance
 
 
-# The shim must expose at least the generated surface: no missing method (a dropped
-# bind_method call). The extra direction is deliberately not asserted: the shim
+# SimWorld must expose at least the generated surface: no missing method (a
+# dropped forward). The extra direction is deliberately not asserted: the wrapper
 # forwards the full ABI, while this table only pins the pointer-free no-arg subset
-# it can value-check, so bound methods outside the table are expected. The exact
+# it can value-check, so methods outside the table are expected. The exact
 # export surface is the export-surface gate's job (tools/check_abi_exports.py).
 func _check_class_surface(world: Object) -> void:
 	var expected_names: Array = _expectations.ABI.keys()
@@ -112,7 +119,7 @@ func _check_class_surface(world: Object) -> void:
 
 	for name in expected_names:
 		if not bound.has(name):
-			_fail("surface", "method '%s' is expected but not bound on DopeWarsWorld" % name)
+			_fail("surface", "method '%s' is expected but not forwarded by SimWorld" % name)
 
 	if expected_names.is_empty():
 		_fail("surface", "generated ABI surface is empty — generator or header is broken")
@@ -120,9 +127,15 @@ func _check_class_surface(world: Object) -> void:
 		_pass("surface: %d bound methods match the generated ABI surface" % expected_names.size())
 
 
-# get_method_list() on a GDExtension instance also reports every inherited
-# Object/RefCounted method, so "the shim's own methods" is computed by subtracting
-# the base class's method set rather than by guessing which names look built-in.
+# get_method_list() on a GDScript instance also reports every inherited
+# Object/RefCounted method, so "the wrapper's own methods" is computed by
+# subtracting the base class's method set rather than by guessing which names
+# look built-in.
+#
+# This is also why SimWorld re-exports the dw_rules_* accessors as instance
+# methods even though DopeWarsWorld binds them statically: a GDScript
+# `static func` never shows up in get_method_list(), so 18 of the ABI's methods
+# would be permanently invisible to this check.
 func _forwarded_method_names(world: Object) -> Array[String]:
 	var inherited := {}
 	for method in RefCounted.new().get_method_list():
@@ -199,17 +212,22 @@ func _fail(what: String, why: String) -> void:
 func _finish() -> void:
 	for note in _skipped:
 		print("  skip    %s" % note)
-		# Derived from the surface size so the floor tracks the header: 4 aggregate
-		# assertions plus one per ABI method.
-		var floor := MIN_ASSERTIONS_FROM_SURFACE
-		if _expectations != null:
-			floor += _expectations.ABI.size()
-		if _passed < floor:
-			_fail(
-						"suite ran",
-						"only %d assertions executed, expected at least %d — checks were skipped or threw"
-						% [_passed, floor]
-			)
+	# Derived from the value-carrying rows so the floor tracks the header: 4
+	# aggregate assertions plus one per pinned value. This check used to sit
+	# inside the skip loop above, over a list nothing ever appended to, so the
+	# anti-false-pass guard never ran at all.
+	var floor := MIN_ASSERTIONS_FROM_SURFACE
+	if _expectations != null:
+		var abi: Dictionary = _expectations.ABI
+		for meta: Dictionary in abi.values():
+			if meta.has("value"):
+				floor += 1
+	if _passed < floor:
+		_fail(
+			"suite ran",
+			"only %d assertions executed, expected at least %d — checks were skipped or threw"
+			% [_passed, floor]
+		)
 	for failure in _failures:
 		push_error("BRIDGE FAIL  %s" % failure)
 	if _failures.is_empty():

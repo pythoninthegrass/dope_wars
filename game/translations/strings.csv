@@ -1,0 +1,106 @@
+keys,en
+DOPE_WARS,Dope Wars
+DOPE_WARS_TITLEBAR_DAY,"Dope Wars, Day {0} of {1}"
+MENU_FILE,File
+MENU_SCORES,Scores
+MENU_SOUNDS,Sounds
+MENU_HELP,Help
+MENU_NO_SOUND,(no sound in this build)
+ITEM_NEW_GAME,New Game
+ITEM_EXIT,Exit
+ITEM_HIGH_SCORES,High Scores
+ITEM_HOW_TO_PLAY,How to play
+LED_CASH,Cash:
+LED_BANK,Bank:
+LED_DEBT,Debt:
+LED_GUNS,Guns:
+HEALTH,Health:
+HEALTH_PERCENT,{0}%
+SUBWAY_FROM,Subway from {0}:
+TABLE_AVAILABLE_DRUGS,Available drugs:
+TABLE_COAT_SPACE,Trenchcoat Space: {0}/{1}
+COL_DRUG,Drug
+COL_PRICE,Price
+COL_QTY,Qty
+BTN_BUY,Buy
+BTN_SELL,Sell
+BTN_FINANCES,Finances
+BTN_FINISH,Finish
+BTN_OK,OK
+BTN_CANCEL,Cancel
+BTN_CLOSE,Close
+BTN_DECLINE,Decline
+BTN_RUN,Run
+BTN_STAY,Stay
+BTN_FIGHT,Fight
+BTN_SAVE_SCORE,Save score
+BTN_SKIP,Skip
+BTN_START_GAME,Start Game
+DLG_DEALER,Dealer
+DLG_BUY,Buy
+DLG_SELL,Sell
+DLG_FINANCES,Finances
+DLG_DEPOSIT,Deposit
+DLG_WITHDRAW,Withdraw
+DLG_PAY_LOAN,Pay Loan
+DLG_WORD_ON_THE_STREET,Word on the street
+DLG_RANDOM_EVENT,Random Event
+DLG_COAT_DEALER,Coat Dealer
+DLG_GUN_DEALER,Gun Dealer
+DLG_COP_CHASE,Cop Chase!
+DLG_YOU_DIED,You Died
+DLG_GAME_OVER,Game Over
+DLG_HIGH_SCORES,High Scores
+DLG_NEW_GAME,New Game
+DLG_HOW_TO_PLAY,How to play
+DLG_LAST_DAY,Last Day
+MSG_LAST_DAY,"This is your last day, man. Maybe you should offload your stash."
+MSG_DEALER_TOO_DEAR,"Duh! Check the price of {0}, dude!"
+MSG_COAT_FULL,Your trenchcoat is full! Sell something or buy a bigger coat.
+MSG_BUY_PROMPT,"You can afford {0} units of {1}, and have room in your coat for {2} units."
+MSG_SELL_PROMPT,You have {0} units of {1}.
+MSG_UNITS_AT,units @ ${0}
+FIN_CASH,Cash
+FIN_BANK,Bank
+FIN_DEBT,Debt
+BTN_DEPOSIT,Deposit
+BTN_WITHDRAW,Withdraw
+BTN_PAY_LOAN,Pay Loan
+MSG_DEPOSIT_PROMPT,Deposit how much of your ${0} cash?
+MSG_WITHDRAW_PROMPT,Withdraw how much of your ${0} bank balance?
+MSG_PAY_LOAN_PROMPT,Pay down how much of your ${0} debt?
+MSG_PRICE_CHEAP,The market is flooded with cheap {0}!
+MSG_PRICE_EXPENSIVE,Addicts are buying {0} at outrageous prices!
+MSG_DEALER_FEE_NOTE,Not enough cash — ATM + dealer fee: ${0} (total ${1} from bank)
+MSG_COAT_OFFER,Would you like to buy a trenchcoat with {0} more pockets for ${1}?
+MSG_GUN_OFFER,Need protection? I got a gun for ${0}.
+MSG_CHASE_INTRO,Officer Hardass and {0} of his deputies are chasing you!
+MSG_CHASE_ESCAPED,You lost them in the alleys.
+MSG_CHASE_FIRED_ON,"They're firing on you, man! You've been hit!"
+MSG_CHASE_STAND_GROUND,You stand your ground and wait for them to close in.
+MSG_CHASE_WON,You took them all down! You got away!
+MSG_CHASE_HIT_DEPUTY,You hit a deputy! {0} left.
+MSG_CHASE_DAMAGE,You got hit for {0} damage!
+MSG_YOU_DIED,You have been killed. Game over.
+MSG_FINAL_SCORE,Final score: ${0}
+MSG_FINAL_SCORE_DEAD,{0} (dead)
+LBL_YOUR_NAME,Your name
+DEFAULT_NAME,Player
+LBL_NAME,Name
+LBL_SCORE,Score
+LBL_DAY,Day
+LBL_STATUS,Status
+LBL_DATE,Date
+STATUS_DEAD,Dead
+MSG_NO_SCORES,No scores yet.
+LBL_NUM_DAYS,Number of days
+LBL_START_CASH,Starting cash
+MSG_HOW_TO_PLAY,"Buy low, sell high, dodge the cops, pay off Marks before he sends muscle, and cash out with the highest net worth by day {0}. Click a drug to Buy or Sell it, click a borough to travel (this is the only way to advance a day)."
+ARRIVAL_MUGGED_CASH,You were mugged in the subway! You lost ${0}.
+ARRIVAL_MUGGED_BEATEN,You were mugged in the subway! They beat you up instead.
+ARRIVAL_FREE_DRUGS,You meet a friend! He lays {0} units of {1} on you!
+ARRIVAL_DOG_CHASE,Police dogs chased you! You dropped {0} units of {1}.
+ARRIVAL_FOUND_DRUGS,You found {0} units of {1} on a dead dude in the subway!
+ARRIVAL_MAMAS_BROWNIES,Mama's brownies! You lost {0} units of {1}.
+ARRIVAL_FREE_WEED_DEATH,You hallucinated for three days... then you died because your brain disintegrated!
+ARRIVAL_FLAVOR,You stopped to get a bite to eat. That cost you ${0}.

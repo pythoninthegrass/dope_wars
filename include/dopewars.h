@@ -515,6 +515,13 @@ dw_result dw_prices_copy(const dw_world *world, dw_price_slot *out_prices, size_
  * currently held with qty > 0. */
 dw_result dw_inventory_copy(const dw_world *world, dw_inventory_slot *out_inventory, size_t out_capacity, size_t *out_required);
 
+/* Two-call length-then-fill over the *previous* turn's price table, so a
+ * caller can render a per-drug price delta. The drug set traded last turn
+ * need not match this turn's, so callers intersect the two copies rather
+ * than assuming the orders line up. On day 1 nothing has been traded yet
+ * and the required length is 0. */
+dw_result dw_prev_prices_copy(const dw_world *world, dw_price_slot *out_prices, size_t out_capacity, size_t *out_required);
+
 /* Look up a drug or location by id (NUL-terminated UTF-8, must match one
  * of the ruleset entries). Returns DW_ERR_UNKNOWN_DRUG /
  * DW_ERR_UNKNOWN_LOCATION on miss; *out_index unchanged in that case. */
@@ -603,6 +610,18 @@ dw_result dw_roll_gun_dealer_offer(dw_world *world, dw_gun_offer *out_offer);
  * fallback as dw_accept_coat_offer. Additionally returns
  * DW_ERR_INSUFFICIENT_SPACE if the gun does not fit in the coat. */
 dw_result dw_accept_gun_offer(dw_world *world, const dw_gun_offer *offer, dw_purchase_result *out_result);
+
+/* Roll whether each dealer visits on arrival (`index.html:1387-1388`).
+ * One call covers both, in the order the turn produces them: the coat
+ * draw happens first and the gun draw second, unconditionally, so a caller
+ * that reports both can never desynchronize the world's RNG stream by
+ * skipping one. A dealer only actually shows up when the player is alive,
+ * so each output is 0 when the player is dead -- but the draw is still
+ * consumed, matching the JS `state.rng() < 0.15 && !state.dead` order of
+ * evaluation. Not called by dw_travel; the caller decides arrival
+ * sequencing, since whether the dealers show up at all depends on whether
+ * dw_should_start_chase fired first. */
+dw_result dw_roll_dealer_visits(dw_world *world, uint8_t *out_coat_visit, uint8_t *out_gun_visit);
 
 /* ---------------------------------------------------------------------- */
 /* Chase / combat                                                          */

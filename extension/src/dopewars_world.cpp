@@ -49,6 +49,7 @@ void DopeWarsWorld::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("state_get"), &DopeWarsWorld::state_get);
 	ClassDB::bind_method(D_METHOD("coat_used"), &DopeWarsWorld::coat_used);
 	ClassDB::bind_method(D_METHOD("prices_copy"), &DopeWarsWorld::prices_copy);
+	ClassDB::bind_method(D_METHOD("prev_prices_copy"), &DopeWarsWorld::prev_prices_copy);
 	ClassDB::bind_method(D_METHOD("inventory_copy"), &DopeWarsWorld::inventory_copy);
 	ClassDB::bind_method(D_METHOD("find_drug_index", "id"), &DopeWarsWorld::find_drug_index);
 	ClassDB::bind_method(D_METHOD("find_location_index", "id"), &DopeWarsWorld::find_location_index);
@@ -65,6 +66,7 @@ void DopeWarsWorld::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("accept_coat_offer", "pockets", "price"), &DopeWarsWorld::accept_coat_offer);
 	ClassDB::bind_method(D_METHOD("roll_gun_dealer_offer"), &DopeWarsWorld::roll_gun_dealer_offer);
 	ClassDB::bind_method(D_METHOD("accept_gun_offer", "price", "damage", "space"), &DopeWarsWorld::accept_gun_offer);
+	ClassDB::bind_method(D_METHOD("roll_dealer_visits"), &DopeWarsWorld::roll_dealer_visits);
 
 	ClassDB::bind_method(D_METHOD("should_start_chase"), &DopeWarsWorld::should_start_chase);
 	ClassDB::bind_method(D_METHOD("start_chase"), &DopeWarsWorld::start_chase);
@@ -143,6 +145,16 @@ void DopeWarsWorld::_bind_methods() {
 // Lifecycle
 // ---------------------------------------------------------------------------
 
+void DopeWarsWorld::ensure_storage() {
+	if (world_ != nullptr) {
+		return;
+	}
+	size_t align = dw_world_align();
+	size_t size = dw_world_size();
+	storage_.assign(size + align - 1, 0);
+	world_ = align_world_ptr(storage_);
+}
+
 int DopeWarsWorld::init(int rng_seed, int num_days, int start_cash) {
 	dw_config config{};
 	config.abi_version = static_cast<uint16_t>(DW_ABI_VERSION);
@@ -150,16 +162,9 @@ int DopeWarsWorld::init(int rng_seed, int num_days, int start_cash) {
 	config.num_days = static_cast<uint32_t>(num_days);
 	config.start_cash = static_cast<int32_t>(start_cash);
 
-	size_t align = dw_world_align();
-	size_t size = dw_world_size();
-	storage_.assign(size + align - 1, 0);
-	world_ = nullptr;
-
-	dw_world *candidate = align_world_ptr(storage_);
-	dw_result result = dw_world_init(candidate, &config);
-	if (result == DW_OK) {
-		world_ = candidate;
-	}
+	ensure_storage();
+	dw_result result = dw_world_init(world_, &config);
+	ready_ = result == DW_OK;
 	return result;
 }
 
@@ -227,6 +232,29 @@ Array DopeWarsWorld::prices_copy() {
 	std::vector<dw_price_slot> slots(required);
 	size_t actual = 0;
 	dw_result result = dw_prices_copy(world_, slots.data(), slots.size(), &actual);
+	if (result != DW_OK) {
+		return out;
+	}
+	for (size_t i = 0; i < actual; i++) {
+		Dictionary entry;
+		entry["drug_index"] = slots[i].drug_index;
+		entry["price"] = slots[i].price;
+		entry["was_event"] = slots[i].was_event;
+		out.push_back(entry);
+	}
+	return out;
+}
+
+Array DopeWarsWorld::prev_prices_copy() {
+	Array out;
+	if (!is_ready()) {
+		return out;
+	}
+	size_t required = 0;
+	dw_prev_prices_copy(world_, nullptr, 0, &required);
+	std::vector<dw_price_slot> slots(required);
+	size_t actual = 0;
+	dw_result result = dw_prev_prices_copy(world_, slots.data(), slots.size(), &actual);
 	if (result != DW_OK) {
 		return out;
 	}
@@ -437,6 +465,23 @@ Dictionary DopeWarsWorld::accept_gun_offer(int price, int damage, int space) {
 	return out;
 }
 
+Dictionary DopeWarsWorld::roll_dealer_visits() {
+	Dictionary out;
+	if (!is_ready()) {
+		out["result"] = DW_ERR_INVALID_ARGUMENT;
+		out["coat_visit"] = 0;
+		out["gun_visit"] = 0;
+		return out;
+	}
+	uint8_t coat_visit = 0;
+	uint8_t gun_visit = 0;
+	dw_result result = dw_roll_dealer_visits(world_, &coat_visit, &gun_visit);
+	out["result"] = result;
+	out["coat_visit"] = coat_visit;
+	out["gun_visit"] = gun_visit;
+	return out;
+}
+
 // ---------------------------------------------------------------------------
 // Chase / combat
 // ---------------------------------------------------------------------------
@@ -618,10 +663,14 @@ Dictionary DopeWarsWorld::world_dump() {
 }
 
 int DopeWarsWorld::world_load(const PackedByteArray &bytes) {
-	if (!is_ready()) {
-		return DW_ERR_INVALID_ARGUMENT;
-	}
-	return dw_world_load(world_, bytes.ptr(), static_cast<size_t>(bytes.size()));
+	// Deliberately not gated on is_ready(): dw_world_load rehydrates in place
+	// from the payload alone, and the caller restoring a save is holding a
+	// brand-new handle that has never been initialized. Gating here made
+	// "resume on boot" impossible -- every fresh process refused its own save.
+	ensure_storage();
+	dw_result result = dw_world_load(world_, bytes.ptr(), static_cast<size_t>(bytes.size()));
+	ready_ = result == DW_OK;
+	return result;
 }
 
 // ---------------------------------------------------------------------------

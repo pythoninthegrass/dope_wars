@@ -36,7 +36,10 @@ public:
 	// Lifecycle
 	int init(int rng_seed, int num_days = 0, int start_cash = -1);
 	int reset();
-	bool is_ready() const { return world_ != nullptr; }
+	// True once a world has been written into `world_`, by either init or
+	// load. Not "storage has been allocated": a failed init leaves allocated
+	// storage holding no world, and every other method must still refuse.
+	bool is_ready() const { return ready_; }
 
 	// The linked core's DW_ABI_VERSION, for a binding to assert at runtime.
 	uint32_t abi_version() const;
@@ -49,6 +52,7 @@ public:
 	Dictionary state_get();
 	Dictionary coat_used();
 	Array prices_copy();
+	Array prev_prices_copy();
 	Array inventory_copy();
 	Dictionary find_drug_index(const String &id);
 	Dictionary find_location_index(const String &id);
@@ -67,6 +71,7 @@ public:
 	Dictionary accept_coat_offer(int pockets, int price);
 	Dictionary roll_gun_dealer_offer();
 	Dictionary accept_gun_offer(int price, int damage, int space);
+	Dictionary roll_dealer_visits();
 
 	// Chase / combat
 	Dictionary should_start_chase();
@@ -106,11 +111,19 @@ public:
 	static int64_t rules_drugs_len();
 
 private:
+	// Allocates the over-allocated backing store and points `world_` at the
+	// aligned dw_world inside it, without initializing a world. Idempotent.
+	// dw_world_load writes a world wholesale, so it needs storage to write
+	// into but no prior dw_world_init -- that is the "a fresh process resumes
+	// a save" path, which is the whole point of a save file.
+	void ensure_storage();
+
 	// storage_ is over-allocated by dw_world_align() - 1 bytes so an aligned
 	// dw_world* can be carved out of it manually; std::vector's own default
 	// alignment is not guaranteed to satisfy whatever dw_world_align() reports.
 	std::vector<uint8_t> storage_;
 	dw_world *world_ = nullptr;
+	bool ready_ = false;
 };
 
 } // namespace godot

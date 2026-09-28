@@ -94,10 +94,38 @@ Every ABI struct:
   order.
 - The `dw_world` handle owns its own RNG stream, seeded from `dw_config`.
   Turn-driving functions (`dw_generate_prices`, `dw_travel`,
-  `dw_roll_arrival_event`, chase/combat rolls, dealer offers) draw from that
-  stream; callers do not pass an RNG.
+  `dw_roll_arrival_event`, `dw_roll_dealer_visits`, chase/combat rolls,
+  dealer offers) draw from that stream; callers do not pass an RNG.
 - The RNG state is included in the canonical dump so a saved game replays
   bit-for-bit on load.
+
+### Why the draw-owning rules live in the core
+
+`index.html:1387-1388` reads `state.rng() < 0.15` twice to decide whether the
+coat and gun dealers show up on arrival. In the prototype those two draws sit
+in the *UI* layer but consume the *world's* RNG, because the JS engine injects
+one `rng` closure through the whole call graph. The Mojo world owns its stream
+instead, so a presentation layer cannot reach it at all: there is no exported
+draw, and `dw_config.rng_seed` is write-only, so a caller cannot even reseed a
+private generator into agreement.
+
+That makes the choice binary. Either the roll is a core rule — the only option
+consistent with `docs/layer-boundaries.md`, which forbids GDScript from
+computing event outcomes — or the two dealer dialogs are unreachable. It is
+therefore `dw_roll_dealer_visits`, which draws the coat roll and then the gun
+roll in a single call, in that order, unconditionally. The unconditional part
+matters: in JS the `&& !state.dead` guard is the *right-hand* operand, so
+short-circuit evaluation has already consumed the draw by the time it is
+tested. A core that skipped the draw on death would desync every subsequent
+draw for the rest of the run.
+
+The same reasoning applies, more weakly, to `dw_prev_prices_copy`. The JS UI
+keeps `state.prevPrices` (`index.html:719`) purely to draw the market table's
+▲/▼ glyph. The world already stores and serializes `prev_price_*` — dropping it
+from the ABI would have meant a second price table living in GDScript, which is
+the cached-mirror state `docs/layer-boundaries.md` rules out.
+
+Both are additive, so `DW_ABI_VERSION` is unchanged at `1u`.
 
 ## Float projections
 

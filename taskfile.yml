@@ -81,14 +81,16 @@ tasks:
       - task: game:bridge-test-script
 
   check:
-    desc: "Mojo parity + ABI gates/conformance + bridge tests + Godot smoke test; non-zero exit on any failure"
+    desc: "Mojo parity + ABI gates/conformance + bridge tests + presentation tests + Godot smoke test; non-zero exit on any failure"
     cmds:
       - task: core:test
       - task: abi:check
       - task: abi:conformance
+      - task: game:boundary-check
       # bridge:test runs the staleness check itself, so it is not repeated here.
       - task: bridge:test
       - task: bridge:test:script
+      - task: game:ui-test
       - task: game:smoke-test
 
   run:

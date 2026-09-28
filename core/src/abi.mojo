@@ -650,6 +650,37 @@ def dw_prices_copy(
     return DW_OK
 
 
+# The previous turn's price table, for the caller's per-drug price-delta
+# display. The world does not keep a was_event flag per previous-turn slot
+# (the JS prevPrices is a bare id -> price map, `index.html:719`), so
+# was_event is always 0 here; the delta display only reads the price.
+@export("dw_prev_prices_copy")
+def dw_prev_prices_copy(
+    world: OptionalPointer[world_mod.World, origin=ImmUntrackedOrigin],
+    out_prices: OptionalPointer[PriceSlot, origin=MutUntrackedOrigin],
+    out_capacity: UInt,
+    out_required: OptionalPointer[UInt, origin=MutUntrackedOrigin],
+) abi("C") -> Int32:
+    if not world or not out_required:
+        return DW_ERR_INVALID_ARGUMENT
+    ref game = world.value()[]
+    var required = UInt(game.prev_price_count())
+    out_required.value()[] = required
+    if not out_prices or out_capacity == 0:
+        return DW_OK
+    if out_capacity < required:
+        return DW_ERR_BUFFER_TOO_SMALL
+    for i in range(game.prev_price_count()):
+        var drug_index = Int(game.prev_price_order[i])
+        out_prices.value()[i] = PriceSlot(
+            UInt32(drug_index),
+            Int32(game.prev_price_value[drug_index]),
+            UInt8(0),
+            Array[UInt8, 3](fill=0),
+        )
+    return DW_OK
+
+
 @export("dw_inventory_copy")
 def dw_inventory_copy(
     world: OptionalPointer[world_mod.World, origin=ImmUntrackedOrigin],
@@ -936,6 +967,23 @@ def dw_accept_gun_offer(
         )^
     )
     return _map_purchase_code(payment.code)
+
+
+@export("dw_roll_dealer_visits")
+def dw_roll_dealer_visits(
+    world: OptionalPointer[world_mod.World, origin=MutUntrackedOrigin],
+    out_coat_visit: OptionalPointer[UInt8, origin=MutUntrackedOrigin],
+    out_gun_visit: OptionalPointer[UInt8, origin=MutUntrackedOrigin],
+) abi("C") -> Int32:
+    if not world or not out_coat_visit or not out_gun_visit:
+        return DW_ERR_INVALID_ARGUMENT
+    try:
+        var visits = dealers.roll_dealer_visits(world.value()[])
+        out_coat_visit.value()[] = UInt8(1) if visits.coat else UInt8(0)
+        out_gun_visit.value()[] = UInt8(1) if visits.gun else UInt8(0)
+        return DW_OK
+    except:
+        return DW_ERR_INVALID_ARGUMENT
 
 
 # ---------------------------------------------------------------------------

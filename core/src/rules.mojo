@@ -35,6 +35,10 @@ comptime COAT_MAX_PRICE = 500
 comptime GUN_MIN_PRICE = 250
 comptime GUN_MAX_PRICE = 600
 
+# Per-dealer chance of showing up on arrival when no chase started
+# (`index.html:1387-1388`).
+comptime DEALER_VISIT_CHANCE = 0.15
+
 comptime NUM_LOCATIONS = 6
 comptime NUM_DRUGS = 12
 

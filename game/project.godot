@@ -1,11 +1,30 @@
-; Engine configuration file for the Dope Wars Godot project (TASK-001.03).
-; Minimal at this stage: enough to boot, load the GDExtension, and run
-; the smoke test scene.
+; Engine configuration file for the Dope Wars Godot project.
+;
+; The window is sized to the prototype's 44rem design width (index.html:63) at
+; 16px/rem, with canvas_items/keep so any other size letterboxes rather than
+; distorts the fixed Win95 chrome.
 
 config_version=5
 
 [application]
 
 config/name="Dope Wars"
+config/description="Dope Wars for Windows 1.2.0.0 (1999) ruleset, Mojo core / C ABI / C++ GDExtension / GDScript."
 config/features=PackedStringArray("4.7")
-run/main_scene="res://main.tscn"
+run/main_scene="res://presentation/main.tscn"
+
+[display]
+
+window/size/viewport_width=704
+window/size/viewport_height=620
+window/size/window_width_override=704
+window/size/window_height_override=620
+window/stretch/mode="canvas_items"
+window/stretch/aspect="keep"
+
+[internationalization]
+
+; Every display string is a tr() key; this is the compiled English table that
+; resolves them (game/translations/strings.csv). A key with no row renders as
+; the key itself, which is what the ui_flow test guards against.
+locale/translations=PackedStringArray("res://translations/strings.en.translation")

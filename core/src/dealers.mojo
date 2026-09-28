@@ -50,6 +50,15 @@ struct PurchaseResult(Copyable, Movable):
         self.fee = fee
 
 
+struct DealerVisits(Copyable, Movable):
+    var coat: Bool
+    var gun: Bool
+
+    def __init__(out self, coat: Bool = False, gun: Bool = False):
+        self.coat = coat
+        self.gun = gun
+
+
 def roll_coat_dealer_offer(mut game: world.World) raises -> CoatOffer:
     var pockets = rng_mod.rand_int(game.rng, rules.COAT_MIN_POCKETS, rules.COAT_MAX_POCKETS)
     var price = rng_mod.rand_int(game.rng, rules.COAT_MIN_PRICE, rules.COAT_MAX_PRICE)
@@ -59,6 +68,20 @@ def roll_coat_dealer_offer(mut game: world.World) raises -> CoatOffer:
 def roll_gun_dealer_offer(mut game: world.World) raises -> GunOffer:
     var price = rng_mod.rand_int(game.rng, rules.GUN_MIN_PRICE, rules.GUN_MAX_PRICE)
     return GunOffer(price, rules.GUN_DAMAGE, rules.GUN_SPACE)
+
+
+# Ported from the two `state.rng() < 0.15` draws in index.html:1387-1388.
+# Both draws always happen, coat first and gun second, even when the player
+# is dead: in JS the `!state.dead` guard is the right-hand operand, so
+# short-circuit evaluation has already consumed the draw by the time it is
+# tested. Skipping the draw on death would desync the RNG stream for the rest
+# of the run.
+def roll_dealer_visits(mut game: world.World) raises -> DealerVisits:
+    var coat = game.rng.next() < rules.DEALER_VISIT_CHANCE
+    var gun = game.rng.next() < rules.DEALER_VISIT_CHANCE
+    if game.dead:
+        return DealerVisits()
+    return DealerVisits(coat, gun)
 
 
 # Shared payment path. Returns the code plus whether the bank was used and the

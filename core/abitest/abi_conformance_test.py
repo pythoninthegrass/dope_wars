@@ -145,7 +145,7 @@ class Abi:
     """ctypes view of the library, with prototypes derived from the header.
 
     Prototypes are read out of include/dopewars.h and mapped to ctypes, not
-    transcribed by hand into a parallel table. A hand-written table of 54
+    transcribed by hand into a parallel table. A hand-written table of 56
     entries would drift from the header the moment a signature changed -- and a
     drifted prototype under ctypes is a mis-cast, not a type error. Deriving them
     means the header is the only place a signature exists, which is the property

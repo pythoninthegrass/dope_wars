@@ -35,7 +35,7 @@ commit if anything is ever added.
 Usage:
   check_abi_exports.py <artifact> [<artifact>...]
   check_abi_exports.py core/build-output/lib/libdopewars.a --nm nm
-  check_abi_exports.py --strict <artifact>   # require the full 54, post-upgrade
+  check_abi_exports.py --strict <artifact>   # require the full 56, post-upgrade
 """
 
 from __future__ import annotations

@@ -90,12 +90,33 @@ return codes into Godot-idiomatic values (`Dictionary`, `PackedByteArray`,
 
 The Godot project: scenes, UI, input handling, autoloads, save-slot
 orchestration, high-score list rendering, translation strings. Where the JS
-prototype's `<script id="ui">` block (`index.html:1081-1710`) ends up.
+prototype's `<script id="ui">` block (`index.html:1081-1710`) ends up. Split into
+four sub-layers whose dependency direction is `presentation`/`platform`/
+`content` → `simulation` → `extension`; `game/README.md` documents the whole map.
+
+### The one exception: `game/simulation/`
+
+`game/simulation/world.gd` (`class_name SimWorld`) is the single pass-through
+wrapper over the GDExtension class, and the only `.gd` file allowed to name it.
+`tools/validate_game_boundary.py`, wired into `task game:boundary-check` (part
+of `task check`), fails if any other script does, with
+`ClassDB.class_exists("DopeWarsWorld")` as the only exemption — naming the class
+to assert it is registered is not the same as depending on its API.
+`tools/test_validate_game_boundary.py` self-checks that gate.
+
+This is the mirror image of the `core/src` gate. `scripts/check-core-boundaries.sh`
+says the simulation never reaches up into Godot; this one says the Godot layer
+never reaches past the wrapper into the extension.
+
+`SimWorld` re-exports the `dw_rules_*` accessors as *instance* methods even
+though the shim binds them statically, because a GDScript `static func` never
+appears in `get_method_list()` and 18 of the ABI's methods would then be
+permanently invisible to the bridge test's completeness check.
 
 ### Allowed
 
 - Any Godot API.
-- Calls to the GDExtension class from `extension/`.
+- Calls to `SimWorld` from anywhere in `game/`.
 - Local UI-only state: which button is focused, which drug row is selected,
   which panel is open, animation timers, tween state.
 - Reading/writing save files via Godot's `FileAccess`, feeding the raw
@@ -105,10 +126,18 @@ prototype's `<script id="ui">` block (`index.html:1081-1710`) ends up.
 
 - Any direct Mojo import. GDScript does not link against Mojo; the
   GDExtension class is the only entry point.
+- Naming `DopeWarsWorld` outside `game/simulation/`, for any reason short of
+  the `ClassDB.class_exists` canary.
 - Any game rule computation. Prices, event outcomes, combat results,
-  serialization format — all come from the extension, never from GDScript.
+  serialization format, dealer-visit chances — all come from the extension,
+  never from GDScript. `include/dopewars.h:444-452` and
+  `docs/abi-contract.md`'s "Why the draw-owning rules live in the core" section
+  are the worked example: the prototype's two 15% dealer rolls read the world's
+  RNG from its UI layer, and GDScript cannot reach that stream at all, so they
+  had to become `dw_roll_dealer_visits`.
 - Any duplicate-of-core state. UI mirrors of `dw_world` values are read
   fresh from the extension per-frame or per-event, not cached in GDScript
-  fields.
+  fields. The static `dw_rules_*` tables are the sanctioned exception:
+  `include/dopewars.h` explicitly says callers may cache them once at startup.
 - Any hard-coded English strings in scene files or scripts. All display
   text goes through `tr()` with keys that map to structured event payloads.

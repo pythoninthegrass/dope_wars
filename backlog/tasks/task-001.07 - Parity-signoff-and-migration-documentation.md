@@ -4,6 +4,7 @@ title: Parity signoff and migration documentation
 status: To Do
 assignee: []
 created_date: '2026-09-26 04:34'
+updated_date: '2026-09-28 01:28'
 labels:
   - parity
   - migration
@@ -12,6 +13,7 @@ labels:
 milestone: m-3
 dependencies:
   - TASK-001.06
+  - TASK-001.09
 references:
   - ~/git/jumpnbump/docs/porting-playbook.md
   - ~/git/jumpnbump/docs/build-layout.md
@@ -52,3 +54,9 @@ Run the full differential parity suite against the JS oracle corpus and formally
 - [ ] #5 Mojo LOC percentage is measured (non-vendor non-generated) and documented; result meets >=43% target
 - [ ] #6 AGENTS.md is updated with the final project structure, build commands, and test entry points
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Dependency on TASK-001.09 added: AC#1 signs off parity "for all oracle scenarios", and `dw_roll_dealer_visits` currently has no fixture, so it cannot be covered by this signoff.
+<!-- SECTION:NOTES:END -->
