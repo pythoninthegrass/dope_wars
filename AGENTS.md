@@ -82,6 +82,7 @@ Mojo LOC target at parity: `>=43%` of non-vendor non-generated LOC, matching the
 ### Live inspection with gda
 
 - `gda`/the `godot` MCP server need `GDA_GODOT` (path to the Godot binary) and `GDA_PROJECT=game` in the environment — without them `daemon start` fails with `project_not_found`, including when called through the MCP tool. Always pair `gda daemon start --windowed` with `gda daemon stop` + `gda daemon uninstall` when done; the start step writes an autoload into `game/project.godot` and `game/addons/gda_harness/`, and skipping the teardown leaves that dirty.
+- Driving input live: find a node's path with `gda game tree`, its screen rect with `gda game rect <path>`, then `gda input mouse-click <x> <y>` (center of the rect) to click it; `gda game get --property <name> <path>` reads back widget state (e.g. a `LineEdit`'s `text`, `select_all_on_focus`) to verify the effect. `gda input key <name>` / `--released` injects keycodes only (no unicode payload), so it drives shortcuts and `Delete`/`Backspace` fine but can't simulate typing printable characters into a field.
 
 ### Headless Godot runs
 
