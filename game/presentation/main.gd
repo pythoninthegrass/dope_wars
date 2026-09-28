@@ -75,8 +75,19 @@ func _ready() -> void:
 ## left free to grow up to MAX_HEIGHT_GROWTH. window/stretch/aspect=keep_width
 ## (project.godot) is what makes the extra height enlarge the layout instead
 ## of letterboxing.
+##
+## project.godot's window/size overrides are display-scale-aware (allow_hidpi,
+## the Godot default): on a HiDPI screen the OS hands back a window sized in
+## points at boot_size / screen_get_scale(), so the window occupies the same
+## pixel count but a proportionally tiny fraction of the screen -- e.g. a 2x
+## Retina panel shows a window half the width it does on the 1x external
+## monitors this was designed against. Scale boot_size back up so the window
+## keeps its intended on-screen footprint everywhere.
 func _constrain_window() -> void:
 	var window := get_window()
+	var scale := DisplayServer.screen_get_scale(window.current_screen)
+	if scale > 1.0:
+		window.size = Vector2i(roundi(window.size.x * scale), roundi(window.size.y * scale))
 	var boot_size := window.size
 	if boot_size.x <= 0 or boot_size.y <= 0:
 		return
