@@ -1,11 +1,15 @@
 ; Engine configuration file for the Dope Wars Godot project.
 ;
 ; The window is sized to the prototype's 44rem design width (index.html:63) at
-; 16px/rem, with canvas_items/keep so any other size letterboxes rather than
-; distorts the fixed Win98 chrome. Unlike the prototype, the game fills the
-; whole client area: there is no browser page around a 660px window, and no
-; in-window titlebar, because the OS draws both. The height is what the
-; prototype's 620px viewport needs to show all twelve drugs without scrolling.
+; 16px/rem. Unlike the prototype, the game fills the whole client area: there
+; is no browser page around a 660px window, and no in-window titlebar, because
+; the OS draws both. The height is what the prototype's 620px viewport needs
+; to show all twelve drugs without scrolling.
+;
+; canvas_items/keep_width pins the horizontal scale to that fixed Win98
+; chrome width -- widening the window would stretch it -- while letting extra
+; height enlarge the viewport instead of letterboxing. Main._constrain_window
+; (presentation/main.gd) caps how far the player can drag it taller.
 
 config_version=5
 
@@ -23,7 +27,7 @@ window/size/viewport_height=620
 window/size/window_width_override=704
 window/size/window_height_override=620
 window/stretch/mode="canvas_items"
-window/stretch/aspect="keep"
+window/stretch/aspect="keep_width"
 
 [internationalization]
 
