@@ -6,7 +6,14 @@ tasks:
   run:
     desc: "Launch the game/ project in Godot"
     cmds:
-      - godot --path game
+      # `task dev` restarts this via watchexec, which SIGTERMs the running
+      # godot process on every rebuild -- task reports that as exit 143.
+      # That's expected, not a failure, so it's ignored here; ignore_error
+      # doesn't propagate to callers on its own, but a task that has already
+      # turned its own failure into a success is seen as successful by
+      # whatever called it.
+      - cmd: godot --path game
+        ignore_error: true
 
   import:
     desc: "Headless Godot import of the game/ project (populates .godot/ cache)"

@@ -1,4 +1,5 @@
 aqua:nektos/act 0.2.89
+aqua:watchexec/watchexec 2.7.3
 godot          4.7.1-stable
 node           24.12.0
 pipx:scons     4.11.1

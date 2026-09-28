@@ -99,6 +99,23 @@ tasks:
       - task: build
       - task: game:run
 
+  dev:
+    desc: "Rebuild and relaunch the game whenever core/, include/, extension/, or game/ sources change"
+    cmds:
+      - >-
+        watchexec --restart --debounce 500ms
+        --watch core/src
+        --watch include
+        --watch extension/src
+        --watch game
+        --exts mojo,h,c,cpp,hpp,gd,tscn,tres,csv,godot,gdextension
+        --ignore 'game/.godot/**'
+        --ignore 'game/bin/**'
+        --ignore 'game/addons/gda_harness/**'
+        --ignore '**/*.translation'
+        --ignore '**/*.import'
+        -- task run
+
   loc:
     desc: "Non-vendor, non-generated LOC by language and the resulting Mojo share (target >=43%)"
     cmds:
