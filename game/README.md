@@ -8,7 +8,7 @@ are all assembled in code from there. Split into four layers, matching
 - `simulation/` — the only layer allowed to reference the GDExtension class
 - `presentation/` — the game window, tables, dialogs, and the arrival flow
 - `platform/` — keyboard routing, save files, high scores
-- `content/` — palette, Win95 chrome, and every display string
+- `content/` — palette, Win98 chrome, and every display string
 
 ## The boundary
 

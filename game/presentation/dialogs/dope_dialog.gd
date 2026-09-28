@@ -25,7 +25,7 @@ var _spinner_typed := false
 
 
 func setup(title_key: String) -> void:
-	theme = Win95Theme.shared()
+	theme = Win98Theme.shared()
 	# index.html:606: the dialog root is the reference's .win, so the frame
 	# carries the 1px black outer ring as well as the bevel.
 	theme_type_variation = &"DialogFrame"

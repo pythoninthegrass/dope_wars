@@ -28,7 +28,7 @@ var _applying := false
 
 
 func _init() -> void:
-	theme = Win95Theme.shared()
+	theme = Win98Theme.shared()
 	add_theme_constant_override("separation", 2)
 	size_flags_vertical = Control.SIZE_EXPAND_FILL
 
@@ -38,7 +38,7 @@ func _init() -> void:
 
 	_tree = Tree.new()
 	_tree.name = "Tree"
-	_tree.theme = Win95Theme.shared()
+	_tree.theme = Win98Theme.shared()
 	_tree.columns = 3
 	_tree.column_titles_visible = true
 	_tree.hide_root = true

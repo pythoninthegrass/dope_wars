@@ -72,7 +72,7 @@ func _field(label_text: String, value_text: String) -> void:
 	row.add_child(label)
 	var value := Label.new()
 	# index.html:1332-1334 wraps each amount in <strong>.
-	value.add_theme_font_override("font", Win95Theme.bold_font())
+	value.add_theme_font_override("font", Win98Theme.bold_font())
 	value.text = value_text
 	row.add_child(value)
 	body().add_child(row)

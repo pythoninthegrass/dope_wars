@@ -1,7 +1,7 @@
-class_name Win95Theme
+class_name Win98Theme
 extends RefCounted
 
-## The Win95 chrome from `index.html:7-505`, as a Godot Theme assembled in
+## The Win98 chrome from `index.html:7-505`, as a Godot Theme assembled in
 ## code. Built rather than authored as a .tres so the palette has exactly one
 ## home (content/palette.gd) and so the bevel is a function rather than twelve
 ## hand-copied StyleBox resources.
@@ -10,11 +10,11 @@ extends RefCounted
 ## top/left and dark edge bottom/right for an outset, the reverse for an inset.
 ## CSS spells that `border-color: light dark dark light`; StyleBoxFlat has a
 ## single `border_color` for all four sides and no per-side coloring, so the
-## bevel is drawn into a 5x5 9-slice ImageTexture and stretched from there.
-## The prototype's `.win` frames (the window, the dialogs) add a 1px black
-## outer ring, which is the same slice grown to 7x7. Everything else in the
-## prototype (LEDs, health bar, tables, dialog frames) is those two plus a
-## background color.
+## bevel is its own `StyleBox` subclass (`BevelStyleBox`) that draws the two
+## edges and the face as flat rects. The prototype's `.win` frames (the
+## window, the dialogs) add a 1px black outer ring, which is the same box
+## with `ring = true`. Everything else in the prototype (LEDs, health bar,
+## tables, dialog frames) is those two plus a background color.
 ##
 ## Registered variations are consumed by setting `theme_type_variation` on a
 ## Control, which is why nothing here needs a per-node stylebox override.
@@ -122,14 +122,39 @@ static func build() -> Theme:
 	# different classes reading the same item name, and only the container
 	# takes a theme_type_variation.
 	theme.set_stylebox("panel", "Panel", bevel(Palette.WIN_FACE, true))
-	# index.html:509, :606: #game and the dialog root are the reference's
-	# .win -- the bevel plus the 1px black outer ring -- not a plain outset.
-	theme.set_type_variation("WindowFace", "PanelContainer")
-	theme.set_stylebox("panel", "WindowFace", win_bevel(Palette.WIN_FACE))
+	# index.html:606: the dialog root is the reference's .win -- the bevel plus
+	# the 1px black outer ring -- floating over the already-themed window
+	# behind it, the same as the prototype's dialog over its page background.
 	theme.set_type_variation("DialogFrame", "PanelContainer")
 	theme.set_stylebox("panel", "DialogFrame", win_bevel(Palette.WIN_FACE))
+	# The main window (index.html:509's #game) is not a floating box here --
+	# it fills the whole OS window, which already draws its own edge and its
+	# own titlebar -- so a ring on all four sides read as a second, mismatched
+	# frame drawn against nothing. Only the top hairline survives, separating
+	# the OS titlebar from the (differently, deliberately system-styled) menu
+	# strip below it; the other three sides are flush so the content reaches
+	# the real window edge.
+	theme.set_type_variation("WindowFace", "PanelContainer")
+	var window_face := StyleBoxFlat.new()
+	window_face.bg_color = Palette.WIN_FACE
+	window_face.border_width_top = 1
+	window_face.border_color = Color.BLACK
+	window_face.content_margin_top = 1
+	# StyleBoxFlat's content_margin_* defaults to -1 ("auto", derived from the
+	# border width), not 0 -- left unset here it would silently inset the
+	# other three sides again, defeating the flush edges above.
+	window_face.content_margin_left = 0
+	window_face.content_margin_right = 0
+	window_face.content_margin_bottom = 0
+	theme.set_stylebox("panel", "WindowFace", window_face)
 
 	_outset(theme, "Outset", Palette.WIN_FACE)
+	# index.html:219-225: the subway panel's frame carries 6px of padding, so
+	# the label and the button grid sit inset from the border instead of
+	# painting over it -- a PanelContainer draws its stylebox first and its
+	# child on top, so a flush child with the same face color hides the
+	# border under an opaque layer of its own.
+	_outset(theme, "SubwayPanel", Palette.WIN_FACE, Vector2i(6, 6))
 	_outset(theme, "DialogIcon", Palette.WIN_FACE_LIGHT2)
 	_inset(theme, "Inset", Palette.WIN_FACE)
 	_inset(theme, "HealthTrack", Palette.LED_RED)
@@ -181,85 +206,28 @@ static func build() -> Theme:
 ## The 2px two-tone frame every panel in the game is made of. `pad` is the CSS
 ## `padding` the prototype puts inside that frame (x horizontal, y vertical),
 ## which is what gives a button its 30px height.
-static func bevel(bg: Color, outset: bool, pad: Vector2i = Vector2i.ZERO) -> StyleBoxTexture:
-	return _texture_box(_bevel_texture(bg, outset), 2, pad)
+static func bevel(bg: Color, outset: bool, pad: Vector2i = Vector2i.ZERO) -> BevelStyleBox:
+	return _bevel_box(bg, outset, false, pad)
 
 
 ## The reference's `.win` (index.html:45-50): the outset bevel plus a 1px
 ## black outer ring from its `box-shadow`, worn by the window face and the
 ## dialog frames.
-static func win_bevel(bg: Color, pad: Vector2i = Vector2i.ZERO) -> StyleBoxTexture:
-	return _texture_box(_win_texture(bg), 3, pad)
+static func win_bevel(bg: Color, pad: Vector2i = Vector2i.ZERO) -> BevelStyleBox:
+	return _bevel_box(bg, true, true, pad)
 
 
-static func _texture_box(texture: Texture2D, margin: int, pad: Vector2i) -> StyleBoxTexture:
-	var box := StyleBoxTexture.new()
-	box.texture = texture
-	box.texture_margin_left = margin
-	box.texture_margin_right = margin
-	box.texture_margin_top = margin
-	box.texture_margin_bottom = margin
+static func _bevel_box(bg: Color, outset: bool, ring: bool, pad: Vector2i) -> BevelStyleBox:
+	var box := BevelStyleBox.new()
+	box.face = bg
+	box.light = Palette.WIN_FACE_LIGHT if outset else Palette.WIN_FACE_DARKER
+	box.dark = Palette.WIN_FACE_DARKER if outset else Palette.WIN_FACE_LIGHT
+	box.ring = ring
 	box.content_margin_left = pad.x
 	box.content_margin_right = pad.x
 	box.content_margin_top = pad.y
 	box.content_margin_bottom = pad.y
-	box.axis_stretch_horizontal = StyleBoxTexture.AXIS_STRETCH_MODE_STRETCH
-	box.axis_stretch_vertical = StyleBoxTexture.AXIS_STRETCH_MODE_STRETCH
 	return box
-
-
-static var _bevel_cache := {}
-
-
-## The 12x12 9-slice behind every bevel: light 2px top/left, dark 2px
-## bottom/right, an 8px flat face in the middle (inset inverts the two tones).
-## The wide face center is load-bearing: StyleBoxTexture samples with linear
-## filtering, so a 1px center interpolates between the two border tones and
-## renders the whole face as a gradient. Eight face pixels confine the blend
-## to one texel at each seam. Built once per color and cached, because
-## build() asks for the same face several times.
-static func _bevel_texture(bg: Color, outset: bool) -> ImageTexture:
-	var key := str(outset) + bg.to_html()
-	if not _bevel_cache.has(key):
-		_bevel_cache[key] = ImageTexture.create_from_image(_bevel_image(bg, outset))
-	return _bevel_cache[key]
-
-
-static func _bevel_image(bg: Color, outset: bool) -> Image:
-	var light := Palette.WIN_FACE_LIGHT if outset else Palette.WIN_FACE_DARKER
-	var dark := Palette.WIN_FACE_DARKER if outset else Palette.WIN_FACE_LIGHT
-	var img := Image.create_empty(12, 12, false, Image.FORMAT_RGBA8)
-	for y in range(12):
-		for x in range(12):
-			var c := bg
-			if x < 2 or y < 2:
-				c = light
-			elif x > 9 or y > 9:
-				c = dark
-			img.set_pixel(x, y, c)
-	return img
-
-
-## The 14x14 slice for `.win` frames: a 1px black ring around the outset
-## bevel, matching index.html:49's `box-shadow: 1px 1px 0 #000, 0 0 0 1px
-## #000`.
-static func _win_texture(bg: Color) -> ImageTexture:
-	var key := "win" + bg.to_html()
-	if not _bevel_cache.has(key):
-		_bevel_cache[key] = ImageTexture.create_from_image(_win_image(bg))
-	return _bevel_cache[key]
-
-
-static func _win_image(bg: Color) -> Image:
-	var img := Image.create_empty(14, 14, false, Image.FORMAT_RGBA8)
-	var bevel := _bevel_image(bg, true)
-	for y in range(14):
-		for x in range(14):
-			if x == 0 or y == 0 or x == 13 or y == 13:
-				img.set_pixel(x, y, Color.BLACK)
-			else:
-				img.set_pixel(x, y, bevel.get_pixel(x - 1, y - 1))
-	return img
 
 
 ## index.html:253-261: the CSS button padding, reused by every frame that has
@@ -267,9 +235,9 @@ static func _win_image(bg: Color) -> Image:
 const BUTTON_PAD := Vector2i(8, 5)
 
 
-static func _outset(theme: Theme, type_name: String, bg: Color) -> void:
+static func _outset(theme: Theme, type_name: String, bg: Color, pad: Vector2i = Vector2i.ZERO) -> void:
 	theme.set_type_variation(type_name, "PanelContainer")
-	theme.set_stylebox("panel", type_name, bevel(bg, true))
+	theme.set_stylebox("panel", type_name, bevel(bg, true, pad))
 
 
 static func _inset(theme: Theme, type_name: String, bg: Color) -> void:
@@ -473,7 +441,7 @@ static func _tree(theme: Theme) -> void:
 
 ## The dialog titlebar. The app itself has no titlebar -- the OS draws that --
 ## so this serves the dialogs, whose title is a Label. Flat navy, no
-## gradients: the Win95 titlebar was solid, and a gradient texture here is
+## gradients: the Win98 titlebar was solid, and a gradient texture here is
 ## exactly the kind of softness this chrome does not have. `base_type` is the
 ## class that will wear it, which decides the item the stylebox is filed
 ## under -- see the resolution rule above.

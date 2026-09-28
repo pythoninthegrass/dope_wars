@@ -782,44 +782,61 @@ func _test_new_game_dialog() -> void:
 # white form field with right-aligned text, and a light menu layer on top of
 # the Win98 window. The theme must carry all of it; the old shadow-trick
 # bevel rendered flat, the unthemed LineEdit fell back to Godot's dark
-# default, and the dialog's button row sat flush on the frame. The bevel
-# slices carry a wide flat face center, because a 1px center interpolates
-# between the two border tones and turns the face into a gradient.
+# default, and the dialog's button row sat flush on the frame. An earlier
+# StyleBoxTexture 9-slice attempt rendered the stretched face as a gradient
+# (linear-filtered border texels bleeding across the center) -- BevelStyleBox
+# draws flat rects instead, so there is no texture to filter.
 func _test_win98_chrome() -> void:
-	var theme := Win95Theme.shared()
+	var theme := Win98Theme.shared()
 
 	# --- button bevel (index.html:253-266) -----------------------------------
 	var normal := theme.get_stylebox("normal", "Button")
-	_assert(normal is StyleBoxTexture, "the Button normal stylebox should be the two-tone bevel texture, got %s" % normal.get_class())
-	var image := _stylebox_image(normal)
-	_assert(image != null and image.get_size() == Vector2i(12, 12), "the button bevel texture should be the 12x12 9-slice, got %s" % str(image.get_size() if image != null else null))
-	if image != null and image.get_size() == Vector2i(12, 12):
-		_assert(image.get_pixel(0, 0) == Palette.WIN_FACE_LIGHT, "the outset bevel's top-left should be light, got %s" % image.get_pixel(0, 0))
-		_assert(image.get_pixel(1, 1) == Palette.WIN_FACE_LIGHT, "the outset bevel's light edge should be 2px wide, got %s" % image.get_pixel(1, 1))
-		_assert(image.get_pixel(2, 2) == Palette.WIN_FACE, "the face must start immediately after the 2px light edge, got %s" % image.get_pixel(2, 2))
-		_assert(image.get_pixel(6, 6) == Palette.WIN_FACE, "the bevel center should be the flat window face, got %s" % image.get_pixel(6, 6))
-		_assert(image.get_pixel(11, 11) == Palette.WIN_FACE_DARKER, "the outset bevel's bottom-right should be dark, got %s" % image.get_pixel(11, 11))
+	_assert(normal is BevelStyleBox, "the Button normal stylebox should be a BevelStyleBox, got %s" % normal.get_class())
+	if normal is BevelStyleBox:
+		var bevel := normal as BevelStyleBox
+		_assert(bevel.light == Palette.WIN_FACE_LIGHT, "the outset bevel's light edge should be the light tone, got %s" % bevel.light)
+		_assert(bevel.dark == Palette.WIN_FACE_DARKER, "the outset bevel's dark edge should be the darker tone, got %s" % bevel.dark)
+		_assert(bevel.face == Palette.WIN_FACE, "the bevel face should be the flat window face, got %s" % bevel.face)
+		_assert(not bevel.ring, "a plain button bevel should carry no outer ring")
 
 	var pressed := theme.get_stylebox("pressed", "Button")
-	var pressed_image := _stylebox_image(pressed)
-	_assert(pressed_image != null, "the Button pressed stylebox should carry the inverted bevel")
-	if pressed_image != null and pressed_image.get_size() == Vector2i(12, 12):
-		_assert(pressed_image.get_pixel(0, 0) == Palette.WIN_FACE_DARKER, "the pressed bevel's top-left should invert to dark, got %s" % pressed_image.get_pixel(0, 0))
-		_assert(pressed_image.get_pixel(11, 11) == Palette.WIN_FACE_LIGHT, "the pressed bevel's bottom-right should invert to light, got %s" % pressed_image.get_pixel(11, 11))
+	_assert(pressed is BevelStyleBox, "the Button pressed stylebox should be a BevelStyleBox, got %s" % pressed.get_class())
+	if pressed is BevelStyleBox:
+		var pressed_bevel := pressed as BevelStyleBox
+		_assert(pressed_bevel.light == Palette.WIN_FACE_DARKER, "the pressed bevel's light edge should invert to dark, got %s" % pressed_bevel.light)
+		_assert(pressed_bevel.dark == Palette.WIN_FACE_LIGHT, "the pressed bevel's dark edge should invert to light, got %s" % pressed_bevel.dark)
 
-	# --- .win frames (index.html:45-50, :509) ---------------------------------
-	# The window and the dialogs are the reference's .win: the bevel plus a 1px
-	# black outer ring. Plain .outset panels (the subway grid) are not.
-	var win := _stylebox_image(theme.get_stylebox("panel", "WindowFace"))
-	_assert(win != null and win.get_size() == Vector2i(14, 14), "the WindowFace panel should be the 14x14 .win slice, got %s" % str(win.get_size() if win != null else null))
-	if win != null and win.get_size() == Vector2i(14, 14):
-		_assert(win.get_pixel(0, 0).r == 0.0, "the .win frame should carry the 1px black outer ring, got %s" % win.get_pixel(0, 0))
-		_assert(win.get_pixel(13, 13).r == 0.0, "the .win black ring should run the full frame, got %s" % win.get_pixel(13, 13))
-		_assert(win.get_pixel(6, 6) == Palette.WIN_FACE, "the .win center should be the flat window face, got %s" % win.get_pixel(6, 6))
-	var plain := _stylebox_image(theme.get_stylebox("panel", "Outset"))
-	_assert(plain != null, "the Outset panel should be a bevel texture")
-	if plain != null:
-		_assert(plain.get_pixel(0, 0) == Palette.WIN_FACE_LIGHT, "plain .outset has no black ring, top-left should be light, got %s" % plain.get_pixel(0, 0))
+	# --- .win frame (index.html:45-50, :606) -----------------------------------
+	# The dialog is the reference's .win: the bevel plus a 1px black outer
+	# ring. Plain .outset panels (the subway grid) are not.
+	var dialog_frame := theme.get_stylebox("panel", "DialogFrame")
+	_assert(dialog_frame is BevelStyleBox and (dialog_frame as BevelStyleBox).ring, "the DialogFrame panel should carry the .win outer ring")
+	var plain := theme.get_stylebox("panel", "Outset")
+	_assert(plain is BevelStyleBox and not (plain as BevelStyleBox).ring, "plain .outset should carry no black ring")
+
+	# --- main window face: flush, top hairline only -----------------------------
+	# Unlike the dialog, the window fills the whole OS window -- there is no
+	# dark backdrop for a ring to separate it from -- so it carries no bevel
+	# and no ring on three sides, only a 1px black top hairline under the OS
+	# titlebar, and zero margin elsewhere so content reaches the real edges.
+	var win := theme.get_stylebox("panel", "WindowFace")
+	_assert(win is StyleBoxFlat, "the WindowFace panel should be a flat box, got %s" % win.get_class())
+	if win is StyleBoxFlat:
+		var win_flat := win as StyleBoxFlat
+		_assert(win_flat.border_width_top == 1, "the window face should carry a 1px top hairline, got %d" % win_flat.border_width_top)
+		_assert(win_flat.border_width_left == 0 and win_flat.border_width_right == 0 and win_flat.border_width_bottom == 0, "the window face should carry no border on its other three sides")
+		_assert(win_flat.content_margin_left == 0 and win_flat.content_margin_right == 0 and win_flat.content_margin_bottom == 0, "the window face should leave zero margin on three sides so content reaches the real window edges")
+
+	# --- zero gradients ---------------------------------------------------------
+	# The one deliberate exception is the system-styled PopupMenu's soft
+	# dropshadow (index.html doesn't have one, but the answer to "should the
+	# menu layer match Win98" was no -- it stays a light system panel).
+	for type_name in theme.get_stylebox_type_list():
+		for item_name in theme.get_stylebox_list(type_name):
+			var box := theme.get_stylebox(item_name, type_name)
+			_assert(not (box is StyleBoxTexture), "%s/%s should not be a stretched StyleBoxTexture (that's the gradient-wash bug), got %s" % [type_name, item_name, box.get_class()])
+			if box is StyleBoxFlat and type_name != "PopupMenu":
+				_assert((box as StyleBoxFlat).shadow_size == 0, "%s/%s should carry no soft shadow outside the system menu layer" % [type_name, item_name])
 
 	# --- form fields (index.html:420-426, :465-470) ----------------------------
 	var field := theme.get_stylebox("normal", "LineEdit")
@@ -978,14 +995,6 @@ static func _held(world: SimWorld, drug_index: int) -> int:
 ## theme's point is light-against-dark, and the palette is achromatic.
 static func _brightness(color: Color) -> float:
 	return (color.r + color.g + color.b) / 3.0
-
-
-## The image behind a texture stylebox, null for any other stylebox kind.
-static func _stylebox_image(stylebox: StyleBox) -> Image:
-	var textured := stylebox as StyleBoxTexture
-	if textured == null:
-		return null
-	return textured.texture.get_image()
 
 
 ## A descendant by node name, for assertions that read the dialog's own

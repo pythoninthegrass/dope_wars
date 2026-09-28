@@ -8,7 +8,7 @@ extends Control
 ## The wiring is the whole point of this file, and it is where the four layers
 ## meet exactly once each:
 ##
-##   content/     Copy, Palette, Win95Theme -- strings and chrome
+##   content/     Copy, Palette, Win98Theme -- strings and chrome
 ##   simulation/  SimWorld -- the only handle on the GDExtension class
 ##   platform/    InputRouter, SaveStore, HighscoreStore -- keys and files
 ##   presentation/ Hud, DialogHost, ArrivalFlow -- widgets and flow
@@ -38,7 +38,7 @@ const SEED_ARG := "--seed="
 
 
 func _ready() -> void:
-	theme = Win95Theme.shared()
+	theme = Win98Theme.shared()
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 
 	# The HUD is the whole client area. The prototype draws a page around a

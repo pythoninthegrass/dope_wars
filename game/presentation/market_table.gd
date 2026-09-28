@@ -28,7 +28,7 @@ var _applying := false
 
 
 func _init() -> void:
-	theme = Win95Theme.shared()
+	theme = Win98Theme.shared()
 	add_theme_constant_override("separation", 2)
 	size_flags_vertical = Control.SIZE_EXPAND_FILL
 
@@ -39,7 +39,7 @@ func _init() -> void:
 
 	_tree = Tree.new()
 	_tree.name = "Tree"
-	_tree.theme = Win95Theme.shared()
+	_tree.theme = Win98Theme.shared()
 	# The prototype's price cell is one <td> holding the trend glyph and the
 	# number (index.html:500-505), which a Tree cell cannot do -- one cell is
 	# one color. So the glyph is its own column, sized to the CSS slot
@@ -54,8 +54,8 @@ func _init() -> void:
 	_tree.set_column_expand(0, true)
 	_tree.set_column_expand(1, false)
 	_tree.set_column_expand(2, false)
-	_tree.set_column_custom_minimum_width(1, Win95Theme.TREND_SLOT)
-	_tree.set_column_custom_minimum_width(2, Win95Theme.PRICE_COLUMN)
+	_tree.set_column_custom_minimum_width(1, Win98Theme.TREND_SLOT)
+	_tree.set_column_custom_minimum_width(2, Win98Theme.PRICE_COLUMN)
 	_tree.item_selected.connect(_on_item_selected)
 	_tree.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	add_child(_tree)
@@ -94,8 +94,8 @@ func refresh(world: SimWorld, selected: int, show_trend: bool) -> void:
 			# index.html:480-498: the glyph is its own color and its own
 			# smaller size, so the price next to it stays black.
 			item.set_text(1, Copy.trend(price, previous.get(drug_index)))
-			item.set_custom_font(1, Win95Theme.trend_font())
-			item.set_custom_font_size(1, Win95Theme.FONT_TREND)
+			item.set_custom_font(1, Win98Theme.trend_font())
+			item.set_custom_font_size(1, Win98Theme.FONT_TREND)
 			item.set_custom_color(1, _trend_color(price, previous.get(drug_index)))
 		_items[drug_index] = item
 

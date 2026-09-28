@@ -67,7 +67,7 @@ var _traded: Dictionary = {}
 
 
 func _init() -> void:
-	theme = Win95Theme.shared()
+	theme = Win98Theme.shared()
 	theme_type_variation = &"WindowFace"
 	_build()
 
@@ -260,7 +260,7 @@ func _build() -> void:
 ## The prototype's titlebar (index.html:66-76, :511) is a window decoration,
 ## and a native app has one already -- Godot's, which Main keeps in sync with
 ## the day. So the title text lives in the menubar strip instead, on the right
-## of the menus, where a Win95 status field would sit.
+## of the menus, where a Win98 status field would sit.
 func _build_day_readout() -> Control:
 	_title = Label.new()
 	_title.name = "DayReadout"
@@ -432,7 +432,7 @@ func _build_led(key: String, label_key: String, variation: StringName) -> Contro
 func _build_subway_panel() -> Control:
 	_subway_panel = PanelContainer.new()
 	_subway_panel.name = "SubwayPanel"
-	_subway_panel.theme_type_variation = &"Outset"
+	_subway_panel.theme_type_variation = &"SubwayPanel"
 	_subway_panel.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	# index.html:160: the top row is a two-column 1fr 1fr grid, so the status
 	# LEDs and the subway panel split the window evenly.
