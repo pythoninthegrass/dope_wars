@@ -317,6 +317,7 @@ static func _button(theme: Theme) -> void:
 	theme.set_color("font_color", "Button", Color.BLACK)
 	theme.set_color("font_hover_color", "Button", Color.BLACK)
 	theme.set_color("font_pressed_color", "Button", Color.BLACK)
+	theme.set_color("font_focus_color", "Button", Color.BLACK)
 	theme.set_color("font_disabled_color", "Button", Palette.WIN_FACE_DARK)
 	theme.set_constant("h_separation", "Button", 0)
 	theme.set_font_size("font_size", "Button", FONT_BODY)
