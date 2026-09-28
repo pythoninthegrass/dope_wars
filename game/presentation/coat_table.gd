@@ -45,7 +45,12 @@ func _init() -> void:
 	_tree.set_column_title(0, tr(Copy.COL_DRUG))
 	_tree.set_column_title(1, tr(Copy.COL_QTY))
 	_tree.set_column_title(2, tr(Copy.COL_PRICE))
+	# index.html:310-316's thead th is left-aligned by default, and :591's
+	# <th class="num"> right-aligns Qty and Price to match the cells beneath
+	# them; Tree column titles default to centered.
+	_tree.set_column_title_alignment(0, HORIZONTAL_ALIGNMENT_LEFT)
 	for column in range(1, 3):
+		_tree.set_column_title_alignment(column, HORIZONTAL_ALIGNMENT_RIGHT)
 		_tree.set_column_custom_minimum_width(column, 72)
 	_tree.set_column_expand(0, true)
 	_tree.item_selected.connect(_on_item_selected)

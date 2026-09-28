@@ -437,13 +437,23 @@ static func _tree(theme: Theme) -> void:
 	theme.set_stylebox("panel", "Tree", StyleBoxEmpty.new())
 	theme.set_stylebox("focus", "Tree", StyleBoxEmpty.new())
 	# index.html:310-316: a sticky window-face title row with a hairline
-	# under it, not the default theme's dark strip.
+	# under it, not the default theme's dark strip, and padding: 2px 6px --
+	# without it the title button's own text sits flush against the column
+	# edge, most visible on a right-aligned header like Price butting up
+	# against the table's right border.
 	var header := flat(Palette.WIN_FACE)
 	header.border_width_bottom = 1
 	header.border_color = Palette.WIN_FACE_DARKER
+	var header_hover := flat(Palette.WIN_FACE)
+	var header_pressed := flat(Palette.WIN_FACE)
+	for box in [header, header_hover, header_pressed]:
+		box.content_margin_left = 6
+		box.content_margin_right = 6
+		box.content_margin_top = 2
+		box.content_margin_bottom = 2
 	theme.set_stylebox("title_button_normal", "Tree", header)
-	theme.set_stylebox("title_button_hover", "Tree", flat(Palette.WIN_FACE))
-	theme.set_stylebox("title_button_pressed", "Tree", flat(Palette.WIN_FACE))
+	theme.set_stylebox("title_button_hover", "Tree", header_hover)
+	theme.set_stylebox("title_button_pressed", "Tree", header_pressed)
 	# The prototype's table has no column rules and no focus rectangle; the
 	# selection highlight is the row background set per-cell instead.
 	theme.set_stylebox("cursor", "Tree", StyleBoxEmpty.new())
@@ -451,6 +461,10 @@ static func _tree(theme: Theme) -> void:
 	theme.set_stylebox("selected", "Tree", StyleBoxEmpty.new())
 	theme.set_stylebox("selected_focus", "Tree", StyleBoxEmpty.new())
 	theme.set_constant("draw_guides", "Tree", 0)
+	# Tree reserves 16px on column 0 for a folding arrow (item_margin's
+	# default) even with hide_root and no children, which pushed row text
+	# right of the header's left edge; there is nothing to fold here.
+	theme.set_constant("item_margin", "Tree", 0)
 	theme.set_color("title_button_color", "Tree", Color.BLACK)
 	theme.set_color("font_color", "Tree", Color.BLACK)
 	theme.set_font("font", "Tree", ui_font())

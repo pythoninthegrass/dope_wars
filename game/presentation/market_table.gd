@@ -51,6 +51,11 @@ func _init() -> void:
 	_tree.set_column_title(0, tr(Copy.COL_DRUG))
 	_tree.set_column_title(1, "")
 	_tree.set_column_title(2, tr(Copy.COL_PRICE))
+	# Tree column titles default to centered (index.html:310-316's thead th is
+	# left-aligned by default, and :500-505 keeps the price column left-aligned
+	# too), so both headers have to be told to match the cells beneath them.
+	_tree.set_column_title_alignment(0, HORIZONTAL_ALIGNMENT_LEFT)
+	_tree.set_column_title_alignment(2, HORIZONTAL_ALIGNMENT_LEFT)
 	_tree.set_column_expand(0, true)
 	_tree.set_column_expand(1, false)
 	_tree.set_column_expand(2, false)
