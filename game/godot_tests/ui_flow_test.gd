@@ -49,6 +49,7 @@ const CASES := [
 	"travel_advances_day",
 	"persistence_round_trip",
 	"finances",
+	"typed_quantity",
 	"endgame_and_highscores",
 	"new_game_dialog",
 ]
@@ -75,6 +76,8 @@ func _run() -> void:
 	await _test_persistence_round_trip()
 	_case("finances")
 	await _test_finances()
+	_case("typed_quantity")
+	await _test_typed_quantity()
 	_case("endgame_and_highscores")
 	await _test_endgame_and_highscores()
 	_case("new_game_dialog")
@@ -510,6 +513,158 @@ func _test_finances() -> void:
 	_assert(_main.hud().led_text("bank") == "400", "the bank LED should follow the deposit")
 
 
+# The typed-text path every other case skips. set_value() writes the Range
+# directly -- the one thing a player never does. Typing lands in the SpinBox's
+# internal LineEdit, and the prototype read that text straight on OK
+# (index.html:1276), while Enter confirmed and Escape cancelled from inside
+# the field (index.html:1676-1686). A port that reads the Range instead of the
+# typed text acts on the spinner's initial value -- the whole holding -- and a
+# port whose LineEdit swallows Enter/Escape is keyboard-deaf in the one field
+# the player is actually using. Both bugs were real here; this case pins both
+# against the prototype's semantics.
+func _test_typed_quantity() -> void:
+	var world := _fresh(SEED)
+	var hud := _main.hud()
+	var drug_index := _cheapest_traded(world)
+	var price := _price_of(world, drug_index)
+
+	_main.hud().market_drug_pressed(drug_index)
+	await _idle()
+	_main._do_buy()
+	await _idle()
+	var buy_dialog := _main.dialogs().current() as QuantityDialog
+	_assert(buy_dialog != null, "Buy should open a quantity dialog")
+	if buy_dialog == null:
+		return
+	buy_dialog.set_value(3)
+	_main.dialogs().confirm()
+	await _idle()
+	_assert(_held(world, drug_index) == 3, "the setup should hold three units")
+
+	# Type "2" and click OK: two units sell, not the three the spinner was
+	# initialized with.
+	_main.hud().coat_drug_pressed(drug_index)
+	await _idle()
+	_main._do_sell()
+	await _idle()
+	var sell := _main.dialogs().current() as QuantityDialog
+	_assert(sell != null, "Sell should open a quantity dialog")
+	if sell == null:
+		return
+	var cash_before := int(world.state_get()["cash"])
+	_quantity_line_edit(sell).text = "2"
+	_main.dialogs().confirm()
+	await _idle()
+	_assert(
+		int(world.state_get()["cash"]) == cash_before + 2 * price,
+		"typing 2 into the sell spinner should sell exactly 2 units (cash %d, was %d, price %d)"
+		% [int(world.state_get()["cash"]), cash_before, price]
+	)
+	_assert(_held(world, drug_index) == 1, "selling 2 of 3 should leave 1 held, got %d" % _held(world, drug_index))
+
+	# Enter inside the field confirms (the prototype clicked qtyOk from the
+	# input, index.html:1682-1684). The LineEdit consumes the key, so the
+	# dialog has to be listening for it there; pressing it on the field is the
+	# route a player takes.
+	_main._do_sell()
+	await _idle()
+	var sell_enter := _main.dialogs().current() as QuantityDialog
+	_assert(sell_enter != null, "Sell should reopen for the Enter case")
+	if sell_enter == null:
+		return
+	var enter_line := _quantity_line_edit(sell_enter)
+	enter_line.text = "1"
+	var enter := InputEventKey.new()
+	enter.keycode = KEY_ENTER
+	enter.pressed = true
+	enter_line.gui_input.emit(enter)
+	await _idle()
+	_assert(not _main.dialogs().is_open(), "Enter in the spinner should confirm the dialog")
+	_assert(
+		int(world.state_get()["cash"]) == cash_before + 3 * price,
+		"Enter should commit the typed amount, cash %d, expected %d" % [int(world.state_get()["cash"]), cash_before + 3 * price]
+	)
+	_assert(hud.coat_table().row_count() == 0, "selling the last unit should empty the coat table")
+
+	# Escape inside the field cancels (index.html:1679-1681), selling nothing.
+	_main.hud().market_drug_pressed(drug_index)
+	await _idle()
+	_main._do_buy()
+	await _idle()
+	var rebuy := _main.dialogs().current() as QuantityDialog
+	_assert(rebuy != null, "Buy should reopen for the Escape case")
+	if rebuy == null:
+		return
+	rebuy.set_value(1)
+	_main.dialogs().confirm()
+	await _idle()
+	var cash_after_rebuy := int(world.state_get()["cash"])
+	_main.hud().coat_drug_pressed(drug_index)
+	await _idle()
+	_main._do_sell()
+	await _idle()
+	var sell_esc := _main.dialogs().current() as QuantityDialog
+	_assert(sell_esc != null, "Sell should reopen for the Escape case")
+	if sell_esc == null:
+		return
+	_quantity_line_edit(sell_esc).text = "1"
+	var escape := InputEventKey.new()
+	escape.keycode = KEY_ESCAPE
+	escape.pressed = true
+	_quantity_line_edit(sell_esc).gui_input.emit(escape)
+	await _idle()
+	_assert(not _main.dialogs().is_open(), "Escape in the spinner should cancel the dialog")
+	_assert(_held(world, drug_index) == 1, "Escape should sell nothing, %d held" % _held(world, drug_index))
+	_assert(int(world.state_get()["cash"]) == cash_after_rebuy, "Escape should not move cash")
+
+	# A field the player cleared commits nothing, which is index.html:1276's
+	# `parseInt('') || 0`. The distinction from an untouched field is that the
+	# text changed and then emptied; the text_changed signal is what records
+	# that, and a keystroke is what raises it.
+	_main.hud().coat_drug_pressed(drug_index)
+	await _idle()
+	_main._do_sell()
+	await _idle()
+	var sell_cleared := _main.dialogs().current() as QuantityDialog
+	_assert(sell_cleared != null, "Sell should reopen for the cleared-field case")
+	if sell_cleared == null:
+		return
+	var cleared_line := _quantity_line_edit(sell_cleared)
+	cleared_line.text = "1"
+	cleared_line.text_changed.emit(cleared_line.text)
+	cleared_line.text = ""
+	_main.dialogs().confirm()
+	await _idle()
+	_assert(not _main.dialogs().is_open(), "a cleared field should still confirm the dialog")
+	_assert(_held(world, drug_index) == 1, "a cleared field should sell nothing, %d held" % _held(world, drug_index))
+	_assert(int(world.state_get()["cash"]) == cash_after_rebuy, "a cleared field should not move cash")
+
+	# The same typed path through Deposit: 500 typed moves 500, not the
+	# spinner's initial value of the whole cash pile.
+	var cash_before_deposit := int(world.state_get()["cash"])
+	_main._do_finances()
+	await _idle()
+	_main._on_finances_action("finDeposit")
+	await _idle()
+	var deposit := _main.dialogs().current() as QuantityDialog
+	_assert(deposit != null, "Deposit should open a quantity dialog")
+	if deposit == null:
+		return
+	_quantity_line_edit(deposit).text = "500"
+	_main.dialogs().confirm()
+	await _idle()
+	_assert(
+		int(world.state_get()["bank"]) == 500,
+		"typing 500 into the deposit spinner should deposit exactly 500, got %d" % int(world.state_get()["bank"])
+	)
+	_assert(
+		int(world.state_get()["cash"]) == cash_before_deposit - 500,
+		"the deposit should leave the rest of the cash alone, got %d of %d" % [int(world.state_get()["cash"]), cash_before_deposit]
+	)
+	_main.dialogs().cancel()
+	await _idle()
+
+
 # index.html:1569-1606 and :1633-1638. Finishing ends the run, offers the
 # score entry, and the store keeps a top-10 sorted by score -- with the date
 # surviving the round trip through the core, which drops it.
@@ -601,6 +756,12 @@ func _test_new_game_dialog() -> void:
 	_assert(dialog.num_days() == 31, "the days field should default to the ruleset's 31, got %d" % dialog.num_days())
 	_assert(dialog.start_cash() == 2000, "the cash field should default to the ruleset's 2000, got %d" % dialog.start_cash())
 	_assert(dialog.requested_seed() == -1, "a new game with no seed asked for should report -1")
+
+	# index.html:1622-1623 -- a blank field falls back to the prototype's
+	# default (31 / 2000), not to the field's minimum. This is the typed path
+	# the set_values() below bypasses, so it needs its own check.
+	_spinbox_of(dialog).get_line_edit().text = ""
+	_assert(dialog.num_days() == 31, "a blank days field should read 31, got %d" % dialog.num_days())
 
 	dialog.set_values(7, 5000, 999)
 	_main.dialogs().confirm()
@@ -718,6 +879,32 @@ static func _price_of(world: SimWorld, drug_index: int) -> int:
 		if int(slot["drug_index"]) == drug_index:
 			return int(slot["price"])
 	return 0
+
+
+## Held quantity of one drug, 0 if not held.
+static func _held(world: SimWorld, drug_index: int) -> int:
+	for slot in world.inventory_copy():
+		if int(slot["drug_index"]) == drug_index:
+			return int(slot["qty"])
+	return 0
+
+
+## The SpinBox a dialog shows, found by walking its tree. Reaching for the
+## widget rather than a test-only method is the point: the typed-text cases
+## must drive the real LineEdit a player types into.
+static func _spinbox_of(node: Node) -> SpinBox:
+	if node is SpinBox:
+		return node
+	for child in node.get_children():
+		var found := _spinbox_of(child)
+		if found != null:
+			return found
+	return null
+
+
+static func _quantity_line_edit(dialog: Node) -> LineEdit:
+	var spin := _spinbox_of(dialog)
+	return spin.get_line_edit() if spin != null else null
 
 
 func _assert(condition: bool, message: String) -> void:

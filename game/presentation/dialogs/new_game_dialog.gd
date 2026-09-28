@@ -21,11 +21,15 @@ const CASH_MAX := 100000
 
 var _days: SpinBox
 var _cash: SpinBox
+var _default_days := 31
+var _default_cash := 2000
 var _seed := -1
 
 
 func present(default_days: int, default_cash: int) -> NewGameDialog:
 	setup(Copy.DLG_NEW_GAME)
+	_default_days = default_days
+	_default_cash = default_cash
 
 	_field(tr(Copy.LBL_NUM_DAYS), _make_days(default_days))
 	_field(tr(Copy.LBL_START_CASH), _make_cash(default_cash))
@@ -35,15 +39,26 @@ func present(default_days: int, default_cash: int) -> NewGameDialog:
 	return self
 
 
-## Clamped exactly as index.html:1622-1623 clamps: the minimum wins over the
-## field, and a blank or unparseable field falls back to the prototype's
-## default rather than to zero.
+## index.html:1622-1623 in full: `Math.max(5, parseInt(value) || 31)`. The
+## minimum wins over the field, and a field that does not parse falls back to
+## the prototype's default rather than to zero, which is why the defaults the
+## form was presented with are remembered instead of hard-coded.
 func num_days() -> int:
-	return maxi(DAYS_MIN, int(_days.value))
+	var typed := _days.get_line_edit().text
+	if typed.is_empty():
+		return _default_days
+	if not typed.is_valid_int():
+		return _default_days
+	return maxi(DAYS_MIN, int(typed))
 
 
 func start_cash() -> int:
-	return maxi(CASH_MIN, int(_cash.value))
+	var typed := _cash.get_line_edit().text
+	if typed.is_empty():
+		return _default_cash
+	if not typed.is_valid_int():
+		return _default_cash
+	return maxi(CASH_MIN, int(typed))
 
 
 ## -1 means "no seed given"; the caller rolls one.
@@ -52,10 +67,13 @@ func requested_seed() -> int:
 
 
 ## Fills the form, for the same reason QuantityDialog has set_value: a SpinBox
-## cannot meaningfully be typed into from a script.
+## cannot meaningfully be typed into from a script. The values are mirrored into
+## the fields so the text and the value cannot disagree.
 func set_values(days: int, cash: int, seed_value: int = -1) -> NewGameDialog:
 	_days.value = days
+	_days.get_line_edit().text = str(days)
 	_cash.value = cash
+	_cash.get_line_edit().text = str(cash)
 	_seed = seed_value
 	return self
 
@@ -80,6 +98,7 @@ func _make_days(default_days: int) -> SpinBox:
 	# The prototype's default is the ruleset's 31, not the field's midpoint.
 	_days.value = default_days
 	_days.select_all_on_focus = true
+	bind_spinner(_days)
 	return _days
 
 
@@ -90,4 +109,5 @@ func _make_cash(default_cash: int) -> SpinBox:
 	_cash.step = 100
 	_cash.value = default_cash
 	_cash.select_all_on_focus = true
+	bind_spinner(_cash)
 	return _cash

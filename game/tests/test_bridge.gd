@@ -32,6 +32,7 @@ func _initialize() -> void:
 	_test_abi_version()
 	_test_world_lifecycle()
 	_test_game_step_sequence()
+	_test_partial_sell()
 	_test_serialize_round_trip()
 	_test_determinism()
 	_test_rules_surface()
@@ -124,6 +125,36 @@ func _test_game_step_sequence() -> void:
 	_assert(deposit["result"] == SimWorld.OK, "deposit should succeed")
 	_assert(deposit["actual"] == 500, "deposit should move 500")
 	_assert(world.state_get()["bank"] == 500, "bank should hold the deposit")
+
+
+## A partial sell. Every other sell in this suite sold the whole holding,
+## which is the blind spot that let a UI regression sell 100 units for a typed
+## 2 without any engine test noticing. This pins the engine chain itself:
+## qty must be honored through GDScript -> C++ -> Mojo, not just accepted.
+func _test_partial_sell() -> void:
+	var world := _new_world()
+	var prices: Array = world.prices_copy()
+	var cheapest := int(prices[0]["drug_index"])
+	var cheapest_price := int(prices[0]["price"])
+	for slot in prices:
+		if int(slot["price"]) < cheapest_price:
+			cheapest = int(slot["drug_index"])
+			cheapest_price = int(slot["price"])
+	_assert(
+		cheapest_price * 10 <= int(world.state_get()["cash"]),
+		"ten of the cheapest drug should be affordable at the start (price %d)" % cheapest_price,
+	)
+	_assert(world.buy(cheapest, 10) == SimWorld.OK, "buying ten of the cheapest drug should succeed")
+	_assert(world.sell(cheapest, 3) == SimWorld.OK, "selling three of the ten should succeed")
+	_assert(_held(world, cheapest) == 7, "selling three of ten should leave seven")
+	_assert(int(world.state_get()["coat_used"]) == 7, "the coat should hold exactly the seven unsold units")
+
+
+static func _held(world: SimWorld, drug_index: int) -> int:
+	for slot in world.inventory_copy():
+		if int(slot["drug_index"]) == drug_index:
+			return int(slot["qty"])
+	return 0
 
 
 func _test_serialize_round_trip() -> void:

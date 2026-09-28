@@ -21,6 +21,7 @@ var _body: VBoxContainer
 var _buttons: HBoxContainer
 var _default_key := ""
 var _cancel_key := ""
+var _spinner_typed := false
 
 
 func setup(title_key: String) -> void:
@@ -107,6 +108,48 @@ func focus_default() -> void:
 		if button != null and button.name == _default_key:
 			button.grab_focus()
 			return
+
+
+## A spinner's text is the dialog's answer, not the widget's: a SpinBox keeps
+## the field text and the value in separate stores and only reconciles them on
+## submit, so a reading is whatever the field started with -- the whole holding
+## -- and its LineEdit eats Enter and Escape before the router can route them
+## (index.html:1276, :1676-1686).
+##
+## A SpinBox's field starts empty, which the prototype's pre-filled input never
+## is, so "the player never typed" and "the player cleared the field" are the
+## same empty string with opposite meanings: the maximum against zero. The
+## signal tells them apart, since it fires on a keystroke and not on an
+## assignment (which is how set_value writes).
+func bind_spinner(spinner: SpinBox) -> void:
+	var edit := spinner.get_line_edit()
+	edit.gui_input.connect(_on_spinner_gui_input.bind(spinner))
+	edit.text_changed.connect(_on_spinner_text_changed)
+
+
+## Folds the spinner's typed text into its value the way a submit would.
+## apply() is the only thing that moves text into the Range -- assigning `text`
+## emits no text_changed, and the LineEdit otherwise waits for a submit. It
+## raises no signal of its own, so this is safe to call while reading.
+func apply_spinner(spinner: SpinBox) -> void:
+	spinner.apply()
+
+
+## Enter confirms and Escape cancels from inside the field, as they do for the
+## rest of the dialog (index.html:1682-1684, :1679-1681).
+func _on_spinner_gui_input(event: InputEvent, spinner: SpinBox) -> void:
+	var key := event as InputEventKey
+	if key == null or not key.pressed or key.echo:
+		return
+	if key.keycode == KEY_ENTER or key.keycode == KEY_KP_ENTER:
+		apply_spinner(spinner)
+		confirm()
+	elif key.keycode == KEY_ESCAPE:
+		cancel()
+
+
+func _on_spinner_text_changed(_text: String) -> void:
+	_spinner_typed = true
 
 
 func _fire(key: String) -> void:
