@@ -1,5 +1,6 @@
 # ETC
 CLAUDE.md
+CLAUDE.local.md
 screenshots/*
 
 # General
@@ -299,6 +300,9 @@ game/translations/*.translation
 third_party/godot-cpp/bin/
 third_party/godot-cpp/gen/**/*.os
 third_party/godot-cpp/.sconsign*.dblite
+
+# Beermat "Dope Wars for Windows" 1.2.0.0 (1999) reference assets, extracted for local research
+vendor/dopewars-1999/
 
 # TASK-002 vendored Mojo runtime (copied into game/bin by the extension build)
 libKGENCompilerRTShared.*
