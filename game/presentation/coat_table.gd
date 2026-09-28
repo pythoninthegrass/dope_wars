@@ -55,6 +55,9 @@ func _init() -> void:
 	_tree.set_column_expand(0, true)
 	_tree.item_selected.connect(_on_item_selected)
 	_tree.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	# Tree defaults to showing a cell's own text as a tooltip when no
+	# tooltip_text is set (scene/gui/tree.cpp); the prototype never had this.
+	_tree.auto_tooltip = false
 
 	# index.html:297-305: `.table-wrap.inset` frames the whole table,
 	# header row included -- a PanelContainer around the Tree rather than a
