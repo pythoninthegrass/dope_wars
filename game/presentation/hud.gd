@@ -81,10 +81,10 @@ func refresh(world: SimWorld) -> void:
 	var dead := bool(state.get("dead", false))
 
 	_title.text = Copy.day_of(day, num_days)
-	_leds["cash"].text = Copy.fmt(state.get("cash", 0))
-	_leds["bank"].text = Copy.fmt(state.get("bank", 0))
-	_leds["debt"].text = Copy.fmt(state.get("debt", 0))
-	_leds["guns"].text = Copy.fmt(state.get("guns", 0))
+	_leds["cash"].text = Copy.led_fmt(state.get("cash", 0))
+	_leds["bank"].text = Copy.led_fmt(state.get("bank", 0))
+	_leds["debt"].text = Copy.led_fmt(state.get("debt", 0))
+	_leds["guns"].text = Copy.led_fmt(state.get("guns", 0))
 	_health.set_health(int(state.get("health", 0)))
 
 	var location_index := int(state.get("location_index", 0))
@@ -381,9 +381,12 @@ func _build_status_column() -> Control:
 	column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	column.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 
-	for led in [["cash", Copy.LED_CASH, &"LedCash"], ["bank", Copy.LED_BANK, &"LedBank"],
-			["debt", Copy.LED_DEBT, &"LedDebt"], ["guns", Copy.LED_GUNS, &"LedGuns"]]:
-		column.add_child(_build_led(String(led[0]), String(led[1]), led[2]))
+	# The ghost placeholder is sized to the widest realistic reading for that
+	# LED -- seven digits of money, two of guns -- so it never has to reflow
+	# as the live value grows or shrinks.
+	for led in [["cash", Copy.LED_CASH, &"LedCash", "8.888.888"], ["bank", Copy.LED_BANK, &"LedBank", "8.888.888"],
+			["debt", Copy.LED_DEBT, &"LedDebt", "8.888.888"], ["guns", Copy.LED_GUNS, &"LedGuns", "88"]]:
+		column.add_child(_build_led(String(led[0]), String(led[1]), led[2], String(led[3])))
 
 	var health_row := HBoxContainer.new()
 	health_row.name = "HealthRow"
@@ -398,11 +401,15 @@ func _build_status_column() -> Control:
 	return column
 
 
-## `variation` names the inset frame the prototype gives this LED; the two text
-## variations are that name with "Label" and "Value" appended, which is how the
-## theme registers the dimmed label and the full-brightness value
-## (index.html:186).
-func _build_led(key: String, label_key: String, variation: StringName) -> Control:
+## `variation` names the inset frame the prototype gives this LED; the text
+## variations are that name with "Label", "Ghost" and "Value" appended, which
+## is how the theme registers the dimmed label, the unlit-segment placeholder
+## and the full-brightness value (index.html:186 plus the ghost this port adds
+## for the digital-clock/stock-ticker look). `ghost_text` is that placeholder,
+## e.g. "8.888.888" for a money LED (Copy.led_fmt() groups with "." rather
+## than "," -- see Win98Theme.led_font()) -- it also fixes the value column's
+## width so the live digits never reflow the row.
+func _build_led(key: String, label_key: String, variation: StringName, ghost_text: String) -> Control:
 	var frame := PanelContainer.new()
 	frame.name = key.capitalize() + "Led"
 	frame.theme_type_variation = variation
@@ -418,13 +425,42 @@ func _build_led(key: String, label_key: String, variation: StringName) -> Contro
 	label.text = tr(label_key)
 	label.theme_type_variation = StringName(String(variation) + "Label")
 	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	# The label sets the row's height (FONT_LED_LABEL > FONT_LED), so without
+	# this it sits top-aligned in its own taller rect while the value/ghost
+	# stack next to it centers -- the mismatch this fixes.
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	row.add_child(label)
+
+	# The ghost and the live value share one rect, right-aligned and stacked,
+	# so the value's lit digits land on top of the ghost's corresponding unlit
+	# ones instead of the two drifting apart as the digit count changes.
+	var stack := Control.new()
+	stack.name = "ValueStack"
+	stack.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	stack.custom_minimum_size = Win98Theme.led_font().get_string_size(
+		ghost_text, HORIZONTAL_ALIGNMENT_LEFT, -1, Win98Theme.FONT_LED)
+	row.add_child(stack)
+
+	var ghost := Label.new()
+	ghost.name = "Ghost"
+	ghost.text = ghost_text
+	ghost.theme_type_variation = StringName(String(variation) + "Ghost")
+	ghost.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	# The row's height comes from the label, which is set larger than the LED
+	# value (FONT_LED_LABEL > FONT_LED), so the value/ghost need their own
+	# vertical centering rather than sitting top-aligned in the taller row.
+	ghost.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	ghost.set_anchors_preset(Control.PRESET_FULL_RECT)
+	stack.add_child(ghost)
 
 	var value := Label.new()
 	value.theme_type_variation = StringName(String(variation) + "Value")
 	value.name = "Value"
 	value.text = "0"
-	row.add_child(value)
+	value.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	value.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	value.set_anchors_preset(Control.PRESET_FULL_RECT)
+	stack.add_child(value)
 	_leds[key] = value
 	return frame
 

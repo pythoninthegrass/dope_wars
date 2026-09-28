@@ -138,9 +138,9 @@ func _test_new_game_boot() -> void:
 		hud.title_text() == "Day %d of %d" % [state["day"], state["num_days"]],
 		"the day readout should read 'Day 1 of 31', got '%s'" % hud.title_text()
 	)
-	_assert(hud.led_text("cash") == "2,000", "cash LED should be 2,000, got '%s'" % hud.led_text("cash"))
+	_assert(hud.led_text("cash") == "2.000", "cash LED should be 2.000, got '%s'" % hud.led_text("cash"))
 	_assert(hud.led_text("bank") == "0", "bank LED should be 0, got '%s'" % hud.led_text("bank"))
-	_assert(hud.led_text("debt") == "5,500", "debt LED should be 5,500, got '%s'" % hud.led_text("debt"))
+	_assert(hud.led_text("debt") == "5.500", "debt LED should be 5.500, got '%s'" % hud.led_text("debt"))
 	_assert(hud.led_text("guns") == "0", "guns LED should be 0, got '%s'" % hud.led_text("guns"))
 
 	var market := hud.market_table()
@@ -264,7 +264,7 @@ func _test_buy_sell_round_trip() -> void:
 	await _idle()
 
 	_assert(int(world.state_get()["cash"]) == cash_before - price * 3, "buying 3 units should cost exactly 3x the price")
-	_assert(hud.led_text("cash") == Copy.fmt(cash_before - price * 3), "the cash LED should follow the purchase")
+	_assert(hud.led_text("cash") == Copy.led_fmt(cash_before - price * 3), "the cash LED should follow the purchase")
 	_assert(hud.coat_table().row_count() == 1, "the coat table should list the drug we just bought")
 	_assert(hud.coat_table().quantity_text(drug_index) == "3", "the coat table should show 3 units")
 	# index.html:1163's render() never re-derives the selections, so a purchase
@@ -292,7 +292,7 @@ func _test_buy_sell_round_trip() -> void:
 
 	_assert(int(world.state_get()["cash"]) == cash_before, "a same-price round trip should return the cash exactly")
 	_assert(hud.coat_table().row_count() == 0, "selling the last unit should empty the coat table")
-	_assert(hud.led_text("cash") == Copy.fmt(cash_before), "the cash LED should be back to where it started")
+	_assert(hud.led_text("cash") == Copy.led_fmt(cash_before), "the cash LED should be back to where it started")
 
 
 # index.html:1186-1190 and :1207-1211. Both click handlers end in a full
@@ -380,7 +380,7 @@ func _test_travel_advances_day() -> void:
 		"the day readout should show the new day, got '%s'" % hud.title_text()
 	)
 	_assert(hud.selected_buy_drug == -1 and hud.selected_sell_drug == -1, "travel should clear both selections (index.html:1372-1373)")
-	_assert(hud.led_text("debt") == Copy.fmt(world.state_get()["debt"]), "the debt LED should show the compounded debt")
+	_assert(hud.led_text("debt") == Copy.led_fmt(world.state_get()["debt"]), "the debt LED should show the compounded debt")
 
 	# Day 2 is when the trend glyph appears, because there is finally a previous
 	# roster to compare against (index.html:1176).

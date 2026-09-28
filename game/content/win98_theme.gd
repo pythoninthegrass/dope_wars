@@ -33,7 +33,10 @@ extends RefCounted
 ## landing on its 1.15rem upper bound at this window width.
 const FONT_TABLE := 13
 const FONT_BODY := 14
-const FONT_LED := 17
+const FONT_LED := 18
+## The label is set larger than the value it sits beside (screenshot 1's
+## labels read as the bigger, bolder element of the two).
+const FONT_LED_LABEL := 23
 ## index.html:483: .price-arrow { font-size: 0.75em } -- a fifth under the
 ## table text it sits in, in a fixed 1.1em slot with 5% of breathing room
 ## after it (index.html:500-505 puts the pair in a 7.5rem price column).
@@ -78,11 +81,50 @@ static func bold_font() -> Font:
 
 
 ## The LEDs are the one monospace surface in the game (index.html:178-180:
-## "Courier New", bold, letter-spaced).
+## "Courier New", bold, letter-spaced). DSEG7-Classic (SIL OFL, bundled under
+## assets/fonts/dseg7-classic) is a real seven-segment face, the closest match
+## to screenshot 1's digital-clock/stock-ticker digits -- unlike a system
+## monospace font, its glyphs are drawn as segments rather than strokes. The
+## Regular weight reads closer to screenshot 1 than Bold, which came out
+## heavier than the source.
+##
+## Its repertoire has no comma, so LED text groups thousands with "." instead
+## (Copy.led_fmt()) rather than falling back to another font for just that
+## glyph -- which is also what a real seven-segment display would do, since
+## it only has the one decimal-point segment to spare for punctuation. A
+## fallback font measures its own ascent/descent, and mixing it into a line
+## made that line's computed height (and so its vertical centering) depend on
+## whether the string happened to contain a comma -- "0" measured 18px tall,
+## "8,888,88" measured 23px, and centering each in the same row put their
+## digits at different baselines.
 static func led_font() -> Font:
 	if not _fonts.has(&"led"):
-		_fonts[&"led"] = _system_font(["Courier New", "Courier", "monospace"], 700)
+		_fonts[&"led"] = load("res://assets/fonts/dseg7-classic/DSEG7Classic-Regular.ttf")
 	return _fonts[&"led"]
+
+
+## The LED's field label ("Cash:", index.html:186): DSEG7's letters are
+## segment approximations rather than real letterforms, so the label keeps its
+## own font -- but a genuine bitmap monospace face rather than the UI's
+## proportional Tahoma, so it reads as the same class of digital readout as
+## the DSEG7 value next to it. Px437 IBM VGA 8x16 (CC BY-SA 4.0, bundled under
+## assets/fonts/px437-ibm-vga, from int10h.org's Oldschool PC Font Pack) is a
+## pixel-perfect recreation of the IBM VGA text-mode ROM font -- the blocky
+## look screenshot 1's labels actually have. Antialiasing and hinting are
+## turned off so it renders as flat pixels instead of a smoothed outline, and
+## subpixel positioning is off too -- without it each glyph can land at a
+## fractional pixel offset (FONT_LED_LABEL isn't a multiple of the font's
+## native 16px grid) and the renderer blurs the hard pixel edges resampling
+## it there, which is what made the label rows look aliased next to Guns'.
+static func led_label_font() -> Font:
+	if not _fonts.has(&"led_label"):
+		var font: FontFile = load("res://assets/fonts/px437-ibm-vga/Px437_IBM_VGA_8x16.ttf")
+		font.antialiasing = TextServer.FONT_ANTIALIASING_NONE
+		font.hinting = TextServer.HINTING_NONE
+		font.oversampling = 1.0
+		font.subpixel_positioning = TextServer.SUBPIXEL_POSITIONING_DISABLED
+		_fonts[&"led_label"] = font
+	return _fonts[&"led_label"]
 
 
 ## The trend glyphs (▲ ▼ —, index.html:481-497) are geometric shapes, and
@@ -297,21 +339,31 @@ static func _label(theme: Theme, type_name: String, bg: Color, fg: Color, font_s
 ## off the inset frame instead of touching it.
 const LED_PAD := Vector2i(8, 3)
 
-## The LED text comes in two brightnesses: index.html:186 dims the label
+## The LED text comes in three brightnesses: index.html:186 dims the label
 ## (`opacity: 0.85`) and leaves the value at full glow, and the value is the
-## one the player reads at a glance.
+## one the player reads at a glance. "Ghost" is new against the prototype: the
+## unlit-segment placeholder ("8,888,888" drawn behind the live value) that
+## gives the digital-clock/stock-ticker look screenshot 1 has and a system
+## monospace font can't -- real LCDs and tickers show the whole digit grid
+## faintly even where nothing is lit.
+##
+## Only the digits get the seven-segment face. DSEG7's letters are segment
+## approximations, not real letterforms (that's what made "Cash:" render as
+## "cAsh:") -- so the label variation uses led_label_font() (a real monospace
+## face) and only Value/Ghost switch to led_font().
 static func _led(theme: Theme, type_name: String, bg: Color, fg: Color) -> void:
 	theme.set_type_variation(type_name, "PanelContainer")
 	theme.set_stylebox("panel", type_name, bevel(bg, false, LED_PAD))
-	_led_text(theme, type_name + "Label", bg.lerp(fg, 0.85))
-	_led_text(theme, type_name + "Value", fg)
+	_led_text(theme, type_name + "Label", bg.lerp(fg, 0.85), led_label_font(), FONT_LED_LABEL)
+	_led_text(theme, type_name + "Value", fg, led_font(), FONT_LED)
+	_led_text(theme, type_name + "Ghost", bg.lerp(fg, 0.18), led_font(), FONT_LED)
 
 
-static func _led_text(theme: Theme, type_name: String, fg: Color) -> void:
+static func _led_text(theme: Theme, type_name: String, fg: Color, font: Font, font_size: int) -> void:
 	theme.set_type_variation(type_name, "Label")
 	theme.set_color("font_color", type_name, fg)
-	theme.set_font("font", type_name, led_font())
-	theme.set_font_size("font_size", type_name, FONT_LED)
+	theme.set_font("font", type_name, font)
+	theme.set_font_size("font_size", type_name, font_size)
 
 static func _row(theme: Theme, type_name: String, bg: Color, fg: Color) -> void:
 	theme.set_type_variation(type_name, "Label")

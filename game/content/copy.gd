@@ -174,6 +174,17 @@ static func money(value: float) -> String:
 	return "$" + fmt(value)
 
 
+## For the HUD's LED strips (Win98Theme.led_font()): DSEG7-Classic has no
+## comma glyph, so LED text groups thousands with "." instead -- also how a
+## real seven-segment display would do it, reusing its one decimal-point
+## segment. See Win98Theme.led_font() for why this isn't just a cosmetic
+## substitution: mixing a fallback font into the line for a missing comma
+## glyph changed that line's computed height depending on whether the string
+## had a comma, which broke vertical centering across the LED rows.
+static func led_fmt(value: float) -> String:
+	return fmt(value).replace(",", ".")
+
+
 # --- structured payloads -> sentences ----------------------------------------
 
 
