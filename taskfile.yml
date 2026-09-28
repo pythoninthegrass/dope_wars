@@ -112,6 +112,7 @@ tasks:
         --ignore 'game/.godot/**'
         --ignore 'game/bin/**'
         --ignore 'game/addons/gda_harness/**'
+        --ignore 'game/godot_tests/**'
         --ignore '**/*.translation'
         --ignore '**/*.import'
         -- task run

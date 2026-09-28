@@ -53,6 +53,7 @@ const CASES := [
 	"endgame_and_highscores",
 	"new_game_dialog",
 	"win98_chrome",
+	"window_resize_bounds",
 ]
 
 ## A coarse backstop for the case registry itself: if every case reported but
@@ -85,6 +86,8 @@ func _run() -> void:
 	await _test_new_game_dialog()
 	_case("win98_chrome")
 	_test_win98_chrome()
+	_case("window_resize_bounds")
+	_test_window_resize_bounds()
 
 
 # docs/layer-boundaries.md:113-114 puts every display string behind tr(). A key
@@ -874,6 +877,21 @@ func _test_win98_chrome() -> void:
 		if buttons.get_parent() is MarginContainer:
 			_assert((buttons.get_parent() as MarginContainer).get_theme_constant("margin_bottom") >= 8, "the button row needs bottom clearance under the frame, got %d" % (buttons.get_parent() as MarginContainer).get_theme_constant("margin_bottom"))
 	dialog.free()
+
+
+# Width is pinned so the fixed-width Win98 chrome never stretches; height may
+# grow 15% so the tables can show a few extra rows without letterboxing.
+func _test_window_resize_bounds() -> void:
+	var window := get_window()
+	_assert(window.min_size.x == window.max_size.x, "min and max width should match to pin the window width, got min=%d max=%d" % [window.min_size.x, window.max_size.x])
+	_assert(window.min_size.x > 0, "the window width should be pinned to a real size, got %d" % window.min_size.x)
+	var expected_max_height := ceili(window.min_size.y * Main.MAX_HEIGHT_GROWTH)
+	_assert(window.max_size.y == expected_max_height, "max height should be 15%% over min height (%d), got %d" % [expected_max_height, window.max_size.y])
+	_assert(window.max_size.y > window.min_size.y, "max height should exceed min height so the window can actually grow taller")
+	_assert(
+		ProjectSettings.get_setting("display/window/stretch/aspect") == "keep_width",
+		"stretch/aspect should be keep_width so extra height enlarges the layout instead of letterboxing"
+	)
 
 
 # --- harness ----------------------------------------------------------------

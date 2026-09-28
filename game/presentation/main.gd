@@ -36,8 +36,14 @@ var _finished := false
 ## so `godot --path game -- --seed=12345` replays that seed.
 const SEED_ARG := "--seed="
 
+## The window width is pinned; the player can drag it up to 15% taller than
+## the configured height (project.godot's window/size/window_height_override)
+## before the OS refuses to grow it further.
+const MAX_HEIGHT_GROWTH := 1.15
+
 
 func _ready() -> void:
+	_constrain_window()
 	theme = Win98Theme.shared()
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 
@@ -63,6 +69,19 @@ func _ready() -> void:
 
 	_world = SimWorld.new()
 	_boot()
+
+
+## min_size == max_size on the x axis pins the window width; the y axis is
+## left free to grow up to MAX_HEIGHT_GROWTH. window/stretch/aspect=keep_width
+## (project.godot) is what makes the extra height enlarge the layout instead
+## of letterboxing.
+func _constrain_window() -> void:
+	var window := get_window()
+	var boot_size := window.size
+	if boot_size.x <= 0 or boot_size.y <= 0:
+		return
+	window.min_size = boot_size
+	window.max_size = Vector2i(boot_size.x, ceili(boot_size.y * MAX_HEIGHT_GROWTH))
 
 
 ## Load the save if there is a usable one, otherwise start fresh --
