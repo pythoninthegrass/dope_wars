@@ -55,4 +55,12 @@
       "wget * | *sh*": "deny"
     }
   },
+  "mcp": {
+    "godot": {
+      "type": "local",
+      "command": ["npx", "@coding-solo/godot-mcp"],
+      "enabled": true,
+      "environment": { "DEBUG": "true" }
+    }
+  },
 }
