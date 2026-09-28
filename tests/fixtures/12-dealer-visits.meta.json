@@ -1,0 +1,5 @@
+{
+  "seed": 13,
+  "description": "coat/gun dealer visit draws",
+  "mechanic": "rollDealerVisits seeded stream, four scripted combinations, dead-player draw consumption, chase skip"
+}

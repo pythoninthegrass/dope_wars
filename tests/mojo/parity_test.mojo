@@ -52,5 +52,9 @@ def test_11_finances() raises:
     replay.replay_fixture("11-finances")
 
 
+def test_12_dealer_visits() raises:
+    replay.replay_fixture("12-dealer-visits")
+
+
 def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()

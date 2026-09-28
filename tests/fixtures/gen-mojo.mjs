@@ -61,6 +61,8 @@ const ALLOWED = [
   '*.type', '*.drug', '*.qty',
   // runner-helper results
   'drug', 'price', 'equal', 'scores',
+  // rollDealerVisits helper return (the two reported dealer visits)
+  'coat', 'gun',
   // high-score entries, in ranked order (fixture 07 checks top-10 truncation)
   'scores.*.name', 'scores.*.score', 'scores.*.day', 'scores.*.dead',
   'scores.*.date',

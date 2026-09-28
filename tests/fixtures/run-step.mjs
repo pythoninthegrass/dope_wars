@@ -58,6 +58,31 @@ export function makeRunStep(Engine) {
       case 'setField':
         Object.assign(state, args)
         return { ok: true }
+      case 'rollDealerVisits': {
+        // The two 15% dealer draws live in the UI layer, not the engine —
+        // index.html:1387-1388 inside runArrivalSequence, and only reached when
+        // shouldStartChase came back false (index.html:1382-1383). index.html is
+        // deleted at the end of TASK-001, so this case is the surviving
+        // statement of those lines' semantics.
+        //
+        // Both draws are consumed before `dead` is consulted. The prototype
+        // spells the guard as `state.rng() < 0.15 && !state.dead`, so
+        // short-circuit evaluation has already advanced state.rng by the time
+        // the guard is tested: a dead player spends two draws and reports
+        // neither dealer. A helper that tested `dead` first would desync the
+        // stream for the rest of the run. core/src/dealers.mojo
+        // `roll_dealer_visits` draws unconditionally for the same reason.
+        //
+        // Without `rng` the helper draws from the state's own seeded stream, so
+        // the reported pair and the post-call `rngState` are both oracle facts.
+        // With `rng` the case is a script-mode assertion: the pair is forced,
+        // and the state snapshot proves nothing was drawn from the seed.
+        const draw = rngArg ?? state.rng
+        const coat = draw() < 0.15
+        const gun = draw() < 0.15
+        if (state.dead) return { coat: false, gun: false }
+        return { coat, gun }
+      }
       case 'buyCheapest': {
         const prices = state.prices
         const ids = Object.keys(prices).sort((a, b) => prices[a] - prices[b])
