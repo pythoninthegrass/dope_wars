@@ -15,11 +15,8 @@
       ]
     },
     "godot": {
-      "command": "npx",
-      "args": ["@coding-solo/godot-mcp"],
-      "env": {
-        "DEBUG": "true"
-      }
+      "command": "uvx",
+      "args": ["--from", "gda[mcp]", "gda-mcp"]
     },
     "serena": {
       "command": "uvx",
