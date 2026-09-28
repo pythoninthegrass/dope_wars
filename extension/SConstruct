@@ -14,6 +14,23 @@
 
 import os
 import subprocess
+import sys
+
+# macOS: godot-cpp's macos.py only passes -isysroot when macos_sdk_path is
+# set explicitly (default ""), which leaves ld_classic (forced below) to
+# fall back to whatever SDK it finds on its own. That fallback has landed on
+# a stray /Library/Developer/CommandLineTools SDK before now -- one whose
+# .tbd format ld_classic can't parse, so it silently drops libSystem/libc++
+# and every libc symbol comes back undefined at link time. Pin it to the
+# active Xcode toolchain's SDK instead, unless the caller already passed
+# macos_sdk_path= on the command line.
+if sys.platform == "darwin" and "macos_sdk_path" not in ARGUMENTS:
+    try:
+        ARGUMENTS["macos_sdk_path"] = subprocess.check_output(
+            ["xcrun", "--sdk", "macosx", "--show-sdk-path"], text=True
+        ).strip()
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        pass
 
 customs = [File("custom.py").srcnode().abspath]
 env = SConscript("../third_party/godot-cpp/SConstruct", {"api_version": "4.7", "customs": customs})
