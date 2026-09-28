@@ -27,6 +27,14 @@ tasks:
       - command -v markdownlint
       - markdownlint --version | grep -qx "{{.MARKDOWNLINT_VERSION}}"
 
+  _install-mise-tools:
+    internal: true
+    desc: "Install every tool pinned in .tool-versions via mise (e.g. watchexec, godot, task itself)"
+    cmds:
+      - mise install
+    status:
+      - mise which watchexec >/dev/null 2>&1
+
   build:
     desc: "Build core/build-output/lib/libdopewars.a from the Mojo sources"
     deps: [_install-venv]

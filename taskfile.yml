@@ -101,6 +101,7 @@ tasks:
 
   dev:
     desc: "Rebuild and relaunch the game whenever core/, include/, extension/, or game/ sources change"
+    deps: [core:_install-mise-tools]
     cmds:
       - >-
         watchexec --restart --debounce 500ms
