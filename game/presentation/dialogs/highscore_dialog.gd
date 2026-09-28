@@ -37,6 +37,7 @@ func present(score: int, day: int, dead: bool) -> HighscoreDialog:
 	_name_field.max_length = NAME_MAX_LENGTH
 	_name_field.custom_minimum_size = Vector2(128, 0)
 	_name_field.select_all_on_focus = true
+	register_primary_field(_name_field)
 	row.add_child(_name_field)
 	body().add_child(row)
 

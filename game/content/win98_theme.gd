@@ -397,7 +397,12 @@ static func _field(theme: Theme) -> void:
 	theme.set_stylebox("focus", "LineEdit", focus)
 	theme.set_color("font_color", "LineEdit", Color.BLACK)
 	theme.set_color("caret_color", "LineEdit", Color.BLACK)
-	theme.set_color("selection_color", "LineEdit", Color("cfe4ff"))
+	# index.html has no custom ::selection rule, so a browser falls back to
+	# its OS text-selection color -- Chrome/Safari's own default is this pale
+	# blue, which is why selecting text in the reference reads this light
+	# rather than the titlebar's navy.
+	theme.set_color("selection_color", "LineEdit", Color("acd4fe"))
+	theme.set_color("font_selected_color", "LineEdit", Color.BLACK)
 	theme.set_constant("alignment", "LineEdit", HORIZONTAL_ALIGNMENT_RIGHT)
 
 

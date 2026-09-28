@@ -22,6 +22,7 @@ var _buttons: HBoxContainer
 var _default_key := ""
 var _cancel_key := ""
 var _spinner_typed := false
+var _primary_field: LineEdit = null
 
 
 func setup(title_key: String) -> void:
@@ -109,14 +110,29 @@ func cancel() -> void:
 	_fire(_cancel_key if not _cancel_key.is_empty() else _default_key)
 
 
-## Puts keyboard focus on the dialog's default button, matching the
-## prototype's `document.getElementById('alertOk').focus()`.
+## Puts keyboard focus on the dialog's primary input field when it has one
+## (index.html:1273's `input.focus(); input.select();`, and the same for the
+## other two field dialogs -- the prototype pre-highlights the value so the
+## player can just type over it), falling back to the default button for
+## dialogs with no field, matching `document.getElementById('alertOk').focus()`.
 func focus_default() -> void:
+	if _primary_field != null:
+		_primary_field.grab_focus()
+		_primary_field.select_all()
+		return
 	for child in _buttons.get_children():
 		var button := child as Button
 		if button != null and button.name == _default_key:
 			button.grab_focus()
 			return
+
+
+## Registers `edit` as the field that gets keyboard focus (and its text
+## selected) when the dialog opens. The first registration wins, matching
+## reading order for dialogs with more than one field.
+func register_primary_field(edit: LineEdit) -> void:
+	if _primary_field == null:
+		_primary_field = edit
 
 
 ## A spinner's text is the dialog's answer, not the widget's: a SpinBox keeps
@@ -134,6 +150,7 @@ func bind_spinner(spinner: SpinBox) -> void:
 	var edit := spinner.get_line_edit()
 	edit.gui_input.connect(_on_spinner_gui_input.bind(spinner))
 	edit.text_changed.connect(_on_spinner_text_changed)
+	register_primary_field(edit)
 
 
 ## Folds the spinner's typed text into its value the way a submit would.
