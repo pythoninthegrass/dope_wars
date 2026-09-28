@@ -14,7 +14,6 @@ const WIN_FACE_LIGHT2 := Color("dfdfdf")
 
 const TITLEBAR := Color("000080")
 const TITLEBAR_TEXT := Color("ffffff")
-const TITLEBAR_GRADIENT_END := Color("1084d0")
 
 const LED_GREEN := Color("00ff2f")
 const LED_GREEN_BG := Color("003300")

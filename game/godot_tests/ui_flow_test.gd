@@ -52,6 +52,7 @@ const CASES := [
 	"typed_quantity",
 	"endgame_and_highscores",
 	"new_game_dialog",
+	"win98_chrome",
 ]
 
 ## A coarse backstop for the case registry itself: if every case reported but
@@ -82,6 +83,8 @@ func _run() -> void:
 	await _test_endgame_and_highscores()
 	_case("new_game_dialog")
 	await _test_new_game_dialog()
+	_case("win98_chrome")
+	_test_win98_chrome()
 
 
 # docs/layer-boundaries.md:113-114 puts every display string behind tr(). A key
@@ -774,6 +777,88 @@ func _test_new_game_dialog() -> void:
 	_assert(_main.hud().title_text() == "Day 1 of 7", "the day readout should show the new game's length, got '%s'" % _main.hud().title_text())
 
 
+# index.html:253-270, :45-63. The reference's chrome is a 2px two-tone border
+# (light top/left, dark bottom/right for outset, the reverse for inset), a
+# white form field with right-aligned text, and a light menu layer on top of
+# the Win98 window. The theme must carry all of it; the old shadow-trick
+# bevel rendered flat, the unthemed LineEdit fell back to Godot's dark
+# default, and the dialog's button row sat flush on the frame. The bevel
+# slices carry a wide flat face center, because a 1px center interpolates
+# between the two border tones and turns the face into a gradient.
+func _test_win98_chrome() -> void:
+	var theme := Win95Theme.shared()
+
+	# --- button bevel (index.html:253-266) -----------------------------------
+	var normal := theme.get_stylebox("normal", "Button")
+	_assert(normal is StyleBoxTexture, "the Button normal stylebox should be the two-tone bevel texture, got %s" % normal.get_class())
+	var image := _stylebox_image(normal)
+	_assert(image != null and image.get_size() == Vector2i(12, 12), "the button bevel texture should be the 12x12 9-slice, got %s" % str(image.get_size() if image != null else null))
+	if image != null and image.get_size() == Vector2i(12, 12):
+		_assert(image.get_pixel(0, 0) == Palette.WIN_FACE_LIGHT, "the outset bevel's top-left should be light, got %s" % image.get_pixel(0, 0))
+		_assert(image.get_pixel(1, 1) == Palette.WIN_FACE_LIGHT, "the outset bevel's light edge should be 2px wide, got %s" % image.get_pixel(1, 1))
+		_assert(image.get_pixel(2, 2) == Palette.WIN_FACE, "the face must start immediately after the 2px light edge, got %s" % image.get_pixel(2, 2))
+		_assert(image.get_pixel(6, 6) == Palette.WIN_FACE, "the bevel center should be the flat window face, got %s" % image.get_pixel(6, 6))
+		_assert(image.get_pixel(11, 11) == Palette.WIN_FACE_DARKER, "the outset bevel's bottom-right should be dark, got %s" % image.get_pixel(11, 11))
+
+	var pressed := theme.get_stylebox("pressed", "Button")
+	var pressed_image := _stylebox_image(pressed)
+	_assert(pressed_image != null, "the Button pressed stylebox should carry the inverted bevel")
+	if pressed_image != null and pressed_image.get_size() == Vector2i(12, 12):
+		_assert(pressed_image.get_pixel(0, 0) == Palette.WIN_FACE_DARKER, "the pressed bevel's top-left should invert to dark, got %s" % pressed_image.get_pixel(0, 0))
+		_assert(pressed_image.get_pixel(11, 11) == Palette.WIN_FACE_LIGHT, "the pressed bevel's bottom-right should invert to light, got %s" % pressed_image.get_pixel(11, 11))
+
+	# --- .win frames (index.html:45-50, :509) ---------------------------------
+	# The window and the dialogs are the reference's .win: the bevel plus a 1px
+	# black outer ring. Plain .outset panels (the subway grid) are not.
+	var win := _stylebox_image(theme.get_stylebox("panel", "WindowFace"))
+	_assert(win != null and win.get_size() == Vector2i(14, 14), "the WindowFace panel should be the 14x14 .win slice, got %s" % str(win.get_size() if win != null else null))
+	if win != null and win.get_size() == Vector2i(14, 14):
+		_assert(win.get_pixel(0, 0).r == 0.0, "the .win frame should carry the 1px black outer ring, got %s" % win.get_pixel(0, 0))
+		_assert(win.get_pixel(13, 13).r == 0.0, "the .win black ring should run the full frame, got %s" % win.get_pixel(13, 13))
+		_assert(win.get_pixel(6, 6) == Palette.WIN_FACE, "the .win center should be the flat window face, got %s" % win.get_pixel(6, 6))
+	var plain := _stylebox_image(theme.get_stylebox("panel", "Outset"))
+	_assert(plain != null, "the Outset panel should be a bevel texture")
+	if plain != null:
+		_assert(plain.get_pixel(0, 0) == Palette.WIN_FACE_LIGHT, "plain .outset has no black ring, top-left should be light, got %s" % plain.get_pixel(0, 0))
+
+	# --- form fields (index.html:420-426, :465-470) ----------------------------
+	var field := theme.get_stylebox("normal", "LineEdit")
+	_assert(field is StyleBoxFlat, "the LineEdit normal stylebox should be a flat white field, got %s" % field.get_class())
+	if field is StyleBoxFlat:
+		_assert(_brightness(field.bg_color) > 0.95, "the form field should be white, got %s" % field.bg_color)
+	_assert(theme.get_color("font_color", "LineEdit") == Color.BLACK, "the form field text should be black, got %s" % theme.get_color("font_color", "LineEdit"))
+	_assert(theme.get_constant("alignment", "LineEdit") == HORIZONTAL_ALIGNMENT_RIGHT, "the form fields should be right-aligned like the prototype's inputs")
+
+	# --- dialog titlebar: flat navy, zero gradients ------------------------------
+	var titlebox := theme.get_stylebox("normal", "TitlebarDialog")
+	_assert(titlebox is StyleBoxFlat, "the dialog titlebar should be a flat navy box, got %s" % titlebox.get_class())
+	if titlebox is StyleBoxFlat:
+		_assert(titlebox.bg_color == Palette.TITLEBAR, "the titlebar should be flat navy, got %s" % titlebox.bg_color)
+
+	# --- menu layer: system-styled, light (not Win98) ---------------------------
+	_assert(theme.get_color("font_color", "PopupMenu") == Color.BLACK, "the dropdown menu text should be black on the light panel, got %s" % theme.get_color("font_color", "PopupMenu"))
+	var menu_panel := theme.get_stylebox("panel", "PopupMenu")
+	var menu_panel_bg := Color.BLACK
+	if menu_panel is StyleBoxFlat:
+		menu_panel_bg = menu_panel.bg_color
+	_assert(menu_panel is StyleBoxFlat and _brightness(menu_panel_bg) > 0.8, "the dropdown panel should be light, got %s" % menu_panel_bg)
+	var strip := theme.get_stylebox("panel", "MenubarStrip")
+	var strip_bg := Color.BLACK
+	if strip is StyleBoxFlat:
+		strip_bg = strip.bg_color
+	_assert(strip is StyleBoxFlat and _brightness(strip_bg) > 0.85, "the menubar strip should be a light neutral, not the Win98 face, got %s" % strip_bg)
+
+	# --- dialog button row (index.html:404-411) ---------------------------------
+	var dialog := QuantityDialog.new().present(Copy.DLG_BUY, "test", 5)
+	var buttons := _find_named(dialog, "Buttons")
+	_assert(buttons != null, "the quantity dialog should carry its button row")
+	if buttons != null:
+		_assert(buttons.get_parent() is MarginContainer, "the dialog button row should sit in a margin, not flush on the frame")
+		if buttons.get_parent() is MarginContainer:
+			_assert((buttons.get_parent() as MarginContainer).get_theme_constant("margin_bottom") >= 8, "the button row needs bottom clearance under the frame, got %d" % (buttons.get_parent() as MarginContainer).get_theme_constant("margin_bottom"))
+	dialog.free()
+
+
 # --- harness ----------------------------------------------------------------
 
 
@@ -887,6 +972,32 @@ static func _held(world: SimWorld, drug_index: int) -> int:
 		if int(slot["drug_index"]) == drug_index:
 			return int(slot["qty"])
 	return 0
+
+
+## A perceptual-enough brightness in 0..1 for the near-gray chrome colors; the
+## theme's point is light-against-dark, and the palette is achromatic.
+static func _brightness(color: Color) -> float:
+	return (color.r + color.g + color.b) / 3.0
+
+
+## The image behind a texture stylebox, null for any other stylebox kind.
+static func _stylebox_image(stylebox: StyleBox) -> Image:
+	var textured := stylebox as StyleBoxTexture
+	if textured == null:
+		return null
+	return textured.texture.get_image()
+
+
+## A descendant by node name, for assertions that read the dialog's own
+## structure rather than a test-only accessor.
+static func _find_named(node: Node, what: String) -> Node:
+	if node.name == what:
+		return node
+	for child in node.get_children():
+		var found := _find_named(child, what)
+		if found != null:
+			return found
+	return null
 
 
 ## The SpinBox a dialog shows, found by walking its tree. Reaching for the

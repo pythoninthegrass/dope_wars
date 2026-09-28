@@ -26,14 +26,16 @@ var _spinner_typed := false
 
 func setup(title_key: String) -> void:
 	theme = Win95Theme.shared()
-	theme_type_variation = &"Outset"
+	# index.html:606: the dialog root is the reference's .win, so the frame
+	# carries the 1px black outer ring as well as the bevel.
+	theme_type_variation = &"DialogFrame"
 	# index.html:369: .dialog { width: min(100% - 2rem, 26rem) }. The cap is
 	# what makes the finances dialog wrap Close onto its own row, so it is
 	# load-bearing rather than cosmetic.
 	custom_minimum_size = Vector2(26.0 * 15.0, 0)
 
 	var frame := VBoxContainer.new()
-	frame.add_theme_constant_override("separation", 2)
+	frame.add_theme_constant_override("separation", 0)
 	add_child(frame)
 
 	var title := Label.new()
@@ -44,26 +46,33 @@ func setup(title_key: String) -> void:
 	title.custom_minimum_size = Vector2(240, 0)
 	frame.add_child(title)
 
-	var body_frame := PanelContainer.new()
-	body_frame.name = "BodyFrame"
-	body_frame.theme_type_variation = &"Outset"
-	frame.add_child(body_frame)
-
+	# index.html:378-386: .dialog-body is 14px of padding on the window face,
+	# not a framed panel of its own.
 	var margin := MarginContainer.new()
+	margin.name = "BodyFrame"
 	for side in ["left", "right", "top", "bottom"]:
 		margin.add_theme_constant_override("margin_" + side, 14)
-	body_frame.add_child(margin)
+	frame.add_child(margin)
 
 	_body = VBoxContainer.new()
 	_body.name = "Body"
 	_body.add_theme_constant_override("separation", 10)
 	margin.add_child(_body)
 
+	# The button row is its own margin (index.html:404-411): the same 14px
+	# side and bottom padding the body carries, with no top, because the body's
+	# bottom padding is the gap above the buttons.
+	var button_margin := MarginContainer.new()
+	button_margin.add_theme_constant_override("margin_left", 14)
+	button_margin.add_theme_constant_override("margin_right", 14)
+	button_margin.add_theme_constant_override("margin_bottom", 14)
+	frame.add_child(button_margin)
+
 	_buttons = HBoxContainer.new()
 	_buttons.name = "Buttons"
 	_buttons.alignment = BoxContainer.ALIGNMENT_CENTER
 	_buttons.add_theme_constant_override("separation", 8)
-	frame.add_child(_buttons)
+	button_margin.add_child(_buttons)
 
 
 ## The container a subclass fills with its prompt, spinner, and rows.

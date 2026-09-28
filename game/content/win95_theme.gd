@@ -9,10 +9,12 @@ extends RefCounted
 ## The whole look is one trick: a 2px border in two colors, light edge
 ## top/left and dark edge bottom/right for an outset, the reverse for an inset.
 ## CSS spells that `border-color: light dark dark light`; StyleBoxFlat has a
-## single `border_color` for all four sides, so the second tone comes from its
-## shadow -- an offset drop shadow in the light color, pushed up-left for an
-## outset and down-right for an inset. Everything else in the prototype (LEDs,
-## health bar, tables, dialog frames) is those two plus a background color.
+## single `border_color` for all four sides and no per-side coloring, so the
+## bevel is drawn into a 5x5 9-slice ImageTexture and stretched from there.
+## The prototype's `.win` frames (the window, the dialogs) add a 1px black
+## outer ring, which is the same slice grown to 7x7. Everything else in the
+## prototype (LEDs, health bar, tables, dialog frames) is those two plus a
+## background color.
 ##
 ## Registered variations are consumed by setting `theme_type_variation` on a
 ## Control, which is why nothing here needs a per-node stylebox override.
@@ -120,19 +122,23 @@ static func build() -> Theme:
 	# different classes reading the same item name, and only the container
 	# takes a theme_type_variation.
 	theme.set_stylebox("panel", "Panel", bevel(Palette.WIN_FACE, true))
-	_outset(theme, "WindowFace", Palette.WIN_FACE)
+	# index.html:509, :606: #game and the dialog root are the reference's
+	# .win -- the bevel plus the 1px black outer ring -- not a plain outset.
+	theme.set_type_variation("WindowFace", "PanelContainer")
+	theme.set_stylebox("panel", "WindowFace", win_bevel(Palette.WIN_FACE))
+	theme.set_type_variation("DialogFrame", "PanelContainer")
+	theme.set_stylebox("panel", "DialogFrame", win_bevel(Palette.WIN_FACE))
 
 	_outset(theme, "Outset", Palette.WIN_FACE)
 	_outset(theme, "DialogIcon", Palette.WIN_FACE_LIGHT2)
 	_inset(theme, "Inset", Palette.WIN_FACE)
 	_inset(theme, "HealthTrack", Palette.LED_RED)
-	# index.html:100-106: the menubar strip is the window face with a single
-	# hairline under it.
 	_menubar_strip(theme)
 
 	_button(theme)
 	_menu(theme)
 	_popup(theme)
+	_field(theme)
 
 	# Each of the prototype's four LEDs is the same inset frame around a
 	# near-black face with a glow color on top (index.html:189-191).
@@ -146,9 +152,8 @@ static func build() -> Theme:
 	_row(theme, "RowIdle", Color.TRANSPARENT, Color.BLACK)
 	_row(theme, "RowSelected", Palette.ROW_SELECTED, Palette.ROW_SELECTED_TEXT)
 	_row(theme, "RowUnavailable", Palette.ROW_UNAVAILABLE, Palette.ROW_UNAVAILABLE_TEXT)
-	# The titlebar is the one gradient in the prototype (index.html:67). The
-	# app itself has no titlebar -- the OS draws that -- so this serves the
-	# dialogs, whose title is a Label.
+	# Flat navy titlebar for the dialogs -- the app itself has no titlebar,
+	# the OS draws that.
 	_titlebar(theme, "TitlebarDialog", "Label")
 
 	# Table chrome. A caption over a table (index.html:293) is a label on the
@@ -176,22 +181,85 @@ static func build() -> Theme:
 ## The 2px two-tone frame every panel in the game is made of. `pad` is the CSS
 ## `padding` the prototype puts inside that frame (x horizontal, y vertical),
 ## which is what gives a button its 30px height.
-static func bevel(bg: Color, outset: bool, pad: Vector2i = Vector2i.ZERO) -> StyleBoxFlat:
-	var box := StyleBoxFlat.new()
-	box.bg_color = bg
-	box.border_width_top = 2
-	box.border_width_right = 2
-	box.border_width_bottom = 2
-	box.border_width_left = 2
-	box.border_color = Palette.WIN_FACE_DARKER
-	box.shadow_color = Palette.WIN_FACE_LIGHT
-	box.shadow_size = 2
-	box.shadow_offset = Vector2(-1, -1) if outset else Vector2(1, 1)
+static func bevel(bg: Color, outset: bool, pad: Vector2i = Vector2i.ZERO) -> StyleBoxTexture:
+	return _texture_box(_bevel_texture(bg, outset), 2, pad)
+
+
+## The reference's `.win` (index.html:45-50): the outset bevel plus a 1px
+## black outer ring from its `box-shadow`, worn by the window face and the
+## dialog frames.
+static func win_bevel(bg: Color, pad: Vector2i = Vector2i.ZERO) -> StyleBoxTexture:
+	return _texture_box(_win_texture(bg), 3, pad)
+
+
+static func _texture_box(texture: Texture2D, margin: int, pad: Vector2i) -> StyleBoxTexture:
+	var box := StyleBoxTexture.new()
+	box.texture = texture
+	box.texture_margin_left = margin
+	box.texture_margin_right = margin
+	box.texture_margin_top = margin
+	box.texture_margin_bottom = margin
 	box.content_margin_left = pad.x
 	box.content_margin_right = pad.x
 	box.content_margin_top = pad.y
 	box.content_margin_bottom = pad.y
+	box.axis_stretch_horizontal = StyleBoxTexture.AXIS_STRETCH_MODE_STRETCH
+	box.axis_stretch_vertical = StyleBoxTexture.AXIS_STRETCH_MODE_STRETCH
 	return box
+
+
+static var _bevel_cache := {}
+
+
+## The 12x12 9-slice behind every bevel: light 2px top/left, dark 2px
+## bottom/right, an 8px flat face in the middle (inset inverts the two tones).
+## The wide face center is load-bearing: StyleBoxTexture samples with linear
+## filtering, so a 1px center interpolates between the two border tones and
+## renders the whole face as a gradient. Eight face pixels confine the blend
+## to one texel at each seam. Built once per color and cached, because
+## build() asks for the same face several times.
+static func _bevel_texture(bg: Color, outset: bool) -> ImageTexture:
+	var key := str(outset) + bg.to_html()
+	if not _bevel_cache.has(key):
+		_bevel_cache[key] = ImageTexture.create_from_image(_bevel_image(bg, outset))
+	return _bevel_cache[key]
+
+
+static func _bevel_image(bg: Color, outset: bool) -> Image:
+	var light := Palette.WIN_FACE_LIGHT if outset else Palette.WIN_FACE_DARKER
+	var dark := Palette.WIN_FACE_DARKER if outset else Palette.WIN_FACE_LIGHT
+	var img := Image.create_empty(12, 12, false, Image.FORMAT_RGBA8)
+	for y in range(12):
+		for x in range(12):
+			var c := bg
+			if x < 2 or y < 2:
+				c = light
+			elif x > 9 or y > 9:
+				c = dark
+			img.set_pixel(x, y, c)
+	return img
+
+
+## The 14x14 slice for `.win` frames: a 1px black ring around the outset
+## bevel, matching index.html:49's `box-shadow: 1px 1px 0 #000, 0 0 0 1px
+## #000`.
+static func _win_texture(bg: Color) -> ImageTexture:
+	var key := "win" + bg.to_html()
+	if not _bevel_cache.has(key):
+		_bevel_cache[key] = ImageTexture.create_from_image(_win_image(bg))
+	return _bevel_cache[key]
+
+
+static func _win_image(bg: Color) -> Image:
+	var img := Image.create_empty(14, 14, false, Image.FORMAT_RGBA8)
+	var bevel := _bevel_image(bg, true)
+	for y in range(14):
+		for x in range(14):
+			if x == 0 or y == 0 or x == 13 or y == 13:
+				img.set_pixel(x, y, Color.BLACK)
+			else:
+				img.set_pixel(x, y, bevel.get_pixel(x - 1, y - 1))
+	return img
 
 
 ## index.html:253-261: the CSS button padding, reused by every frame that has
@@ -209,12 +277,14 @@ static func _inset(theme: Theme, type_name: String, bg: Color) -> void:
 	theme.set_stylebox("panel", type_name, bevel(bg, false))
 
 
-## index.html:100-106 -- the menubar's own face, its 2px/6px padding, and its
-## single hairline.
+## The menubar strip. The top chrome of the app -- this strip and the menus
+## that drop off it -- is deliberately the one part of the UI that is not the
+## Win98 face: a light neutral toolbar tone with a soft hairline, in place of
+## the prototype's gray strip (index.html:100-106).
 static func _menubar_strip(theme: Theme) -> void:
-	var box := flat(Palette.WIN_FACE)
+	var box := flat(Color("efefef"))
 	box.border_width_bottom = 1
-	box.border_color = Palette.WIN_FACE_DARKER
+	box.border_color = Color("d0d0d0")
 	box.content_margin_left = 6
 	box.content_margin_right = 6
 	box.content_margin_top = 2
@@ -284,31 +354,82 @@ static func _button(theme: Theme) -> void:
 	theme.set_font_size("font_size", "Button", FONT_BODY)
 
 
-## index.html:109-118: the menubar entries are bare text that lights up
-## titlebar-blue on hover -- no button frame at any point, which is why
-## MenuButton gets empty styleboxes rather than Button's bevels.
+## The menubar entries stay system-styled: no stylebox overrides at all, so
+## MenuButton falls back to the engine default -- bare text with a soft
+## highlight on hover -- and only the text colors and size are pinned for the
+## light strip above. The prototype's titlebar-blue hover
+## (index.html:109-118) is exactly the look the top chrome is not supposed to
+## have.
 static func _menu(theme: Theme) -> void:
-	theme.set_stylebox("normal", "MenuButton", StyleBoxEmpty.new())
-	theme.set_stylebox("focus", "MenuButton", StyleBoxEmpty.new())
-	theme.set_stylebox("hover", "MenuButton", flat(Palette.TITLEBAR))
-	theme.set_stylebox("pressed", "MenuButton", flat(Palette.TITLEBAR))
-	theme.set_stylebox("disabled", "MenuButton", StyleBoxEmpty.new())
 	theme.set_color("font_color", "MenuButton", Color.BLACK)
-	theme.set_color("font_hover_color", "MenuButton", Color.WHITE)
-	theme.set_color("font_pressed_color", "MenuButton", Color.WHITE)
+	theme.set_color("font_hover_color", "MenuButton", Color.BLACK)
+	theme.set_color("font_pressed_color", "MenuButton", Color.BLACK)
 	theme.set_color("font_disabled_color", "MenuButton", Palette.WIN_FACE_DARK)
 	theme.set_font_size("font_size", "MenuButton", FONT_BODY)
 
 
-## index.html:124-150: the dropdowns are outset-framed items that go
-## titlebar-blue on hover.
+## The dropdowns are the menu layer, so they stay system-styled as well: a
+## light rounded panel with a soft shadow and a pale hover bar, in place of
+## the prototype's outset-framed titlebar-blue items (index.html:124-150).
 static func _popup(theme: Theme) -> void:
-	theme.set_stylebox("panel", "PopupMenu", bevel(Palette.WIN_FACE, true))
-	theme.set_stylebox("hover", "PopupMenu", flat(Palette.TITLEBAR))
+	var panel := StyleBoxFlat.new()
+	panel.bg_color = Color("f7f7f7")
+	panel.border_width_left = 1
+	panel.border_width_right = 1
+	panel.border_width_top = 1
+	panel.border_width_bottom = 1
+	panel.border_color = Color("c9c9c9")
+	panel.corner_radius_top_left = 4
+	panel.corner_radius_top_right = 4
+	panel.corner_radius_bottom_left = 4
+	panel.corner_radius_bottom_right = 4
+	panel.shadow_color = Color(0, 0, 0, 0.25)
+	panel.shadow_size = 3
+	panel.shadow_offset = Vector2(0, 1)
+	# The prototype's menu-items frame carries 2px of padding
+	# (index.html:132-134).
+	panel.content_margin_left = 2
+	panel.content_margin_right = 2
+	panel.content_margin_top = 2
+	panel.content_margin_bottom = 2
+	theme.set_stylebox("panel", "PopupMenu", panel)
+	theme.set_stylebox("hover", "PopupMenu", flat(Color("dbeafe")))
 	theme.set_color("font_color", "PopupMenu", Color.BLACK)
-	theme.set_color("font_hover_color", "PopupMenu", Color.WHITE)
+	theme.set_color("font_hover_color", "PopupMenu", Color.BLACK)
 	theme.set_color("font_disabled_color", "PopupMenu", Palette.WIN_FACE_DARK)
 	theme.set_font_size("font_size", "PopupMenu", FONT_TABLE)
+
+
+## index.html:420-426 and :465-470: the dialog form fields are plain white
+## inputs, the value right-aligned, a thin border at rest and a blue ring when
+## focused. A SpinBox's field is a LineEdit, so this one item themes every
+## number field in the game.
+static func _field(theme: Theme) -> void:
+	var normal := StyleBoxFlat.new()
+	normal.bg_color = Color.WHITE
+	normal.border_width_left = 1
+	normal.border_width_right = 1
+	normal.border_width_top = 1
+	normal.border_width_bottom = 1
+	normal.border_color = Color("a9a9a9")
+	# The prototype's inputs carry 3px 6px of padding (index.html:424, :469).
+	normal.content_margin_left = 6
+	normal.content_margin_right = 6
+	normal.content_margin_top = 3
+	normal.content_margin_bottom = 3
+	theme.set_stylebox("normal", "LineEdit", normal)
+	theme.set_stylebox("read_only", "LineEdit", normal)
+	var focus := normal.duplicate() as StyleBoxFlat
+	focus.border_width_left = 2
+	focus.border_width_right = 2
+	focus.border_width_top = 2
+	focus.border_width_bottom = 2
+	focus.border_color = Color("4a9eff")
+	theme.set_stylebox("focus", "LineEdit", focus)
+	theme.set_color("font_color", "LineEdit", Color.BLACK)
+	theme.set_color("caret_color", "LineEdit", Color.BLACK)
+	theme.set_color("selection_color", "LineEdit", Color("cfe4ff"))
+	theme.set_constant("alignment", "LineEdit", HORIZONTAL_ALIGNMENT_RIGHT)
 
 
 ## index.html:297-330: a white inset-framed table whose column titles are the
@@ -350,26 +471,16 @@ static func _tree(theme: Theme) -> void:
 	theme.set_constant("inner_item_margin_bottom", "Tree", 1)
 
 
-## A 2px-tall horizontal gradient, which is all a titlebar needs. Built as a
-## 256x2 texture stretched horizontally so the gradient runs left-to-right at
-## any window width. `base_type` is the class that will wear it, which decides
-## the item the stylebox is filed under -- see the resolution rule above.
+## The dialog titlebar. The app itself has no titlebar -- the OS draws that --
+## so this serves the dialogs, whose title is a Label. Flat navy, no
+## gradients: the Win95 titlebar was solid, and a gradient texture here is
+## exactly the kind of softness this chrome does not have. `base_type` is the
+## class that will wear it, which decides the item the stylebox is filed
+## under -- see the resolution rule above.
 static func _titlebar(theme: Theme, type_name: String, base_type: String) -> void:
-	var gradient := Gradient.new()
-	gradient.set_color(0, Palette.TITLEBAR)
-	gradient.set_color(1, Palette.TITLEBAR_GRADIENT_END)
-	var texture := GradientTexture2D.new()
-	texture.gradient = gradient
-	texture.width = 256
-	texture.height = 2
-	texture.fill_from = Vector2(0, 0)
-	texture.fill_to = Vector2(1, 0)
-
-	var box := StyleBoxTexture.new()
-	box.texture = texture
-	box.axis_stretch_horizontal = StyleBoxTexture.AXIS_STRETCH_MODE_STRETCH
+	var box := flat(Palette.TITLEBAR)
 	# A Label sizes itself from its stylebox's content margins, so a
-	# margin-less StyleBoxTexture would make the titlebar zero-height.
+	# margin-less box would make the titlebar zero-height.
 	box.content_margin_left = 6
 	box.content_margin_top = 3
 	box.content_margin_right = 6
