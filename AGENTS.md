@@ -2,7 +2,7 @@
 
 ## What this repo is
 
-Research, planning, and a **playable web prototype** for a Godot reference implementation of Dope Wars. There is no Godot source code yet.
+A Godot reference implementation of Dope Wars — a Mojo simulation core behind a frozen C ABI, a C++ GDExtension shim, and a GDScript presentation layer — ported from and verified against a **playable web prototype** (`index.html`). See `docs/architecture.md` for the four-layer structure and data flow, `docs/build-and-test.md` for the full build/test runbook, and `docs/parity-deltas.md` for the approved behavioral differences from the prototype.
 
 `CLAUDE.md` is a symlink to this file (`AGENTS.md`); edit `AGENTS.md`, not `CLAUDE.md`.
 
@@ -56,7 +56,7 @@ The Godot reference implementation is a four-layer stack, one direction of depen
 
   Every player-visible string is a `tr()` key resolved from `game/translations/strings.csv` via the `.translation` that `project.godot` registers. A key with no row renders as the key itself, and a CSV value containing a comma must be quoted — `task game:ui-test` asserts both.
 
-Mojo LOC target at parity: `>=43%` of non-vendor non-generated LOC, matching the Zig ratio in `~/git/jumpnbump/`. **This is reported, not gated, and it is currently missed: 27.3% after the presentation layer landed (35.3% before it).** The denominator now contains `game/`, and `game/presentation/` is GDScript *by rule* — `docs/layer-boundaries.md` forbids game rules in GDScript and `core/` may contain no Godot import, so no part of a UI layer can move to Mojo. Re-baseline the target against the simulation stack (`core/` + `include/` + `extension/`) or state the intended scope explicitly; do not quietly move lines between languages to make the ratio work.
+Mojo LOC target at parity: `>=43%` of non-vendor non-generated LOC, matching the Zig ratio in `~/git/jumpnbump/`. **This is reported, not gated, and it is currently missed against the whole repo: 25.70% (`task loc`, measured 2026-09-28).** The denominator contains `game/`'s 3526 GDScript lines, and `game/presentation/` is GDScript *by rule* — `docs/layer-boundaries.md` forbids game rules in GDScript and `core/` may contain no Godot import, so no part of a UI layer can move to Mojo. Scoped instead to the simulation stack the target is meant to compare (`core/` + `include/` + `extension/`), Mojo is 67.97% of that stack — comfortably past parity. See `docs/architecture.md`'s "Mojo LOC share" section for the full breakdown.
 
 **The pinned Mojo toolchain (1.1.0, `MOJO_VERSION` in `taskfiles/core.yml`) exports all 56 declarations of `include/dopewars.h`.** `@export` refuses `ref` parameters and bare `Pointer`/`UnsafePointer` parameters, but accepts `OptionalPointer[T, origin=MutUntrackedOrigin]` / `ImmUntrackedOrigin` — an explicitly-bound untracked origin is not parametric, and the Optional wrapper maps onto the header's NULL-rejection discipline. `docs/mojo-1.1.0-abi-constraints.md` is the probe log: its dead ends are real dead ends, and its corrected "The spelling that works" section is the way through. `tools/check_abi_exports.py` compares the built artifact's global defined set against the header declarations in both directions (Mach-O underscores normalized); the "blocked on the toolchain" allowance is derived machinery that is currently empty, and it fails on any pointer-free regression.
 

@@ -34,8 +34,13 @@ tasks:
       # checkout (no .godot/ yet) has never built the global class name
       # cache, which crashes on first launch (script types like SimWorld
       # unresolved) rather than just missing an asset -- hence deps here
-      # rather than only on game:smoke-test.
+      # rather than only on game:smoke-test. Also require the generated
+      # translation resource: a .godot/ left over from an interrupted import
+      # (e.g. a prior extension:build that raced this task) satisfies
+      # `test -d .godot` without ever having produced it, and every
+      # downstream test then fails on a missing translation load.
       - test -d .godot
+      - test -f translations/strings.en.translation
 
   smoke-test:
     desc: "Boot the real game headlessly and verify it comes up without script errors"
