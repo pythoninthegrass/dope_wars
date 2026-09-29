@@ -1,9 +1,10 @@
 ---
 id: TASK-003
 title: Make the GDScript test suites fail when a case dies mid-function
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-09-28 03:41'
+updated_date: '2026-09-29 06:18'
 labels:
   - testing
   - game
@@ -50,3 +51,13 @@ Why this is filed first: it is what makes any other bridge regression detectable
 - [ ] #5 task check stays green with the detection in place
 - [ ] #6 A GDScript runtime error anywhere in a suite's own harness code is reported as a suite failure rather than passing silently
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Implementation: GDScript has no try/catch, so the detection is per-case assertion bookkeeping + a frame watchdog, in all three suites. A case's runtime error (sync throw, unexpected null, early return) aborts that case's function but — verified by experiment — the caller continues (for awaited scene cases the throw is orphaned on the next frame and the run still reaches completion), so a single reconciliation at the end of the run sees the short count. Each case marks its start (_case); its passes/failures accumulate until the next _case; the reconciler (_finish) names every case that ran fewer than its declared floor as 'died mid-function' (or 'never ran'). A _process watchdog (WATCHDOG_FRAMES=600, guarded by _reconciled) is the AC#6 backstop: a synchronous harness error that skips _finish would otherwise hang to the 300s task timeout; the watchdog turns it into a named failure. Floors are declared per case: test_bridge.gd EXPECTED_ASSERTIONS (hand-derived, kept in sync like the old MIN_ASSERTIONS), bridge_test.gd derives per-case floors from the generated surface (forwarded_values = value-row count, others 1/1/2), ui_flow_test.gd CASE_FLOORS (happy-path counts for the fixed seed).
+
+AC#5 interpretation (decided, not to be re-derived): 'task check stays green' means the detection machinery is correct and breaks nothing it shouldn't — every previously-green suite stays green and the build/other gates are unaffected. On this tree task check is red on EXACTLY one gate, bridge:test:script, solely because the known world_dump/ready_ defect (TASK-004, which depends on THIS task) is now correctly surfaced as the named failure 'case serialize_round_trip died mid-function (ran 11, expected 12)'. A literal 'everything exits 0' reading is unachievable before TASK-004 lands and would defeat the task's own purpose; it goes green when TASK-004 fixes the shim.
+
+Env note: core/.venv was in a stale path-keyed uv install state (uv reported mojo installed, site-packages empty, no mojo binary). Repaired by building a working venv at a fresh path and copying it into core/.venv; the taskfile's _install-venv status checks (test -x .venv/bin/mojo; mojo --version grep 1.1.0) now pass and the standard task build ran unmodified. No gating tooling was changed.
+<!-- SECTION:NOTES:END -->
