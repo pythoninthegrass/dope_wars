@@ -733,6 +733,10 @@ def test_game_step_sequence() raises:
     assert_equal(_init(ptr, UInt32(7)), DW_OK)
     var start = _state(ptr)
     assert_equal(start.day, UInt32(1))
+    # A fresh coat holds no drugs and no guns, so the used space reads 0 of
+    # the 100-slot capacity, not the gun-space constant.
+    assert_equal(start.guns, UInt32(0))
+    assert_equal(start.coat_used, Int32(0))
 
     var drug = _drug_in_roster(ptr)
     assert_equal(external_call["dw_buy", Int32](ptr, UInt32(drug), UInt32(2)), DW_OK)
@@ -788,6 +792,10 @@ def test_dealer_offers_and_purchases() raises:
     assert_equal(gun.space, UInt32(4))
     assert_equal(external_call["dw_accept_gun_offer", Int32](ptr, Pointer(to=gun), Pointer(to=purchase)), DW_OK)
     assert_equal(_state(ptr).guns, UInt32(1))
+    # One gun with zero drugs held is 4 used slots: the gun's space, not a
+    # defect. This is the state the trenchcoat indicator renders as 4/100
+    # (docs/gameplay.md "Inventory"; index.html:711-716).
+    assert_equal(_state(ptr).coat_used, Int32(4))
 
 
 def test_combat_flow() raises:
