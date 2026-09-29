@@ -43,6 +43,15 @@ var _passed := 0
 var _failures: Array[String] = []
 var _skipped: Array[String] = []
 var _expectations: Object = null
+var _per_case := {}
+var _current_case := "harness"
+var _reconciled := false
+var _frames := 0
+
+# Backstop for a synchronous error in _ready before _finish: it aborts _ready
+# and the scene would otherwise spin without ever quitting. A healthy run
+# reaches _finish on the first frame, well under this many frames later.
+const WATCHDOG_FRAMES := 600
 
 
 func _ready() -> void:
@@ -63,9 +72,13 @@ func _ready() -> void:
 	# naming the GDExtension class outside game/simulation/, and going through
 	# the wrapper is the path the game actually takes.
 	var world := SimWorld.new()
+	_case("class_surface")
 	_check_class_surface(world)
+	_case("abi_identity")
 	_check_abi_identity(world)
+	_case("forwarded_values")
 	_check_forwarded_values(world)
+	_case("width_fidelity")
 	_check_width_fidelity(world)
 	_finish()
 
@@ -201,27 +214,66 @@ func _check_width_fidelity(world: Object) -> void:
 		_pass("width: no uint32_t value arrived re-signed negative")
 
 
+## Marks a case as started; its assertions (passes and failures alike -- both
+## are checks that ran) accumulate until the next _case, so a case that throws,
+## returns early, or never runs ends up short of its floor in _finish.
+func _case(name: String) -> void:
+	_current_case = name
+	_per_case[name] = 0
+
+
 func _pass(what: String) -> void:
+	_per_case[_current_case] = int(_per_case.get(_current_case, 0)) + 1
 	_passed += 1
 
 
 func _fail(what: String, why: String) -> void:
+	_per_case[_current_case] = int(_per_case.get(_current_case, 0)) + 1
 	_failures.append("%s — %s" % [what, why])
 
 
+# Fires only when a synchronous _ready error skipped _finish and the scene would
+# otherwise never quit; a healthy run reconciles on the first frame.
+func _process(_delta: float) -> void:
+	if not _reconciled:
+		_frames += 1
+		if _frames >= WATCHDOG_FRAMES:
+			_finish()
+
+
 func _finish() -> void:
+	if _reconciled:
+		return
+	_reconciled = true
 	for note in _skipped:
 		print("  skip    %s" % note)
+	# Per-case floors, derived from the generated surface like the whole-suite
+	# floor below: forwarded_values carries one assertion per value row, the
+	# other three are single aggregate checks. A case that dies mid-function ends
+	# up short of its floor and is named here rather than surfacing as a bare
+	# script error.
+	var value_rows := 0
+	if _expectations != null:
+		for meta: Dictionary in _expectations.ABI.values():
+			if meta.has("value"):
+				value_rows += 1
+	var expected := {
+		"class_surface": 1,
+		"abi_identity": 1,
+		"forwarded_values": value_rows,
+		"width_fidelity": 2,
+	}
+	for name: String in expected:
+		var want: int = expected[name]
+		var ran: int = int(_per_case.get(name, 0))
+		if ran < want:
+			var why := "never ran" if not _per_case.has(name) else "died mid-function"
+			_failures.append("case %s — %s (ran %d assertions, expected %d)" % [name, why, ran, want])
 	# Derived from the value-carrying rows so the floor tracks the header: 4
 	# aggregate assertions plus one per pinned value. This check used to sit
 	# inside the skip loop above, over a list nothing ever appended to, so the
 	# anti-false-pass guard never ran at all.
-	var floor := MIN_ASSERTIONS_FROM_SURFACE
-	if _expectations != null:
-		var abi: Dictionary = _expectations.ABI
-		for meta: Dictionary in abi.values():
-			if meta.has("value"):
-				floor += 1
+	var floor := MIN_ASSERTIONS_FROM_SURFACE + value_rows
 	if _passed < floor:
 		_fail(
 			"suite ran",

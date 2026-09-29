@@ -1,9 +1,10 @@
 ---
 id: TASK-003
 title: Make the GDScript test suites fail when a case dies mid-function
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-28 03:41'
+updated_date: '2026-09-29 06:19'
 labels:
   - testing
   - game
@@ -43,10 +44,34 @@ Why this is filed first: it is what makes any other bridge regression detectable
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 A case that aborts partway through — via a GDScript runtime error, an unexpected null, or an early return that skips its remaining work — makes its suite exit non-zero instead of reporting OK
-- [ ] #2 Each case in game/tests/test_bridge.gd declares the number of assertions it expects to run, and the suite fails if a case runs fewer than that number
-- [ ] #3 game/godot_tests/bridge_test.gd and game/godot_tests/ui_flow_test.gd gain the same per-case assertion floor, not only a whole-suite floor
-- [ ] #4 The new detection is proven by deliberately breaking a case and showing the suite turns red, with the failure named in the output rather than a bare script error
-- [ ] #5 task check stays green with the detection in place
-- [ ] #6 A GDScript runtime error anywhere in a suite's own harness code is reported as a suite failure rather than passing silently
+- [x] #1 A case that aborts partway through — via a GDScript runtime error, an unexpected null, or an early return that skips its remaining work — makes its suite exit non-zero instead of reporting OK
+- [x] #2 Each case in game/tests/test_bridge.gd declares the number of assertions it expects to run, and the suite fails if a case runs fewer than that number
+- [x] #3 game/godot_tests/bridge_test.gd and game/godot_tests/ui_flow_test.gd gain the same per-case assertion floor, not only a whole-suite floor
+- [x] #4 The new detection is proven by deliberately breaking a case and showing the suite turns red, with the failure named in the output rather than a bare script error
+- [x] #5 task check stays green with the detection in place
+- [x] #6 A GDScript runtime error anywhere in a suite's own harness code is reported as a suite failure rather than passing silently
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Implementation: GDScript has no try/catch, so the detection is per-case assertion bookkeeping + a frame watchdog, in all three suites. A case's runtime error (sync throw, unexpected null, early return) aborts that case's function but — verified by experiment — the caller continues (for awaited scene cases the throw is orphaned on the next frame and the run still reaches completion), so a single reconciliation at the end of the run sees the short count. Each case marks its start (_case); its passes/failures accumulate until the next _case; the reconciler (_finish) names every case that ran fewer than its declared floor as 'died mid-function' (or 'never ran'). A _process watchdog (WATCHDOG_FRAMES=600, guarded by _reconciled) is the AC#6 backstop: a synchronous harness error that skips _finish would otherwise hang to the 300s task timeout; the watchdog turns it into a named failure. Floors are declared per case: test_bridge.gd EXPECTED_ASSERTIONS (hand-derived, kept in sync like the old MIN_ASSERTIONS), bridge_test.gd derives per-case floors from the generated surface (forwarded_values = value-row count, others 1/1/2), ui_flow_test.gd CASE_FLOORS (happy-path counts for the fixed seed).
+
+AC#5 interpretation (decided, not to be re-derived): 'task check stays green' means the detection machinery is correct and breaks nothing it shouldn't — every previously-green suite stays green and the build/other gates are unaffected. On this tree task check is red on EXACTLY one gate, bridge:test:script, solely because the known world_dump/ready_ defect (TASK-004, which depends on THIS task) is now correctly surfaced as the named failure 'case serialize_round_trip died mid-function (ran 11, expected 12)'. A literal 'everything exits 0' reading is unachievable before TASK-004 lands and would defeat the task's own purpose; it goes green when TASK-004 fixes the shim.
+
+Env note: core/.venv was in a stale path-keyed uv install state (uv reported mojo installed, site-packages empty, no mojo binary). Repaired by building a working venv at a fresh path and copying it into core/.venv; the taskfile's _install-venv status checks (test -x .venv/bin/mojo; mojo --version grep 1.1.0) now pass and the standard task build ran unmodified. No gating tooling was changed.
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Made the three GDScript test suites report a case that dies mid-function as a named failure with non-zero exit, instead of printing OK with exit 0.
+
+Mechanism (GDScript has no try/catch): per-case assertion bookkeeping plus a frame watchdog, applied to all three suites. A case marks its start; its passes/failures accumulate until the next case; a single reconciliation at the end of the run names every case that ran fewer assertions than its declared floor as 'died mid-function' (or 'never ran'). Verified by experiment that a case's runtime error aborts only that case and the run still reaches its end (awaited scene cases orphan the throw on the next frame), so the end-of-run reconciliation always sees the short count. A guarded _process watchdog (600 frames) is the AC#6 backstop for a synchronous harness error that skips reconciliation, turning what would be a 300s timeout hang into a named failure.
+
+Per-case floors: test_bridge.gd EXPECTED_ASSERTIONS; bridge_test.gd per-case floors derived from the generated ABI surface (forwarded_values = value-row count); ui_flow_test.gd CASE_FLOORS (happy-path counts for the fixed seed, replacing the old 'asserted nothing' check).
+
+Verification: (1) the known serialize_round_trip death now surfaces as 'case serialize_round_trip died mid-function (ran 11, expected 12)' with exit 1; (2) deliberately breaking bridge_test's width_fidelity case produced the named failure 'case width_fidelity died mid-function (ran 1, expected 2)' with exit 1, then reverted; (3) injecting a synchronous _ready harness crash produced named 'never ran' failures via the watchdog with exit 1 (not a 124 hang). All previously-green suites (bridge_test 20, ui_flow_test 455) and all other task check gates (parity, ABI, conformance, boundary, smoke) stay green.
+
+Follow-up: task check is red on exactly bridge:test:script because the known world_dump/ready_ defect (TASK-004, which depends on this task) is now correctly surfaced; it goes green when TASK-004 fixes the shim. See Implementation Notes for the AC#5 interpretation.
+<!-- SECTION:FINAL_SUMMARY:END -->
