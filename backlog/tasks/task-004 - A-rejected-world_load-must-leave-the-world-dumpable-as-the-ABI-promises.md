@@ -1,10 +1,10 @@
 ---
 id: TASK-004
 title: 'A rejected world_load must leave the world dumpable, as the ABI promises'
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-28 03:41'
-updated_date: '2026-09-28 03:41'
+updated_date: '2026-09-29 13:14'
 labels:
   - game
   - abi
@@ -47,12 +47,12 @@ No ABI change is needed or wanted here. The header is frozen, `DW_ABI_VERSION` m
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 After world_load returns DW_ERR_SERIALIZATION_FAILED, a subsequent world_dump returns the same bytes it returned before that load, making the header's unchanged-world guarantee observable from GDScript
-- [ ] #2 After a rejected world_load, the other world calls on that handle still work rather than returning DW_ERR_INVALID_ARGUMENT
-- [ ] #3 A handle that has never held a world still refuses every call after a failed load, so a corrupt save is still discarded on boot and the next game starts clean
-- [ ] #4 The existing assertion in game/tests/test_bridge.gd that a failed load should not mutate the world executes and passes instead of raising a script error
-- [ ] #5 include/dopewars.h is unchanged and DW_ABI_VERSION does not move; no core source change is required
-- [ ] #6 task check and the corrupt-save case in the ui flow suite stay green
+- [x] #1 After world_load returns DW_ERR_SERIALIZATION_FAILED, a subsequent world_dump returns the same bytes it returned before that load, making the header's unchanged-world guarantee observable from GDScript
+- [x] #2 After a rejected world_load, the other world calls on that handle still work rather than returning DW_ERR_INVALID_ARGUMENT
+- [x] #3 A handle that has never held a world still refuses every call after a failed load, so a corrupt save is still discarded on boot and the next game starts clean
+- [x] #4 The existing assertion in game/tests/test_bridge.gd that a failed load should not mutate the world executes and passes instead of raising a script error
+- [x] #5 include/dopewars.h is unchanged and DW_ABI_VERSION does not move; no core source change is required
+- [x] #6 task check and the corrupt-save case in the ui flow suite stay green
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -62,3 +62,13 @@ TASK-003 must land first: until a suite reports a dead case as a failure, the as
 
 Boot path deliberately unaffected: a handle that has never held a world must stay unusable after a rejected load, so `game/platform/save_store.gd` can still discard a corrupt save (index.html:1544-1553, pinned by the ui flow suite). The shim's `ready_` currently conflates "has a world" with "the last load succeeded" (extension/src/dopewars_world.cpp:672).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+The shim's world_load set `ready_ = result == DW_OK` on every load, so a rejected load (truncated/corrupt dump) demoted a handle that already held a world, and every is_ready()-gated method then returned DW_ERR_INVALID_ARGUMENT — hiding the ABI's "on failure, world state is unchanged" guarantee from GDScript.
+
+Fix: world_load now only ever promotes `ready_` (false -> true) — a rejected load no longer clears it, while a handle that never held a world stays refused after a failed load, preserving the boot-time corrupt-save discard (index.html:1544-1553, pinned by the ui flow suite).
+
+Coverage (game/tests/test_bridge.gd, serialize_round_trip floor 12 -> 16): the previously unreachable "a failed load should not mutate the world" assertion now executes and passes (dump bytes identical after a rejected load); new assertions pin that state_get still succeeds on a rejected handle and that a fresh handle + truncated dump stays not-ready with world calls refusing. include/dopewars.h and core/ are untouched; DW_ABI_VERSION did not move. `task check` green; ui flow suite 455 assertions OK.
+<!-- SECTION:FINAL_SUMMARY:END -->

@@ -35,7 +35,7 @@ const EXPECTED_ASSERTIONS := {
 	"world_lifecycle": 12,
 	"game_step_sequence": 17,
 	"partial_sell": 6,
-	"serialize_round_trip": 12,
+	"serialize_round_trip": 16,
 	"determinism": 5,
 	"rules_surface": 7,
 	"prev_prices": 16,
@@ -258,6 +258,24 @@ func _test_serialize_round_trip() -> void:
 		"a truncated dump should be rejected",
 	)
 	_assert(restored.world_dump()["bytes"] == bytes, "a failed load should not mutate the world")
+	_assert(
+		restored.state_get()["result"] == SimWorld.OK,
+		"a rejected load should not brick the handle's other world calls",
+	)
+
+	# A handle that never held a world stays refused after a failed load, so a
+	# corrupt save is still discarded on boot and the next game starts clean
+	# (index.html:1544-1553).
+	var fresh := SimWorld.new()
+	_assert(
+		fresh.world_load(truncated) == SimWorld.ERR_SERIALIZATION_FAILED,
+		"an uninitialized world should refuse a truncated dump",
+	)
+	_assert(not fresh.is_ready(), "a failed load should not make a fresh handle ready")
+	_assert(
+		fresh.state_get()["result"] == SimWorld.ERR_INVALID_ARGUMENT,
+		"a fresh handle should still refuse world calls after a failed load",
+	)
 
 
 func _test_determinism() -> void:

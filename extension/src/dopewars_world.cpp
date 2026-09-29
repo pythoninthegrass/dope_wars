@@ -667,9 +667,17 @@ int DopeWarsWorld::world_load(const PackedByteArray &bytes) {
 	// from the payload alone, and the caller restoring a save is holding a
 	// brand-new handle that has never been initialized. Gating here made
 	// "resume on boot" impossible -- every fresh process refused its own save.
+	//
+	// A rejected load must not clear ready_ either: the header promises "on
+	// failure, world state is unchanged" and the core honors it, so a handle
+	// that already held a world keeps holding it. ready_ therefore only ever
+	// transitions false -> true here, which is what lets a fresh handle that
+	// never held a world stay refused after a corrupt save.
 	ensure_storage();
 	dw_result result = dw_world_load(world_, bytes.ptr(), static_cast<size_t>(bytes.size()));
-	ready_ = result == DW_OK;
+	if (result == DW_OK) {
+		ready_ = true;
+	}
 	return result;
 }
 
