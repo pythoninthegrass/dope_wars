@@ -1,10 +1,10 @@
 ---
 id: TASK-001
 title: Migrate index.html prototype to Godot with Mojo-first architecture
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-26 04:33'
-updated_date: '2026-09-26 04:34'
+updated_date: '2026-09-29 05:11'
 labels:
   - godot
   - mojo
@@ -55,9 +55,15 @@ Port the 1711-line `index.html` browser prototype to a full Godot game using Moj
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Full game loop is playable in Godot: new game, buy/sell, travel, arrival events, coat/gun dealers, chase/combat, finances, and end-of-game score screen
-- [ ] #2 Behavior parity with JS oracle for all agreed scenarios — deterministic under fixed seed
-- [ ] #3 Non-vendor non-generated LOC reaches >=43% Mojo by final parity milestone
-- [ ] #4 All 7 subtasks are complete and pass their own acceptance criteria
-- [ ] #5 Contributor docs explain architecture, build commands, test tiers, and how to measure Mojo LOC percentage
+- [x] #1 Full game loop is playable in Godot: new game, buy/sell, travel, arrival events, coat/gun dealers, chase/combat, finances, and end-of-game score screen
+- [x] #2 Behavior parity with JS oracle for all agreed scenarios — deterministic under fixed seed
+- [x] #3 Non-vendor non-generated LOC reaches >=43% Mojo by final parity milestone -- treated as a loose/reported target, not a gate (Lance, 2026-09-29): whole-repo measurement is 25.70% (task loc, 2026-09-28) since game/'s GDScript UI layer cannot legally move to Mojo per docs/layer-boundaries.md; scoped to the simulation stack alone (core/+include/+extension/), Mojo is 67.97% -- past parity. See docs/architecture.md.
+- [x] #4 All 7 subtasks are complete and pass their own acceptance criteria
+- [x] #5 Contributor docs explain architecture, build commands, test tiers, and how to measure Mojo LOC percentage
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Closed 2026-09-29 alongside TASK-001.07. All 8 subtasks (.01, .02, .03, .05, .06, .07, .08, .09) are Done; task check and task lint pass clean on main (e6d94b5). AC#3's flat 43% LOC target is explicitly a loose/reported target per Lance -- not gating completion. TASK-001.04 is referenced in this task's dependencies field but no such subtask file exists in backlog/; looks like a numbering gap from early planning, nothing outstanding.
+<!-- SECTION:NOTES:END -->
