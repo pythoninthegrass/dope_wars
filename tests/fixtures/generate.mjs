@@ -59,7 +59,7 @@ const FIXTURES = [
   },
   {
     name: '03-travel-interest',
-    meta: { seed: 1, description: 'travel across 5 days', mechanic: '10% debt compounding, 2% bank interest, day advancement' },
+    meta: { seed: 1, description: 'travel across 5 days', mechanic: '10% debt compounding, 5% bank interest, day advancement' },
     steps: [
       { call: 'newGame', args: { seed: 1 } },
       { call: 'setField', args: { bank: 1000 } },
@@ -145,10 +145,10 @@ const FIXTURES = [
     steps: [
       { call: 'newGame', args: { seed: 1 } },
       // startChase without gun
-      { call: 'startChase', rng: [] },
+      { call: 'startChase', rng: [0.5] },
       // startChase with gun (canFight true)
       { call: 'setField', args: { guns: 1 } },
-      { call: 'startChase', rng: [] },
+      { call: 'startChase', rng: [0.5] },
       // runFromChase escape (defender, rng < 0.60)
       { call: 'setField', args: { health: 100 } },
       { call: 'runFromChase', args: { chase: { deputies: 3 }, isAggressor: false }, rng: [0.5] },

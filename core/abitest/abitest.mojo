@@ -217,7 +217,7 @@ def _world() -> Pointer[UInt8, origin=MutUntrackedOrigin]:
 
 
 def _config(seed: UInt32, num_days: UInt32 = 0, start_cash: Int32 = -1) -> Config:
-    return Config(UInt16(1), UInt16(0), seed, num_days, start_cash)
+    return Config(UInt16(2), UInt16(0), seed, num_days, start_cash)
 
 
 def _init(
@@ -380,7 +380,7 @@ def test_world_init_and_reset() raises:
 
 def test_init_rejects_bad_abi_version() raises:
     var ptr = _world()
-    var cfg = Config(UInt16(2), UInt16(0), UInt32(7), UInt32(0), Int32(-1))
+    var cfg = Config(UInt16(1), UInt16(0), UInt32(7), UInt32(0), Int32(-1))
     assert_equal(
         external_call["dw_world_init", Int32](ptr, Pointer(to=cfg)),
         DW_ERR_ABI_VERSION_MISMATCH,
@@ -674,7 +674,7 @@ def test_rules_accessors() raises:
     assert_equal(external_call["dw_rules_gun_space", UInt32](), UInt32(4))
     assert_equal(external_call["dw_rules_player_armor", UInt32](), UInt32(100))
     assert_equal(external_call["dw_rules_debt_interest_bp", UInt32](), UInt32(1000))
-    assert_equal(external_call["dw_rules_bank_interest_bp", UInt32](), UInt32(200))
+    assert_equal(external_call["dw_rules_bank_interest_bp", UInt32](), UInt32(500))
     assert_equal(external_call["dw_rules_bank_purchase_fee_bp", UInt32](), UInt32(2500))
     assert_equal(external_call["dw_rules_cheap_divide", UInt32](), UInt32(4))
     assert_equal(external_call["dw_rules_expensive_multiply", UInt32](), UInt32(4))
@@ -799,7 +799,10 @@ def test_combat_flow() raises:
 
     var chase = ChaseView(UInt32(0), UInt8(0), Array[UInt8, 3](fill=0))
     assert_equal(external_call["dw_start_chase", Int32](ptr, Pointer(to=chase)), DW_OK)
-    assert_equal(chase.deputies, UInt32(1))
+    # beermat-verified (TASK-009): deputies is randInt(2, 11), no longer a
+    # deterministic function of day alone -- this is seed 7's actual draw
+    # after should_start_chase's one draw.
+    assert_equal(chase.deputies, UInt32(4))
     assert_equal(chase.can_fight, UInt8(0))
 
     var ratings = FightRatingsView(UInt32(0), UInt32(0))

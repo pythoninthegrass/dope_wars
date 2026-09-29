@@ -19,7 +19,7 @@ comptime START_DEBT = 5500
 comptime START_HEALTH = 100
 comptime START_COAT_CAPACITY = 100
 comptime DEBT_INTEREST = 0.10
-comptime BANK_INTEREST = 0.02
+comptime BANK_INTEREST = 0.05  # beermat-verified (TASK-009): was 0.02
 comptime START_LOCATION = "bronx"
 comptime GUN_DAMAGE = 5
 comptime GUN_SPACE = 4
@@ -106,13 +106,13 @@ def drugs() -> List[Drug]:
         Drug("acid", "Acid", 1000, 4400, True, False),
         Drug("cocaine", "Cocaine", 15000, 29000, False, True),
         Drug("crack", "Crack", 1500, 4800, False, False),
-        Drug("ecstasy", "Ecstasy", 800, 2200, False, False),
+        Drug("ecstasy", "Ecstasy", 10, 75, False, False),  # beermat-verified (TASK-009): was 800-2200
         Drug("hashish", "Hashish", 480, 1320, True, False),
         Drug("heroin", "Heroin", 5500, 13500, False, True),
         Drug("opium", "Opium", 540, 3700, False, True),
         Drug("peyote", "Peyote", 220, 700, False, False),
         Drug("shrooms", "Shrooms", 600, 1300, False, False),
-        Drug("smack", "Smack", 3500, 10000, False, True),
+        Drug("smack", "Smack", 1500, 4500, False, True),  # beermat-verified (TASK-009): was 3500-10000
         Drug("speed", "Speed", 90, 250, True, True),
         Drug("weed", "Weed", 300, 1100, True, False),
     ]

@@ -182,7 +182,7 @@ describe('buy / sell', () => {
 })
 
 describe('travel', () => {
-  test('advances day, accrues 10% debt and 2% bank, regenerates prices', () => {
+  test('advances day, accrues 10% debt and 5% bank, regenerates prices', () => {
     const state = Engine.newGame({ seed: 1 })
     state.bank = 1000
     const before = state.day
@@ -191,7 +191,7 @@ describe('travel', () => {
     assert.equal(state.day, before + 1)
     assert.equal(state.location, 'ghetto')
     assert.equal(state.debt, 6050)
-    assert.equal(state.bank, 1000 * 1.02)
+    assert.equal(state.bank, 1000 * 1.05)
     assert.ok(Object.keys(state.prices).length > 0)
   })
 

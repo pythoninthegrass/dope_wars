@@ -11,9 +11,9 @@
 #   4. the game is over (day >= numDays)
 #
 # Interest is applied on the way out: debt compounds at 10% and is rounded to a
-# whole dollar, bank compounds at 2% and is left fractional. That asymmetry is
-# the original's, and it is why bank is a Float64 in the world while debt is
-# always integral.
+# whole dollar, bank compounds at 5% (beermat-verified, TASK-009) and is left
+# fractional. That asymmetry is the original's, and it is why bank is a
+# Float64 in the world while debt is always integral.
 
 import jsmath
 import prices

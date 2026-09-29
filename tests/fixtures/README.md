@@ -51,7 +51,7 @@ Each `.meta.json` sidecar records:
 | --- | --- |
 | `01-price-generation` | `generatePrices` roster + event scaling |
 | `02-buy-sell-edges` | coat overflow, unaffordable, non-tradeable, partial sell |
-| `03-travel-interest` | day advancement, 10% debt compounding, 2% bank interest |
+| `03-travel-interest` | day advancement, 10% debt compounding, 5% bank interest |
 | `04-arrival-events` | every `rollArrivalEvent` branch (mugged/freeDrugs/dogChase/foundDrugs/mamasBrownies/freeWeedDeath/flavor/none) |
 | `05-dealers` | coat + gun dealers: cash path, bank+25% fee path, insufficient |
 | `06-chase-combat` | `startChase` w/ + w/o guns; `runFromChase` escape/fail/aggressor; `fight` hit/miss/won |

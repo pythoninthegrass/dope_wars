@@ -135,6 +135,13 @@ Three stock cop tiers, escalating as the player kills off lower ones (`struct CO
 | Officer Bob | 15 | 4 | 30 | 20 | 4-10 | Baretta |
 | Agent Smith | 50 | 6 | 20 | 20 | 6-18 | .38 Special |
 
+**Not beermat-verified**: real beermat 1.2.0.0 play (TASK-009) observed Officer
+Hardass deputy counts of 2, 2, 4, 6, 10, and 11 across days 2-20 (no cops were
+ever killed, so no tier escalation was observed) — a wider range than this
+table's 2-8, and with no day correlation. `index.html`'s `startChase` uses a
+flat `randInt(2, 11)` beermat-verified range rather than this C-source table's
+narrower bounds.
+
 Whether cops attack at all in a given random-encounter roll depends on the location's police-presence rating (see Random events, above).
 
 **Combat math** (`GetFightRatings`, `src/serverside.c:2616-2637`; `Fire`, `src/serverside.c:2845-2894`):

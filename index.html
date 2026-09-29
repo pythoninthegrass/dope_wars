@@ -645,7 +645,7 @@
       startHealth: 100,
       startCoatCapacity: 100,
       debtInterest: 0.10,
-      bankInterest: 0.02,
+      bankInterest: 0.05, // beermat-verified (TASK-009): 5%/turn, matches docs/gameplay.md's C-source figure, not the Keymash-only 2%
       startLocation: 'bronx',
       gunDamage: 5,
       gunSpace: 4,
@@ -662,13 +662,13 @@
         { id: 'acid', name: 'Acid', min: 1000, max: 4400, cheap: true, expensive: false },
         { id: 'cocaine', name: 'Cocaine', min: 15000, max: 29000, cheap: false, expensive: true },
         { id: 'crack', name: 'Crack', min: 1500, max: 4800, cheap: false, expensive: false },
-        { id: 'ecstasy', name: 'Ecstasy', min: 800, max: 2200, cheap: false, expensive: false },
+        { id: 'ecstasy', name: 'Ecstasy', min: 10, max: 75, cheap: false, expensive: false }, // beermat-verified (TASK-009): was 800-2200
         { id: 'hashish', name: 'Hashish', min: 480, max: 1320, cheap: true, expensive: false },
         { id: 'heroin', name: 'Heroin', min: 5500, max: 13500, cheap: false, expensive: true },
         { id: 'opium', name: 'Opium', min: 540, max: 3700, cheap: false, expensive: true },
         { id: 'peyote', name: 'Peyote', min: 220, max: 700, cheap: false, expensive: false },
         { id: 'shrooms', name: 'Shrooms', min: 600, max: 1300, cheap: false, expensive: false },
-        { id: 'smack', name: 'Smack', min: 3500, max: 10000, cheap: false, expensive: true },
+        { id: 'smack', name: 'Smack', min: 1500, max: 4500, cheap: false, expensive: true }, // beermat-verified (TASK-009): was 3500-10000
         { id: 'speed', name: 'Speed', min: 90, max: 250, cheap: true, expensive: true },
         { id: 'weed', name: 'Weed', min: 300, max: 1100, cheap: true, expensive: false },
       ],
@@ -975,8 +975,11 @@
     }
 
     function startChase(state, rng) {
-      const day = state.day;
-      const deputies = Math.min(9, 1 + Math.floor(day / 4));
+      // beermat-verified (TASK-009): deputy count isn't day-scaled — observed
+      // (day, deputies) pairs {2:10, 9:11, 14:6, 15:2, 17:4, 20:2} show no
+      // day correlation, only a flat range wider than docs/gameplay.md's
+      // C-source Officer Hardass table (2-8).
+      const deputies = randInt(rng, 2, 11);
       return {
         cop: 'Officer Hardass',
         deputies,

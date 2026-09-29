@@ -160,6 +160,10 @@ float64, so save/load stays bit-exact.
   - Renumbering an existing anonymous-enum constant.
   - Change to the observable semantics of an existing function (including
     RNG draw order for a given seed).
+- **v2 (TASK-009)**: `dw_start_chase` changed from a pure function of `day`
+  (zero RNG draws) to `randInt(2, 11)` (one RNG draw), matching beermat-verified
+  play data. Struct layouts and the dump byte count are unchanged from v1 —
+  this bump is solely for the RNG-draw-order rule above.
 
 ## Serialization
 

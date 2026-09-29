@@ -33,7 +33,7 @@ from abi_symbols import (  # noqa: E402
     struct_sizes,
 )
 
-DW_ABI_VERSION = 1
+DW_ABI_VERSION = 2
 
 # Result codes (include/dopewars.h, anonymous enum). Frozen from ABI v1;
 # appended to, never renumbered.
@@ -71,7 +71,7 @@ EXPECTED_RULES = {
     "dw_rules_gun_space": (ctypes.c_uint32, 4),
     "dw_rules_player_armor": (ctypes.c_uint32, 100),
     "dw_rules_debt_interest_bp": (ctypes.c_uint32, 1000),
-    "dw_rules_bank_interest_bp": (ctypes.c_uint32, 200),
+    "dw_rules_bank_interest_bp": (ctypes.c_uint32, 500),
     "dw_rules_bank_purchase_fee_bp": (ctypes.c_uint32, 2500),
     "dw_rules_cheap_divide": (ctypes.c_uint32, 4),
     "dw_rules_expensive_multiply": (ctypes.c_uint32, 4),

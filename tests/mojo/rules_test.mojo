@@ -20,7 +20,7 @@ def test_scalar_rules_match_js() raises:
     assert_equal(rules.START_HEALTH, 100)
     assert_equal(rules.START_COAT_CAPACITY, 100)
     assert_equal(rules.DEBT_INTEREST, 0.10)
-    assert_equal(rules.BANK_INTEREST, 0.02)
+    assert_equal(rules.BANK_INTEREST, 0.05)
     assert_equal(rules.START_LOCATION, "bronx")
     assert_equal(rules.GUN_DAMAGE, 5)
     assert_equal(rules.GUN_SPACE, 4)
@@ -63,13 +63,13 @@ def test_drugs_match_js() raises:
         "acid|Acid|1000|4400|t|f",
         "cocaine|Cocaine|15000|29000|f|t",
         "crack|Crack|1500|4800|f|f",
-        "ecstasy|Ecstasy|800|2200|f|f",
+        "ecstasy|Ecstasy|10|75|f|f",
         "hashish|Hashish|480|1320|t|f",
         "heroin|Heroin|5500|13500|f|t",
         "opium|Opium|540|3700|f|t",
         "peyote|Peyote|220|700|f|f",
         "shrooms|Shrooms|600|1300|f|f",
-        "smack|Smack|3500|10000|f|t",
+        "smack|Smack|1500|4500|f|t",
         "speed|Speed|90|250|t|t",
         "weed|Weed|300|1100|t|f",
     ]

@@ -57,7 +57,7 @@ extern "C" {
  * changes. Additive changes (new functions, new appended anonymous-enum
  * constants, new `#define`s that don't invalidate existing struct sizes)
  * do NOT bump this. See `docs/abi-contract.md` for the full policy. */
-#define DW_ABI_VERSION 1u
+#define DW_ABI_VERSION 2u
 
 /* The value above, readable at runtime.
  *

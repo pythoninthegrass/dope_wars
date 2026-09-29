@@ -57,11 +57,12 @@ def should_start_chase(mut game: world.World) raises -> Bool:
     return rng_mod.rand_int(game.rng, 0, 80 + police) >= 50
 
 
-def start_chase(ref game: world.World) -> Chase:
-    # Deputies scale with the day: 1 + floor(day / 4), capped at 9.
-    var deputies = 1 + game.day // 4
-    if deputies > 9:
-        deputies = 9
+def start_chase(mut game: world.World) raises -> Chase:
+    # beermat-verified (TASK-009): deputy count isn't day-scaled -- observed
+    # (day, deputies) pairs {2:10, 9:11, 14:6, 15:2, 17:4, 20:2} show no day
+    # correlation, only a flat range wider than docs/gameplay.md's C-source
+    # Officer Hardass table (2-8).
+    var deputies = rng_mod.rand_int(game.rng, 2, 11)
     return Chase(deputies)
 
 

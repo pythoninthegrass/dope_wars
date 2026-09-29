@@ -73,9 +73,13 @@ capital at risk.
   **Fight is disabled with 0 guns.** Run can fail on a given round ("They're
   firing on you, man! You've been hit!" — costs ~5% health) before
   eventually succeeding ("You lost them in the alleys."). Treat it as a
-  multi-round skill check, not a single roll — keep clicking Run. The
-  deputy count scales up over the game (observed 1 deputy early, 9 deputies
-  by day ~22) but didn't visibly change outcome odds in this run.
+  multi-round skill check, not a single roll — keep clicking Run. This
+  Keymash run observed the deputy count scaling up over the game (1 deputy
+  early, 9 by day ~22), but that curve is **Keymash-specific, not
+  beermat-verified** — the real beermat 1.2.0.0 build shows no day
+  correlation at all (observed deputies 2, 2, 4, 6, 10, 11 across days 2-20,
+  see TASK-009), so `index.html`'s `startChase` now uses a flat random range
+  instead of either curve.
 - Pure flavor-text danger cues with no mechanical effect were also observed
   ("Police dogs chased you for 2 blocks.").
 
@@ -96,9 +100,12 @@ capital at risk.
   10% growth per border crossing on outstanding debt. Left untouched for a
   stretch, debt visibly snowballed (e.g., $5,500 → $8,303 over ~8 travels
   with only prices/events in between).
-- Bank balance separately earns ~2% per travel and is **immune to
-  muggings/debt seizure** (per in-game Finances help text) — deposit cash
-  you're not actively trading with.
+- Bank balance separately earns ~2% per travel in this Keymash run and is
+  **immune to muggings/debt seizure** (per in-game Finances help text) —
+  deposit cash you're not actively trading with. **Not beermat-verified**:
+  the real beermat 1.2.0.0 build shows 5%/turn instead (matches
+  `docs/gameplay.md`'s C-source figure), so `index.html`'s `bankInterest`
+  now uses 0.05, not this Keymash-observed 0.02 (see TASK-009).
 - Paying debt down aggressively whenever cash is flush is clearly worth it:
   once cleared entirely (day ~20 this run), the compounding drag disappears
   and net worth accelerates.

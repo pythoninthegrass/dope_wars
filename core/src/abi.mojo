@@ -33,7 +33,7 @@ import travel
 import world as world_mod
 
 
-comptime DW_ABI_VERSION = 1
+comptime DW_ABI_VERSION = 2
 
 # dw_result values (include/dopewars.h). Frozen from ABI v1 onward.
 comptime DW_OK = Int32(0)
@@ -1008,21 +1008,24 @@ def dw_should_start_chase(
 
 @export("dw_start_chase")
 def dw_start_chase(
-    world: OptionalPointer[world_mod.World, origin=ImmUntrackedOrigin],
+    world: OptionalPointer[world_mod.World, origin=MutUntrackedOrigin],
     out_chase: OptionalPointer[ChaseView, origin=MutUntrackedOrigin],
 ) abi("C") -> Int32:
     if not world or not out_chase:
         return DW_ERR_INVALID_ARGUMENT
-    ref game = world.value()[]
-    var chase = combat.start_chase(game)
-    out_chase.value().unsafe_write(
-        ChaseView(
-            UInt32(chase.deputies),
-            UInt8(1) if game.guns > 0 else UInt8(0),
-            Array[UInt8, 3](fill=0),
+    try:
+        ref game = world.value()[]
+        var chase = combat.start_chase(game)
+        out_chase.value().unsafe_write(
+            ChaseView(
+                UInt32(chase.deputies),
+                UInt8(1) if game.guns > 0 else UInt8(0),
+                Array[UInt8, 3](fill=0),
+            )
         )
-    )
-    return DW_OK
+        return DW_OK
+    except:
+        return DW_ERR_INVALID_ARGUMENT
 
 
 @export("dw_get_fight_ratings")
