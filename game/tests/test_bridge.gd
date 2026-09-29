@@ -18,10 +18,39 @@ extends SceneTree
 
 var _failures := 0
 var _assertions := 0
+var _per_case := {}
+var _current_case := "harness"
+var _reconciled := false
+var _frames := 0
 
-## Derived from the surface this file touches, so "ran and did nothing" fails
-## loudly instead of reporting a pass. See AGENTS.md on false passes.
+# Per-case assertion floor. Each case declares the number of assertions it runs
+# on the happy path (including the init assert its _new_world() call makes); a
+# case that dies partway -- a GDScript runtime error, an unexpected null, an
+# early return -- runs fewer and is reported as a named failure. A whole-suite
+# floor cannot see a case that dies on its third check while the total still
+# clears MIN_ASSERTIONS, which is exactly how _test_serialize_round_trip's death
+# reported OK. Keep these in sync when a case gains or loses a check.
+const EXPECTED_ASSERTIONS := {
+	"abi_version": 1,
+	"world_lifecycle": 12,
+	"game_step_sequence": 17,
+	"partial_sell": 6,
+	"serialize_round_trip": 12,
+	"determinism": 5,
+	"rules_surface": 7,
+	"prev_prices": 16,
+	"dealer_visits": 10,
+}
+
+## Coarse backstop for the harness itself: if every case reports but the total
+## is almost nothing, the run is still wrong. See AGENTS.md on false passes.
 const MIN_ASSERTIONS := 40
+
+# Backstop for a synchronous error in the harness before the cases: it aborts
+# _initialize and skips _finish, so the tree would otherwise spin without ever
+# quitting. A healthy _initialize is synchronous and reaches _finish on the
+# first frame, well under this many frames later.
+const WATCHDOG_FRAMES := 600
 
 
 func _initialize() -> void:
@@ -29,29 +58,72 @@ func _initialize() -> void:
 		ClassDB.class_exists("DopeWarsWorld"),
 		"the extension class is not registered; the extension did not load",
 	)
+	_case("abi_version")
 	_test_abi_version()
+	_case("world_lifecycle")
 	_test_world_lifecycle()
+	_case("game_step_sequence")
 	_test_game_step_sequence()
+	_case("partial_sell")
 	_test_partial_sell()
+	_case("serialize_round_trip")
 	_test_serialize_round_trip()
+	_case("determinism")
 	_test_determinism()
+	_case("rules_surface")
 	_test_rules_surface()
+	_case("prev_prices")
 	_test_prev_prices()
+	_case("dealer_visits")
 	_test_dealer_visits()
+	_finish()
 
+
+## Marks a case as started. Its assertions accumulate until the next _case, so a
+## case that throws, returns early, or is never reached ends up short of its
+## declared floor in _finish.
+func _case(name: String) -> void:
+	_current_case = name
+	_per_case[name] = 0
+
+
+## Reconciles the per-case floors and the whole-suite floor, then quits. Guarded
+## so the watchdog can call it without double-reporting.
+func _finish() -> void:
+	if _reconciled:
+		return
+	_reconciled = true
+	for name: String in EXPECTED_ASSERTIONS:
+		var expected: int = EXPECTED_ASSERTIONS[name]
+		var ran: int = int(_per_case.get(name, 0))
+		if ran < expected:
+			_failures += 1
+			var why := "never ran" if not _per_case.has(name) else "died mid-function"
+			printerr("FAIL: case '%s' %s (ran %d assertions, expected %d)" % [name, why, ran, expected])
 	if _assertions < MIN_ASSERTIONS:
 		_failures += 1
 		printerr("FAIL: ran %d assertions, expected at least %d" % [_assertions, MIN_ASSERTIONS])
 
 	if _failures > 0:
-		push_error("%d test_bridge assertion(s) failed" % _failures)
+		push_error("%d test_bridge failure(s)" % _failures)
 		quit(1)
 	else:
 		print("test_bridge: OK (%d assertions)" % _assertions)
 		quit(0)
 
 
+# Fires only when a synchronous harness error skipped _finish and the tree would
+# otherwise never quit; a healthy run reconciles on the first frame.
+func _process(_delta: float) -> bool:
+	if not _reconciled:
+		_frames += 1
+		if _frames >= WATCHDOG_FRAMES:
+			_finish()
+	return false
+
+
 func _assert(condition: bool, message: String) -> void:
+	_per_case[_current_case] = int(_per_case.get(_current_case, 0)) + 1
 	_assertions += 1
 	if not condition:
 		_failures += 1

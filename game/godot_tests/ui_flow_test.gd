@@ -20,6 +20,13 @@ var _passed := 0
 var _failures: Array[String] = []
 var _main: Main = null
 var _per_case := {}
+var _reconciled := false
+var _frames := 0
+
+# Backstop for a synchronous error in _ready before _finish: it aborts _ready
+# (or the awaited run) and the scene would otherwise spin without ever quitting.
+# A healthy run reaches _finish well under this many frames later.
+const WATCHDOG_FRAMES := 600
 
 
 func _ready() -> void:
@@ -55,6 +62,28 @@ const CASES := [
 	"win98_chrome",
 	"window_resize_bounds",
 ]
+
+## Per-case assertion floor. Each case declares the number of assertions it runs
+## on the happy path for the fixed seed; a case that dies partway -- a GDScript
+## runtime error, an unexpected null, an early return that skips its remaining
+## work -- runs fewer and is a named failure. The old "asserted nothing" check
+## only caught a case that ran zero assertions; a case that died on its second
+## check sailed past it. Keep these in sync when a case gains or loses a check.
+const CASE_FLOORS := {
+	"translation_keys_resolve": 210,
+	"new_game_boot": 24,
+	"keyboard_shortcuts": 21,
+	"buy_sell_round_trip": 18,
+	"click_rebuilds_table": 11,
+	"travel_advances_day": 15,
+	"persistence_round_trip": 16,
+	"finances": 7,
+	"typed_quantity": 21,
+	"endgame_and_highscores": 16,
+	"new_game_dialog": 9,
+	"win98_chrome": 82,
+	"window_resize_bounds": 5,
+}
 
 ## A coarse backstop for the case registry itself: if every case reported but
 ## somehow asserted almost nothing, the run is still wrong.
@@ -1067,12 +1096,27 @@ func _case(name: String) -> void:
 	_per_case[name] = 0
 
 
+# Fires only when a synchronous _ready error skipped _finish and the scene would
+# otherwise never quit; a healthy run reconciles on the first frame.
+func _process(_delta: float) -> void:
+	if not _reconciled:
+		_frames += 1
+		if _frames >= WATCHDOG_FRAMES:
+			_finish()
+
+
 func _finish() -> void:
+	if _reconciled:
+		return
+	_reconciled = true
 	for name: String in CASES:
 		if not _per_case.has(name):
 			_failures.append("suite ran — case '%s' never executed" % name)
-		elif _per_case[name] == 0:
-			_failures.append("suite ran — case '%s' executed but asserted nothing" % name)
+		elif int(_per_case[name]) < CASE_FLOORS[name]:
+			_failures.append(
+				"case '%s' died mid-function (ran %d assertions, expected %d)"
+				% [name, int(_per_case[name]), CASE_FLOORS[name]]
+			)
 	if _passed < MIN_ASSERTIONS:
 		_failures.append("suite ran — only %d assertions executed, expected at least %d" % [_passed, MIN_ASSERTIONS])
 
