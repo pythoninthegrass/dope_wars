@@ -3,13 +3,38 @@
 version: "3"
 
 vars:
-  GHIDRA_HEADLESS: "$(brew --prefix ghidra)/libexec/support/analyzeHeadless"
+  GHIDRA_VERSION: "12.1.4"
+  GHIDRA_BUILD: "20260921"
+  GHIDRA_SHA256: "ddac49f903da9d5bac833e5cc79395098b9c33cfd3279be5f31bd00387d2d4db"
+  GHIDRA_JAVA: "temurin-21"
+  GHIDRA_ROOT: '{{.HOME}}/.local/opt/ghidra/ghidra_{{.GHIDRA_VERSION}}_PUBLIC'
+  GHIDRA_HEADLESS: '{{if eq OS "darwin"}}$(brew --prefix ghidra)/libexec/support/analyzeHeadless{{else}}{{.GHIDRA_ROOT}}/support/analyzeHeadless{{end}}'
+  GHIDRA_RUN: "mise exec java@{{.GHIDRA_JAVA}} --"
 
 tasks:
+  _install-java:
+    internal: true
+    desc: "Install the JDK Ghidra needs via mise"
+    cmds:
+      - mise install java@{{.GHIDRA_JAVA}}
+    status:
+      - mise where java@{{.GHIDRA_JAVA}} >/dev/null 2>&1
+
   _install-ghidra:
     internal: true
-    desc: "Install Ghidra via Homebrew when missing (reverse-engineering prerequisite; not a mise tool)"
+    desc: "Install Ghidra (Homebrew on macOS, pinned upstream zip on Linux) when missing; reverse-engineering prerequisite"
+    deps: [_install-java]
     cmds:
-      - brew install ghidra
+      - |
+        {{if eq OS "darwin"}}
+        brew install ghidra
+        {{else}}
+        zip="$(mktemp -d)/ghidra.zip"
+        curl -fsSL -o "$zip" "https://github.com/NationalSecurityAgency/ghidra/releases/download/Ghidra_{{.GHIDRA_VERSION}}_build/ghidra_{{.GHIDRA_VERSION}}_PUBLIC_{{.GHIDRA_BUILD}}.zip"
+        echo "{{.GHIDRA_SHA256}}  $zip" | sha256sum -c -
+        mkdir -p "$(dirname "{{.GHIDRA_ROOT}}")"
+        unzip -q "$zip" -d "$(dirname "{{.GHIDRA_ROOT}}")"
+        rm -rf "$(dirname "$zip")"
+        {{end}}
     status:
       - test -x "{{.GHIDRA_HEADLESS}}"

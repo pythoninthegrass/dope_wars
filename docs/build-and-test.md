@@ -8,9 +8,11 @@ creates `core/.venv` and installs the exact pinned Mojo release
 (`MOJO_VERSION` in `taskfiles/core.yml`) into it via `uv pip install`; every
 `core:*` task depends on it, so it runs on demand rather than needing a
 separate setup step. Ghidra (reverse-engineering only, not needed to build or
-run the game) is a Homebrew formula rather than a mise tool: `re:_install-ghidra`
-in `taskfiles/re.yml` runs `brew install ghidra` on demand, and every `re:*`
-task depends on it.
+run the game) is not a mise tool: `re:_install-ghidra` in `taskfiles/re.yml`
+runs `brew install ghidra` on macOS, and on Linux (no distro package exists)
+unpacks the checksum-pinned upstream release into `~/.local/opt/ghidra`. Both
+use a mise-managed Temurin 21 JDK (`re:_install-java`), and every `re:*` task
+depends on them.
 
 ```sh
 git clone <repo>
