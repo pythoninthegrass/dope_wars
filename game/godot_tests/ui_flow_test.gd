@@ -60,7 +60,8 @@ const CASES := [
 	"endgame_and_highscores",
 	"new_game_dialog",
 	"win98_chrome",
-	"window_resize_bounds",
+	"window_pinned",
+	"tables_fit_twelve_drugs",
 ]
 
 ## Per-case assertion floor. Each case declares the number of assertions it runs
@@ -82,7 +83,8 @@ const CASE_FLOORS := {
 	"endgame_and_highscores": 16,
 	"new_game_dialog": 9,
 	"win98_chrome": 82,
-	"window_resize_bounds": 5,
+	"window_pinned": 5,
+	"tables_fit_twelve_drugs": 4,
 }
 
 ## A coarse backstop for the case registry itself: if every case reported but
@@ -115,8 +117,10 @@ func _run() -> void:
 	await _test_new_game_dialog()
 	_case("win98_chrome")
 	_test_win98_chrome()
-	_case("window_resize_bounds")
-	_test_window_resize_bounds()
+	_case("window_pinned")
+	_test_window_pinned()
+	_case("tables_fit_twelve_drugs")
+	await _test_tables_fit_twelve_drugs()
 
 
 # docs/layer-boundaries.md:113-114 puts every display string behind tr(). A key
@@ -908,19 +912,59 @@ func _test_win98_chrome() -> void:
 	dialog.free()
 
 
-# Width is pinned so the fixed-width Win98 chrome never stretches; height may
-# grow 15% so the tables can show a few extra rows without letterboxing.
-func _test_window_resize_bounds() -> void:
+# The window is one fixed size on both axes: the Win98 chrome is fixed-width so
+# widening would only stretch it, and nothing needs extra height (see
+# _test_tables_fit_twelve_drugs). Resizing is also visibly broken on macOS --
+# Godot renders into an unflipped view's CAMetalLayer, so a height change shows
+# one frame of displaced content -- which is why this is pinned rather than
+# merely bounded. See TASK-005.
+func _test_window_pinned() -> void:
 	var window := get_window()
-	_assert(window.min_size.x == window.max_size.x, "min and max width should match to pin the window width, got min=%d max=%d" % [window.min_size.x, window.max_size.x])
-	_assert(window.min_size.x > 0, "the window width should be pinned to a real size, got %d" % window.min_size.x)
-	var expected_max_height := ceili(window.min_size.y * Main.MAX_HEIGHT_GROWTH)
-	_assert(window.max_size.y == expected_max_height, "max height should be 15%% over min height (%d), got %d" % [expected_max_height, window.max_size.y])
-	_assert(window.max_size.y > window.min_size.y, "max height should exceed min height so the window can actually grow taller")
+	_assert(window.min_size == window.max_size, "min and max size should match to pin the window, got min=%v max=%v" % [window.min_size, window.max_size])
+	_assert(window.min_size.x > 0 and window.min_size.y > 0, "the window should be pinned to a real size, got %v" % window.min_size)
+	_assert(
+		ProjectSettings.get_setting("display/window/size/resizable") == false,
+		"window/size/resizable should be false so the OS draws no drag edge"
+	)
+	_assert(
+		ProjectSettings.get_setting("display/window/size/maximize_disabled") == true,
+		"window/size/maximize_disabled should be true so the maximize button cannot resize the window"
+	)
 	_assert(
 		ProjectSettings.get_setting("display/window/stretch/aspect") == "keep_width",
-		"stretch/aspect should be keep_width so extra height enlarges the layout instead of letterboxing"
+		"stretch/aspect should be keep_width so the fixed-width chrome never stretches"
 	)
+
+
+# The reason the window needs no resizing: every borough with maxDrugs: 12 can
+# trade all DW_NUM_DRUGS at once, and the coat holds one row per drug, so twelve
+# rows is the largest either table ever renders. Asserting it fits without
+# scrolling is what keeps the pinned height honest if a row's height changes.
+func _test_tables_fit_twelve_drugs() -> void:
+	var seed_with_full_market := 0
+	for candidate in range(1, 400):
+		_main.start_new_game(candidate)
+		await get_tree().process_frame
+		if _main.hud().market_table().row_count() == SimWorld.NUM_DRUGS:
+			seed_with_full_market = candidate
+			break
+	_assert(seed_with_full_market > 0, "no seed under 400 produced a market trading all %d drugs" % SimWorld.NUM_DRUGS)
+	if seed_with_full_market == 0:
+		return
+	await get_tree().process_frame
+	var tree: Tree = _main.hud().market_table().tree()
+	var last: TreeItem = null
+	for item in tree.get_root().get_children():
+		last = item
+	_assert(last != null, "a market of %d drugs should render rows" % SimWorld.NUM_DRUGS)
+	if last == null:
+		return
+	var area := tree.get_item_area_rect(last)
+	_assert(
+		area.position.y + area.size.y <= tree.size.y,
+		"twelve market rows should fit the table without scrolling: last row ends at %d, table is %d tall" % [area.position.y + area.size.y, tree.size.y]
+	)
+	_assert(tree.get_scroll().y == 0.0, "a full twelve-drug market should not scroll, got scroll y=%d" % tree.get_scroll().y)
 
 
 # --- harness ----------------------------------------------------------------

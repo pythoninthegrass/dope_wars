@@ -36,12 +36,6 @@ var _finished := false
 ## so `godot --path game -- --seed=12345` replays that seed.
 const SEED_ARG := "--seed="
 
-## The window width is pinned; the player can drag it up to 15% taller than
-## the configured height (project.godot's window/size/window_height_override)
-## before the OS refuses to grow it further.
-const MAX_HEIGHT_GROWTH := 1.15
-
-
 func _ready() -> void:
 	_constrain_window()
 	theme = Win98Theme.shared()
@@ -71,10 +65,11 @@ func _ready() -> void:
 	_boot()
 
 
-## min_size == max_size on the x axis pins the window width; the y axis is
-## left free to grow up to MAX_HEIGHT_GROWTH. window/stretch/aspect=keep_width
-## (project.godot) is what makes the extra height enlarge the layout instead
-## of letterboxing.
+## min_size == max_size pins the window on both axes, backing up
+## window/size/resizable=false (project.godot) with a clamp the window applies
+## to a programmatic size too. Nothing needs to grow: both tables cap at the
+## twelve drugs of DW_NUM_DRUGS and twelve rows already fit this height with
+## room to spare (see the ui_flow_test tables_fit_twelve_drugs case).
 ##
 ## project.godot's window/size overrides are display-scale-aware (allow_hidpi,
 ## the Godot default): on a HiDPI screen the OS hands back a window sized in
@@ -92,7 +87,7 @@ func _constrain_window() -> void:
 	if boot_size.x <= 0 or boot_size.y <= 0:
 		return
 	window.min_size = boot_size
-	window.max_size = Vector2i(boot_size.x, ceili(boot_size.y * MAX_HEIGHT_GROWTH))
+	window.max_size = boot_size
 
 
 ## Load the save if there is a usable one, otherwise start fresh --

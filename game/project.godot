@@ -6,10 +6,17 @@
 ; the OS draws both. The height is what the prototype's 620px viewport needs
 ; to show all twelve drugs without scrolling.
 ;
-; canvas_items/keep_width pins the horizontal scale to that fixed Win98
-; chrome width -- widening the window would stretch it -- while letting extra
-; height enlarge the viewport instead of letterboxing. Main._constrain_window
-; (presentation/main.gd) caps how far the player can drag it taller.
+; canvas_items/keep_width pins the horizontal scale to that fixed Win98 chrome
+; width, so widening the window would only stretch it.
+;
+; The window is not resizable at all (resizable=false, maximize_disabled=true).
+; Both tables are capped at the twelve drugs of DW_NUM_DRUGS -- the four
+; boroughs with maxDrugs: 12 can trade every drug at once -- and twelve rows
+; measure 236px against the 329px the tables already get at this height, so
+; there is no size the player could need that this one does not already cover.
+; Resizing is also visibly broken on macOS: Godot renders into an unflipped
+; view's CAMetalLayer, so every height change composites one frame with the
+; content displaced by the full delta and undrawn black under the title bar.
 
 config_version=5
 
@@ -26,6 +33,8 @@ window/size/viewport_width=704
 window/size/viewport_height=620
 window/size/window_width_override=704
 window/size/window_height_override=620
+window/size/resizable=false
+window/size/maximize_disabled=true
 window/stretch/mode="canvas_items"
 window/stretch/aspect="keep_width"
 
