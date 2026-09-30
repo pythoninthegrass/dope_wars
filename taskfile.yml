@@ -15,6 +15,7 @@ includes:
   core: taskfiles/core.yml
   extension: taskfiles/extension.yml
   game: taskfiles/game.yml
+  re: taskfiles/re.yml
 
 tasks:
   default:

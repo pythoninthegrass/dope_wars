@@ -7,7 +7,10 @@ anything missing. Mojo itself is not a mise tool: `task core:_install-venv`
 creates `core/.venv` and installs the exact pinned Mojo release
 (`MOJO_VERSION` in `taskfiles/core.yml`) into it via `uv pip install`; every
 `core:*` task depends on it, so it runs on demand rather than needing a
-separate setup step.
+separate setup step. Ghidra (reverse-engineering only, not needed to build or
+run the game) is a Homebrew formula rather than a mise tool: `re:_install-ghidra`
+in `taskfiles/re.yml` runs `brew install ghidra` on demand, and every `re:*`
+task depends on it.
 
 ```sh
 git clone <repo>

@@ -1,0 +1,15 @@
+# yaml-language-server: $schema=https://taskfile.dev/schema.json
+
+version: "3"
+
+vars:
+  GHIDRA_HEADLESS: "$(brew --prefix ghidra)/libexec/support/analyzeHeadless"
+
+tasks:
+  _install-ghidra:
+    internal: true
+    desc: "Install Ghidra via Homebrew when missing (reverse-engineering prerequisite; not a mise tool)"
+    cmds:
+      - brew install ghidra
+    status:
+      - test -x "{{.GHIDRA_HEADLESS}}"
