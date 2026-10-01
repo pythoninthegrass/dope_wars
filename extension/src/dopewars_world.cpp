@@ -127,9 +127,6 @@ void DopeWarsWorld::_bind_methods() {
 	BIND_CONSTANT(DW_ARRIVAL_FREE_DRUGS);
 	BIND_CONSTANT(DW_ARRIVAL_DOG_CHASE);
 	BIND_CONSTANT(DW_ARRIVAL_FOUND_DRUGS);
-	BIND_CONSTANT(DW_ARRIVAL_MAMAS_BROWNIES);
-	BIND_CONSTANT(DW_ARRIVAL_FREE_WEED_DEATH);
-	BIND_CONSTANT(DW_ARRIVAL_FLAVOR);
 
 	BIND_CONSTANT(DW_DEALER_NONE);
 	BIND_CONSTANT(DW_DEALER_COAT);
@@ -399,7 +396,7 @@ Dictionary DopeWarsWorld::roll_arrival_event() {
 		out["drug_index"] = event.drug_index;
 		out["qty"] = event.qty;
 		out["amount"] = event.amount;
-		out["damage"] = event.damage;
+		out["blocks"] = event.blocks;
 	}
 	return out;
 }

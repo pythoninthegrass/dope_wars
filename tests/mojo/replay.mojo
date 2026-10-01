@@ -5,7 +5,7 @@
 # world against the oracle's post-call snapshot. Any divergence fails with the
 # fixture, step and call named.
 #
-# The runner helpers (setPrices, setInventory, setField, buyCheapest,
+# The runner helpers (setPrices, setPrevPrices, setInventory, setField, buyCheapest,
 # insertHighScores, serializeRoundTrip) are the same ones tests/fixtures/README.md
 # obliges every port to implement. They exist so a fixture can drive the engine
 # into a specific state without depending on prior RNG history.
@@ -54,6 +54,22 @@ def _apply_set_prices(mut game: world.World, ref rec: record.Record) raises:
         if index < 0:
             raise Error("setPrices got an unknown drug: " + pair.path)
         game.set_price(index, pair.as_int(), False)
+
+
+# setPrevPrices replaces the previous market the arrival event draws its drugs from.
+def _apply_set_prev_prices(mut game: world.World, ref rec: record.Record) raises:
+    game.prev_price_order_len = 0
+    for i in range(rules.NUM_DRUGS):
+        game.prev_price_present[i] = 0
+        game.prev_price_value[i] = 0
+    for pair in rec.args.pairs:
+        var index = rules.find_drug_index(pair.path)
+        if index < 0:
+            raise Error("setPrevPrices got an unknown drug: " + pair.path)
+        game.prev_price_order[game.prev_price_order_len] = UInt8(index)
+        game.prev_price_order_len += 1
+        game.prev_price_present[index] = 1
+        game.prev_price_value[index] = pair.as_int()
 
 
 # setInventory replaces the whole inventory. The helper always uses avgPrice 0.
@@ -240,6 +256,8 @@ def run_step(mut game: world.World, ref rec: record.Record) raises:
         assert_equal(outcome.day, rec.ret.int_at("day"))
     elif call == "setPrices":
         _apply_set_prices(game, rec)
+    elif call == "setPrevPrices":
+        _apply_set_prev_prices(game, rec)
     elif call == "setInventory":
         _apply_set_inventory(game, rec)
     elif call == "setField":

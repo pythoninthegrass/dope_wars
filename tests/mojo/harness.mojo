@@ -210,14 +210,12 @@ def assert_arrival_event_matches(
         expected_kind = events.ARRIVAL_DOG_CHASE
     elif kind_name == "foundDrugs":
         expected_kind = events.ARRIVAL_FOUND_DRUGS
-    elif kind_name == "mamasBrownies":
-        expected_kind = events.ARRIVAL_MAMAS_BROWNIES
-    elif kind_name == "freeWeedDeath":
-        expected_kind = events.ARRIVAL_FREE_WEED_DEATH
-    elif kind_name == "flavor":
-        expected_kind = events.ARRIVAL_FLAVOR
     assert_equal(event.kind, expected_kind)
     if expected.has("drug"):
         assert_equal(event.drug_index, rules.find_drug_index(expected.string_at("drug")))
     if expected.has("qty"):
         assert_equal(event.qty, expected.int_at("qty"))
+    if expected.has("amount"):
+        assert_equal(event.amount, expected.int_at("amount"))
+    if expected.has("blocks"):
+        assert_equal(event.blocks, expected.int_at("blocks"))

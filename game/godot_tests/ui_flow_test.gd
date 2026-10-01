@@ -71,12 +71,12 @@ const CASES := [
 ## only caught a case that ran zero assertions; a case that died on its second
 ## check sailed past it. Keep these in sync when a case gains or loses a check.
 const CASE_FLOORS := {
-	"translation_keys_resolve": 210,
+	"translation_keys_resolve": 218,
 	"new_game_boot": 22,
 	"keyboard_shortcuts": 21,
 	"buy_sell_round_trip": 18,
 	"click_rebuilds_table": 11,
-	"travel_advances_day": 12,
+	"travel_advances_day": 11,
 	"persistence_round_trip": 16,
 	"finances": 7,
 	"typed_quantity": 21,

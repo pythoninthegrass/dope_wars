@@ -33,7 +33,7 @@ import travel
 import world as world_mod
 
 
-comptime DW_ABI_VERSION = 6
+comptime DW_ABI_VERSION = 7
 
 # dw_result values (include/dopewars.h). Frozen from ABI v1 onward.
 comptime DW_OK = Int32(0)
@@ -135,7 +135,7 @@ struct ArrivalEventView(Copyable, Movable):
     var drug_index: UInt32
     var qty: Int32
     var amount: Int32
-    var damage: Int32
+    var blocks: Int32
     var _pad1: Int32
 
 
@@ -857,7 +857,7 @@ def dw_roll_arrival_event(
                 drug_index,
                 Int32(event.qty),
                 Int32(event.amount),
-                Int32(event.damage),
+                Int32(event.blocks),
                 Int32(0),
             )
         )

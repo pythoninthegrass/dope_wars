@@ -28,6 +28,13 @@ comptime EXPENSIVE_MULTIPLY = 5
 comptime ABSENT_ODDS = 8
 comptime EVENT_ODDS = 20
 
+# The arrival event fires on Random(ARRIVAL_EVENT_ODDS) == 0, and always (as the mugging) above the wealth cap.
+comptime ARRIVAL_EVENT_ODDS = 14
+comptime EVENT_WEALTH_CAP = 99999999.0
+# Found and given drugs are drawn over Beermat's first 11 drug slots, so the last slot (weed) never turns up.
+comptime GIFT_DRUG_RANGE = 11
+comptime DOG_DROP_CAP = 10
+
 comptime COAT_MIN_POCKETS = 11
 comptime COAT_MAX_POCKETS = 20
 comptime COAT_MIN_PRICE = 201
@@ -120,3 +127,12 @@ def find_drug_index(id: String) -> Int:
         if table[i].id == id:
             return i
     return -1
+
+
+# Beermat's drug order, which its arrival-event rejection loops draw slots over.
+def beermat_slot_drug_index(slot: Int) -> Int:
+    var order = [
+        "acid", "cocaine", "hashish", "heroin", "ecstasy", "smack",
+        "opium", "crack", "peyote", "shrooms", "speed", "weed",
+    ]
+    return find_drug_index(order[slot])

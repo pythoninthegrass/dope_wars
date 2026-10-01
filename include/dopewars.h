@@ -57,7 +57,7 @@ extern "C" {
  * changes. Additive changes (new functions, new appended anonymous-enum
  * constants, new `#define`s that don't invalidate existing struct sizes)
  * do NOT bump this. See `docs/abi-contract.md` for the full policy. */
-#define DW_ABI_VERSION 6u
+#define DW_ABI_VERSION 7u
 
 /* The value above, readable at runtime.
  *
@@ -147,10 +147,10 @@ enum {
 /* Kind enums (uint8_t-typedef'd, never bare C enum)                       */
 /* ---------------------------------------------------------------------- */
 
-/* dw_arrival_event.kind — see `index.html:869-927` for the JS oracle's
- * percentile roll table. DW_ARRIVAL_NONE means the roll landed in the
- * no-event band (>=75%) or the branch degenerated to "nothing happens"
- * (e.g. free-drugs branch with no tradeable drug or no coat space). */
+/* dw_arrival_event.kind — Beermat's arrival event (docs/beermat-re.md, M-06).
+ * DW_ARRIVAL_NONE means the Random(14) chance missed or the drug outcome
+ * degenerated to "nothing happens" (full coat, or no eligible drug in the
+ * market the player left). FOUND_DRUGS and FREE_DRUGS are outcomes 0 and 2. */
 typedef uint8_t dw_arrival_event_kind;
 enum {
     DW_ARRIVAL_NONE = 0,
@@ -158,9 +158,6 @@ enum {
     DW_ARRIVAL_FREE_DRUGS = 2,
     DW_ARRIVAL_DOG_CHASE = 3,
     DW_ARRIVAL_FOUND_DRUGS = 4,
-    DW_ARRIVAL_MAMAS_BROWNIES = 5,
-    DW_ARRIVAL_FREE_WEED_DEATH = 6,
-    DW_ARRIVAL_FLAVOR = 7,
 };
 
 /* dw_roll_dealer_visit's *out_kind. At most one dealer visits per
@@ -293,15 +290,11 @@ DW_STATIC_ASSERT(sizeof(dw_price_event) == 8, "dw_price_event layout changed");
 
 /* One arrival event (structured payload only — presentation strings live
  * in GDScript, not in this ABI). Field usage by kind:
- *   MUGGED           -> amount = dollars lost (or damage taken if cash==0),
- *                       damage = HP lost when the "cashless mugging" path
- *                       fires, otherwise 0.
+ *   MUGGED           -> amount = dollars lost (0 when cash was 0).
  *   FREE_DRUGS       -> drug_index, qty granted.
- *   DOG_CHASE        -> drug_index, qty lost.
+ *   DOG_CHASE        -> blocks = blocks chased; qty = units dropped, with
+ *                       drug_index the dropped drug only when qty > 0.
  *   FOUND_DRUGS      -> drug_index, qty granted.
- *   MAMAS_BROWNIES   -> drug_index (weed or hashish), qty lost.
- *   FREE_WEED_DEATH  -> no payload; player is now dead.
- *   FLAVOR           -> amount = dollars spent on food.
  *   NONE             -> no payload. */
 typedef struct dw_arrival_event {
     dw_arrival_event_kind kind;
@@ -309,7 +302,7 @@ typedef struct dw_arrival_event {
     uint32_t              drug_index; /* < DW_NUM_DRUGS when meaningful */
     int32_t               qty;
     int32_t               amount;
-    int32_t               damage;
+    int32_t               blocks;
     int32_t               _pad1;      /* specified-zero */
 } dw_arrival_event;
 DW_STATIC_ASSERT(sizeof(dw_arrival_event) == 24, "dw_arrival_event layout changed");
@@ -576,11 +569,12 @@ dw_result dw_finances(dw_world *world, dw_finances_action action, int64_t amount
 /* Arrival / dealer events                                                 */
 /* ---------------------------------------------------------------------- */
 
-/* Roll one arrival event on entering the new location
- * (`index.html:869-927`). Populates *out_event; kind == DW_ARRIVAL_NONE
- * means nothing happened. State mutations (mugging cash loss, free-drug
- * inventory grant, dog-chase inventory loss, brownies loss, free-weed
- * death, flavor-food cash loss) are applied before this call returns. */
+/* Roll one arrival event on entering the new location (docs/beermat-re.md,
+ * M-06). Populates *out_event; kind == DW_ARRIVAL_NONE means nothing
+ * happened. State mutations (mugging cash loss, found or given inventory,
+ * police-dog drop) are applied before this call returns. Found and given
+ * drugs come from the previous market (see dw_generate_prices ordering in
+ * the arrival sequence), because Beermat rolls prices after the event. */
 dw_result dw_roll_arrival_event(dw_world *world, dw_arrival_event *out_event);
 
 /* Roll whether a dealer visits on this non-chase arrival: Random(14) == 0,

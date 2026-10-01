@@ -102,7 +102,7 @@ struct ArrivalEventView(Copyable, Movable):
     var drug_index: UInt32
     var qty: Int32
     var amount: Int32
-    var damage: Int32
+    var blocks: Int32
     var _pad1: Int32
 
 
@@ -206,7 +206,7 @@ def _world() -> Pointer[UInt8, origin=MutUntrackedOrigin]:
 
 
 def _config(seed: UInt32, num_days: UInt32 = 0, start_cash: Int32 = -1) -> Config:
-    return Config(UInt16(6), UInt16(0), seed, num_days, start_cash)
+    return Config(UInt16(7), UInt16(0), seed, num_days, start_cash)
 
 
 def _init(

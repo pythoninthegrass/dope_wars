@@ -142,14 +142,11 @@ const LBL_NUM_DAYS := "LBL_NUM_DAYS"
 const LBL_START_CASH := "LBL_START_CASH"
 const MSG_HOW_TO_PLAY := "MSG_HOW_TO_PLAY"
 
-const ARRIVAL_MUGGED_CASH := "ARRIVAL_MUGGED_CASH"
-const ARRIVAL_MUGGED_BEATEN := "ARRIVAL_MUGGED_BEATEN"
+const ARRIVAL_MUGGED := "ARRIVAL_MUGGED"
 const ARRIVAL_FREE_DRUGS := "ARRIVAL_FREE_DRUGS"
 const ARRIVAL_DOG_CHASE := "ARRIVAL_DOG_CHASE"
+const ARRIVAL_DOG_CHASE_DROPPED := "ARRIVAL_DOG_CHASE_DROPPED"
 const ARRIVAL_FOUND_DRUGS := "ARRIVAL_FOUND_DRUGS"
-const ARRIVAL_MAMAS_BROWNIES := "ARRIVAL_MAMAS_BROWNIES"
-const ARRIVAL_FREE_WEED_DEATH := "ARRIVAL_FREE_WEED_DEATH"
-const ARRIVAL_FLAVOR := "ARRIVAL_FLAVOR"
 
 
 # --- formatting -------------------------------------------------------------
@@ -248,28 +245,22 @@ static func price_event_message(kind: int, drug_id: String, drug_name: String) -
 	return t("MSG_PRICE_CRASH_" + drug_id.to_upper())
 
 
-## The arrival event (index.html:869-927) as a sentence. The core hands over a
-## structured dw_arrival_event, so the branch that JS picked with `state.cash
-## == 0` shows up here as `damage != 0` -- the mugging only deals damage on
-## the cashless path, and the header documents that pairing.
-static func arrival_message(event: Dictionary, drug_name: String) -> String:
+## The arrival event as Beermat's sentence (docs/beermat-re.md, M-06). The core
+## hands over a structured dw_arrival_event; `location_name` is where the
+## player is standing and `drug_name` the drug found, given or dropped.
+static func arrival_message(event: Dictionary, drug_name: String, location_name: String) -> String:
 	match int(event.get("kind", SimWorld.ARRIVAL_NONE)):
 		SimWorld.ARRIVAL_MUGGED:
-			if int(event.get("damage", 0)) != 0:
-				return t(ARRIVAL_MUGGED_BEATEN)
-			return t(ARRIVAL_MUGGED_CASH).format([group(int(event.get("amount", 0)))])
+			return t(ARRIVAL_MUGGED).format([location_name])
 		SimWorld.ARRIVAL_FREE_DRUGS:
-			return t(ARRIVAL_FREE_DRUGS).format([int(event.get("qty", 0)), drug_name])
+			return t(ARRIVAL_FREE_DRUGS).format([drug_name])
 		SimWorld.ARRIVAL_DOG_CHASE:
-			return t(ARRIVAL_DOG_CHASE).format([int(event.get("qty", 0)), drug_name])
+			var blocks := int(event.get("blocks", 0))
+			if int(event.get("qty", 0)) > 0:
+				return t(ARRIVAL_DOG_CHASE_DROPPED).format([blocks])
+			return t(ARRIVAL_DOG_CHASE).format([blocks])
 		SimWorld.ARRIVAL_FOUND_DRUGS:
-			return t(ARRIVAL_FOUND_DRUGS).format([int(event.get("qty", 0)), drug_name])
-		SimWorld.ARRIVAL_MAMAS_BROWNIES:
-			return t(ARRIVAL_MAMAS_BROWNIES).format([int(event.get("qty", 0)), drug_name])
-		SimWorld.ARRIVAL_FREE_WEED_DEATH:
-			return t(ARRIVAL_FREE_WEED_DEATH)
-		SimWorld.ARRIVAL_FLAVOR:
-			return t(ARRIVAL_FLAVOR).format([group(int(event.get("amount", 0)))])
+			return t(ARRIVAL_FOUND_DRUGS).format([int(event.get("qty", 0)), drug_name, location_name])
 	return ""
 
 

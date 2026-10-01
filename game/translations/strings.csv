@@ -103,11 +103,8 @@ MSG_NO_SCORES,No scores yet.
 LBL_NUM_DAYS,Number of days
 LBL_START_CASH,Starting cash
 MSG_HOW_TO_PLAY,"Buy low, sell high, dodge the cops, pay off Marks before he sends muscle, and cash out with the highest net worth by day {0}. Click a drug to Buy or Sell it, click a borough to travel (this is the only way to advance a day)."
-ARRIVAL_MUGGED_CASH,You were mugged in the subway! You lost ${0}.
-ARRIVAL_MUGGED_BEATEN,You were mugged in the subway! They beat you up instead.
-ARRIVAL_FREE_DRUGS,You meet a friend! He lays {0} units of {1} on you!
-ARRIVAL_DOG_CHASE,Police dogs chased you! You dropped {0} units of {1}.
-ARRIVAL_FOUND_DRUGS,You found {0} units of {1} on a dead dude in the subway!
-ARRIVAL_MAMAS_BROWNIES,Mama's brownies! You lost {0} units of {1}.
-ARRIVAL_FREE_WEED_DEATH,You hallucinated for three days... then you died because your brain disintegrated!
-ARRIVAL_FLAVOR,You stopped to get a bite to eat. That cost you ${0}.
+ARRIVAL_MUGGED,You were mugged on the {0}!
+ARRIVAL_FREE_DRUGS,You meet a friend! He lays some {0} on you!
+ARRIVAL_DOG_CHASE,Police dogs chased you for {0} blocks.
+ARRIVAL_DOG_CHASE_DROPPED,"Police dogs chased you for {0} blocks. You dropped some drugs! That's a drag, man!"
+ARRIVAL_FOUND_DRUGS,You find {0} units of {1} on a dead dude in the {2}!
