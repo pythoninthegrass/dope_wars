@@ -48,5 +48,5 @@ const ABI = {
 # ABI identity, read from the header's DW_ABI_VERSION #define. Not a copy:
 # a bump to the header moves this, and a shim still reporting the old value
 # fails the bridge test.
-const DW_ABI_VERSION: int = 3
+const DW_ABI_VERSION: int = 4
 

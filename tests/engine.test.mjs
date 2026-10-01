@@ -116,15 +116,88 @@ describe('newGame', () => {
   })
 })
 
-describe('generatePrices', () => {
-  test('produces a roster within the borough min/max drug count', () => {
-    const state = Engine.newGame({ seed: 7 })
-    for (let i = 0; i < 50; i++) {
-      Engine.generatePrices(state)
-      const loc = Engine.RULES.locations.find((l) => l.id === state.location)
-      const count = Object.keys(state.prices).length
-      assert.ok(count >= loc.minDrugs && count <= loc.maxDrugs, `count ${count} outside [${loc.minDrugs},${loc.maxDrugs}]`)
+// Builds the rng draw sequence generatePrices consumes: per drug, in engine order, price then availability then the spike and crash rolls (drawn even when the drug is absent), then the bust/addicts pick only for an available spike hit.
+function priceDraws(drugs, { absent = new Set(), spike = false, crash = false } = {}) {
+  const draws = []
+  for (const drug of drugs) {
+    const available = !absent.has(drug.id)
+    draws.push(0)
+    draws.push(available ? 0.999 : 0)
+    if (drug.expensive) {
+      const hit = spike
+      draws.push(hit ? 0 : 0.999)
+      if (hit && available) draws.push(0)
     }
+    if (drug.cheap) draws.push(crash ? 0 : 0.999)
+  }
+  return draws
+}
+
+function scriptedRng(draws) {
+  let i = 0
+  const rng = () => {
+    if (i >= draws.length) throw new Error(`rng exhausted after ${draws.length} draws`)
+    return draws[i++]
+  }
+  rng.drawn = () => i
+  return rng
+}
+
+describe('generatePrices', () => {
+  test('locations carry no per-borough drug count', () => {
+    for (const loc of Engine.RULES.locations) {
+      assert.equal('minDrugs' in loc, false, loc.id)
+      assert.equal('maxDrugs' in loc, false, loc.id)
+    }
+  })
+
+  test('each drug is unavailable about 1 time in 8 at every location', () => {
+    const state = Engine.newGame({ seed: 8 })
+    const n = 3000
+    for (const loc of Engine.RULES.locations) {
+      state.location = loc.id
+      const absent = {}
+      for (let i = 0; i < n; i++) {
+        Engine.generatePrices(state)
+        for (const drug of Engine.RULES.drugs) {
+          if (!(drug.id in state.prices)) absent[drug.id] = (absent[drug.id] || 0) + 1
+        }
+      }
+      for (const drug of Engine.RULES.drugs) {
+        const rate = (absent[drug.id] || 0) / n
+        assert.ok(rate > 0.10 && rate < 0.15, `${loc.id} ${drug.id} absent rate ${rate}`)
+      }
+    }
+  })
+
+  test('the traded count can be anywhere from none to all twelve drugs', () => {
+    const drugs = Engine.RULES.drugs
+    const none = Engine.newGame({ seed: 1 })
+    none.rng = scriptedRng(priceDraws(drugs, { absent: new Set(drugs.map((d) => d.id)) }))
+    Engine.generatePrices(none)
+    assert.equal(Object.keys(none.prices).length, 0)
+    assert.deepEqual([...none.priceEvents], [])
+
+    const all = Engine.newGame({ seed: 1 })
+    all.rng = scriptedRng(priceDraws(drugs))
+    Engine.generatePrices(all)
+    assert.equal(Object.keys(all.prices).length, drugs.length)
+  })
+
+  test('draws per drug are price, availability, then the flagged spike and crash rolls, even for an absent drug', () => {
+    const drugs = Engine.RULES.drugs
+    const flagged = drugs.filter((d) => d.cheap).length + drugs.filter((d) => d.expensive).length
+    const expectedDraws = drugs.length * 2 + flagged
+    const state = Engine.newGame({ seed: 1 })
+    const absent = new Set(['acid', 'cocaine'])
+    const rng = scriptedRng(priceDraws(drugs, { absent, spike: true, crash: true }))
+    state.rng = rng
+    Engine.generatePrices(state)
+    assert.equal(rng.drawn(), expectedDraws + drugs.filter((d) => d.expensive && !absent.has(d.id)).length)
+    assert.equal('acid' in state.prices, false)
+    assert.equal('cocaine' in state.prices, false)
+    assert.equal(state.priceEvents.some((e) => absent.has(e.drug)), false)
+    assert.ok(state.priceEvents.some((e) => e.drug === 'heroin'))
   })
 
   test('every listed price is within the drug base range, or scaled x5 / div 10 for an event', () => {
@@ -142,7 +215,7 @@ describe('generatePrices', () => {
 
   test('when every 1-in-20 roll hits, each available spike drug costs min x5 and each crash drug min div 10', () => {
     const state = Engine.newGame({ seed: 5 })
-    state.rng = () => 0
+    state.rng = scriptedRng(priceDraws(Engine.RULES.drugs, { spike: true, crash: true }))
     Engine.generatePrices(state)
     assert.equal(Engine.RULES.expensiveMultiply, 5)
     assert.equal(Engine.RULES.cheapDivide, 10)
@@ -177,7 +250,7 @@ describe('generatePrices', () => {
 
   test('a spike message is one of the two Beermat texts, drawn about 50/50', () => {
     const forced = Engine.newGame({ seed: 5 })
-    forced.rng = () => 0
+    forced.rng = scriptedRng(priceDraws(Engine.RULES.drugs, { spike: true }))
     Engine.generatePrices(forced)
     const forcedSpikes = forced.priceEvents.filter((e) => e.type === 'bust' || e.type === 'expensive')
     assert.ok(forcedSpikes.length > 0)
@@ -241,14 +314,16 @@ describe('generatePrices', () => {
     assert.ok(rate > 0.04 && rate < 0.06, `event rate ${rate}`)
   })
 
-  test('a drug not selected this stop is absent from prices (not tradeable)', () => {
+  test('an unavailable drug is absent from prices and can be neither bought nor sold', () => {
     const state = Engine.newGame({ seed: 3 })
+    state.rng = scriptedRng(priceDraws(Engine.RULES.drugs, { absent: new Set(['speed']) }))
     Engine.generatePrices(state)
-    for (const drug of Engine.RULES.drugs) {
-      if (!(drug.id in state.prices)) {
-        assert.equal(Engine.buy(state, drug.id, 1).ok, false)
-      }
-    }
+    assert.equal('speed' in state.prices, false)
+    state.inventory = { speed: { qty: 3, avgPrice: 100 } }
+    assert.equal(Engine.buy(state, 'speed', 1).ok, false)
+    const sold = Engine.sell(state, 'speed', 1)
+    assert.equal(sold.ok, false)
+    assert.equal(state.inventory.speed.qty, 3)
   })
 })
 

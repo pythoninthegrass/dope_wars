@@ -651,12 +651,12 @@
       gunSpace: 4,
       playerArmor: 100,
       locations: [
-        { id: 'bronx', name: 'Bronx', police: 10, minDrugs: 7, maxDrugs: 12 },
-        { id: 'ghetto', name: 'Ghetto', police: 5, minDrugs: 8, maxDrugs: 12 },
-        { id: 'centralpark', name: 'Central Park', police: 15, minDrugs: 6, maxDrugs: 12 },
-        { id: 'manhattan', name: 'Manhattan', police: 90, minDrugs: 4, maxDrugs: 10 },
-        { id: 'coneyisland', name: 'Coney Island', police: 20, minDrugs: 6, maxDrugs: 12 },
-        { id: 'brooklyn', name: 'Brooklyn', police: 70, minDrugs: 4, maxDrugs: 11 },
+        { id: 'bronx', name: 'Bronx', police: 10 },
+        { id: 'ghetto', name: 'Ghetto', police: 5 },
+        { id: 'centralpark', name: 'Central Park', police: 15 },
+        { id: 'manhattan', name: 'Manhattan', police: 90 },
+        { id: 'coneyisland', name: 'Coney Island', police: 20 },
+        { id: 'brooklyn', name: 'Brooklyn', police: 70 },
       ],
       drugs: [
         { id: 'acid', name: 'Acid', min: 1000, max: 4500, cheap: true, expensive: false, crashMessage: 'The market has been flooded with cheap home-made acid!' },
@@ -672,6 +672,7 @@
         { id: 'speed', name: 'Speed', min: 70, max: 250, cheap: false, expensive: true },
         { id: 'weed', name: 'Weed', min: 300, max: 900, cheap: true, expensive: false, crashMessage: 'Columbian freighter dusted the Coast Guard!  Weed prices have bottomed out!' },
       ],
+      absentOdds: 8,
       eventOdds: 20,
       cheapDivide: 10,
       expensiveMultiply: 5,
@@ -718,43 +719,30 @@
 
     function generatePrices(state) {
       state.prevPrices = state.prices || {};
-      const loc = findLocation(state.location);
       const rng = state.rng;
-      const targetCount = randInt(rng, loc.minDrugs, loc.maxDrugs);
-      const available = RULES.drugs.slice();
-      shuffle(available, rng);
-      const traded = new Set(available.slice(0, targetCount).map((d) => d.id));
-
       const prices = {};
       const events = [];
       for (const drug of RULES.drugs) {
-        if (!traded.has(drug.id)) continue;
         let price = randInt(rng, drug.min, drug.max);
-        if (drug.expensive && randInt(rng, 0, RULES.eventOdds - 1) === 0) {
+        const available = randInt(rng, 0, RULES.absentOdds - 1) !== 0;
+        // Spike and crash rolls are drawn for every flagged drug, but only take effect on an available one.
+        if (drug.expensive && randInt(rng, 0, RULES.eventOdds - 1) === 0 && available) {
           price *= RULES.expensiveMultiply;
           const bust = randInt(rng, 0, 1) === 0;
           events.push(bust
             ? { type: 'bust', drug: drug.id, message: `Cops made a big ${drug.name} bust!  Prices are outrageous!` }
             : { type: 'expensive', drug: drug.id, message: `Addicts are buying ${drug.name} at outrageous prices!` });
         }
-        if (drug.cheap && randInt(rng, 0, RULES.eventOdds - 1) === 0) {
+        if (drug.cheap && randInt(rng, 0, RULES.eventOdds - 1) === 0 && available) {
           price = Math.floor(price / RULES.cheapDivide);
           events.push({ type: 'cheap', drug: drug.id, message: drug.crashMessage });
         }
-        prices[drug.id] = price;
+        if (available) prices[drug.id] = price;
       }
 
       state.prices = prices;
       state.priceEvents = events;
       return events;
-    }
-
-    function shuffle(arr, rng) {
-      for (let i = arr.length - 1; i > 0; i--) {
-        const j = randInt(rng, 0, i);
-        const tmp = arr[i]; arr[i] = arr[j]; arr[j] = tmp;
-      }
-      return arr;
     }
 
     function buy(state, drugId, qty) {

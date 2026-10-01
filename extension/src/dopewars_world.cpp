@@ -701,8 +701,6 @@ Array DopeWarsWorld::rules_locations() {
 		entry["id"] = String::utf8(locations[i].id, static_cast<int>(strnlen(locations[i].id, DW_MAX_LOCATION_ID_LEN)));
 		entry["name"] = String::utf8(locations[i].name, static_cast<int>(strnlen(locations[i].name, DW_MAX_LOCATION_NAME_LEN)));
 		entry["police"] = locations[i].police;
-		entry["min_drugs"] = locations[i].min_drugs;
-		entry["max_drugs"] = locations[i].max_drugs;
 		out.push_back(entry);
 	}
 	return out;

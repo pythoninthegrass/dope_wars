@@ -26,6 +26,7 @@ comptime GUN_SPACE = 4
 comptime PLAYER_ARMOR = 100
 comptime CHEAP_DIVIDE = 10
 comptime EXPENSIVE_MULTIPLY = 5
+comptime ABSENT_ODDS = 8
 comptime EVENT_ODDS = 20
 comptime BANK_PURCHASE_FEE = 0.25
 
@@ -48,22 +49,16 @@ struct Location:
     var id: String
     var name: String
     var police: Int64
-    var min_drugs: Int64
-    var max_drugs: Int64
 
     def __init__(
         out self,
         id: String,
         name: String,
         police: Int64,
-        min_drugs: Int64,
-        max_drugs: Int64,
     ):
         self.id = id
         self.name = name
         self.police = police
-        self.min_drugs = min_drugs
-        self.max_drugs = max_drugs
 
 
 struct Drug:
@@ -93,12 +88,12 @@ struct Drug:
 
 def locations() -> List[Location]:
     return [
-        Location("bronx", "Bronx", 10, 7, 12),
-        Location("ghetto", "Ghetto", 5, 8, 12),
-        Location("centralpark", "Central Park", 15, 6, 12),
-        Location("manhattan", "Manhattan", 90, 4, 10),
-        Location("coneyisland", "Coney Island", 20, 6, 12),
-        Location("brooklyn", "Brooklyn", 70, 4, 11),
+        Location("bronx", "Bronx", 10),
+        Location("ghetto", "Ghetto", 5),
+        Location("centralpark", "Central Park", 15),
+        Location("manhattan", "Manhattan", 90),
+        Location("coneyisland", "Coney Island", 20),
+        Location("brooklyn", "Brooklyn", 70),
     ]
 
 

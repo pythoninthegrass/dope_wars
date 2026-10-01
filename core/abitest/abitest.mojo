@@ -44,9 +44,6 @@ struct LocationView(Copyable, Movable):
     var id: Array[UInt8, 32]
     var name: Array[UInt8, 32]
     var police: UInt32
-    var min_drugs: UInt32
-    var max_drugs: UInt32
-    var _pad0: UInt32
 
 
 @fieldwise_init
@@ -217,7 +214,7 @@ def _world() -> Pointer[UInt8, origin=MutUntrackedOrigin]:
 
 
 def _config(seed: UInt32, num_days: UInt32 = 0, start_cash: Int32 = -1) -> Config:
-    return Config(UInt16(3), UInt16(0), seed, num_days, start_cash)
+    return Config(UInt16(4), UInt16(0), seed, num_days, start_cash)
 
 
 def _init(
@@ -328,7 +325,7 @@ def _bytes_to_string[N: Int](arr: Array[UInt8, N]) -> String:
 
 def test_struct_sizes_match_header() raises:
     assert_equal(size_of[Config](), 16)
-    assert_equal(size_of[LocationView](), 80)
+    assert_equal(size_of[LocationView](), 68)
     assert_equal(size_of[DrugView](), 76)
     assert_equal(size_of[StateView](), 56)
     assert_equal(size_of[InventorySlot](), 16)
@@ -572,13 +569,13 @@ def test_two_call_world_dump() raises:
 
 
 def test_two_call_rules_copies() raises:
-    var dummy_loc = LocationView(Array[UInt8, 32](fill=0), Array[UInt8, 32](fill=0), UInt32(0), UInt32(0), UInt32(0), UInt32(0))
+    var dummy_loc = LocationView(Array[UInt8, 32](fill=0), Array[UInt8, 32](fill=0), UInt32(0))
     var required: UInt = 0
     assert_equal(external_call["dw_rules_locations_copy", Int32](Pointer(to=dummy_loc), UInt(0), Pointer(to=required)), DW_OK)
     assert_equal(required, UInt(DW_NUM_LOCATIONS))
     var locations = List[LocationView]()
     for _ in range(Int(required)):
-        locations.append(LocationView(Array[UInt8, 32](fill=0), Array[UInt8, 32](fill=0), UInt32(0), UInt32(0), UInt32(0), UInt32(0)))
+        locations.append(LocationView(Array[UInt8, 32](fill=0), Array[UInt8, 32](fill=0), UInt32(0)))
     var actual: UInt = 0
     assert_equal(external_call["dw_rules_locations_copy", Int32](locations.unsafe_ptr(), required, Pointer(to=actual)), DW_OK)
     assert_equal(actual, required)
@@ -814,7 +811,7 @@ def test_combat_flow() raises:
     # beermat-verified (TASK-009): deputies is randInt(2, 11), no longer a
     # deterministic function of day alone -- this is seed 7's actual draw
     # after should_start_chase's one draw.
-    assert_equal(chase.deputies, UInt32(3))
+    assert_equal(chase.deputies, UInt32(11))
     assert_equal(chase.can_fight, UInt8(0))
 
     var ratings = FightRatingsView(UInt32(0), UInt32(0))

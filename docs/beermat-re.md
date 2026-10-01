@@ -35,9 +35,9 @@ Classifications compare each rule with the prototype engine (`index.html`, `<scr
 | --- | --- | --- | --- | --- |
 | Drug records | `0x0045c260` (calls `0x0045d09c` 12 times) | see table below | `index.html:641-705` RULES.drugs, same min/max as Beermat; the crash flag is stored as `cheap` and the spike flag as `expensive` | match (M-01, TASK-010.02.01) |
 | Price roll | `0x0045d120` | `price = Random(spread + 1) + min`, re-rolled for all 12 drugs on every arrival and at new game | `randInt(min, max)` per listed drug | match, including the numbers (M-01) |
-| Availability | `0x0045d120` | each drug is independently absent with probability 1/8 (`Random(8) == 0` clears the available flag), at every location | per-location count `minDrugs..maxDrugs` of a random subset; Bronx 7-12, Ghetto 8-12, Central Park 6-12, Manhattan 4-10, Coney Island 6-12, Brooklyn 4-11 | **mismatch M-03** |
-| Price spike | `0x0045d120` | only for drugs with the spike flag, only if available: `Random(20) == 0` then `price *= 5`; the message is `Random(2)` between "Cops made a big `<drug>` bust!  Prices are outrageous!" and "Addicts are buying `<drug>` at outrageous prices!" | for each traded spike-flagged drug, in drug-index order: `randInt(0, 19) == 0` multiplies the price by 5 and a following `randInt(0, 1)` picks the bust text (0) or the "Addicts are buying ..." text (1); events are `bust` and `expensive` | match (M-02, TASK-010.02.02) |
-| Price crash | `0x0045d120` | only for drugs with the crash flag, only if available: `Random(20) == 0` then `price = price div 10`; a fixed message per drug (acid, hashish, ecstasy, weed) | for each traded crash-flagged drug: `randInt(0, 19) == 0` divides the price by 10 (integer division) with the fixed per-drug message below; the event is `cheap` | match (M-02, TASK-010.02.02) |
+| Availability | `0x0045d120` | each drug is independently absent with probability 1/8 (`Random(8) == 0` clears the available flag), at every location | `randInt(0, 7) == 0` per drug, drawn right after the price roll, at every location; `RULES.absentOdds` is 8 and locations carry no drug count, so 0 to 12 drugs can be traded | match (M-03, TASK-010.02.03) |
+| Price spike | `0x0045d120` | only for drugs with the spike flag, only if available: `Random(20) == 0` then `price *= 5`; the message is `Random(2)` between "Cops made a big `<drug>` bust!  Prices are outrageous!" and "Addicts are buying `<drug>` at outrageous prices!" | for each available spike-flagged drug, in drug-index order: `randInt(0, 19) == 0` multiplies the price by 5 and a following `randInt(0, 1)` picks the bust text (0) or the "Addicts are buying ..." text (1); events are `bust` and `expensive` | match (M-02, TASK-010.02.02) |
+| Price crash | `0x0045d120` | only for drugs with the crash flag, only if available: `Random(20) == 0` then `price = price div 10`; a fixed message per drug (acid, hashish, ecstasy, weed) | for each available crash-flagged drug: `randInt(0, 19) == 0` divides the price by 10 (integer division) with the fixed per-drug message below; the event is `cheap` | match (M-02, TASK-010.02.02) |
 | Selling an absent drug | `0x0045e884` | refused: "There is no `<drug>` on the market here?" | refused when the price is unset | match |
 | Buying | `0x0045e448` | quantity at most `cash div price`; zero means "Duh ! Check the price of `<drug>` out, dude!"; pockets full means "Erm, your pockets are full, dude."; the dialog default is `min(free space, affordable)` | same floor division and "Duh! Check the price" text | match |
 | Average cost | `0x0045e448` | `(qty * price + held * avg) div (held + qty)`, integer division | float average, no truncation | **mismatch M-12** (display only) |
@@ -51,7 +51,7 @@ The crash messages, indexed by the drug-record position at `0x0045d120` (acid 0,
 | Ecstasy | "Rival dealers raided a pharmacy and are selling cheap ecstasy!" |
 | Weed | "Columbian freighter dusted the Coast Guard!  Weed prices have bottomed out!" |
 
-The engine still draws availability its own way until M-03 (it picks the traded set first, then rolls price, spike and crash only for traded drugs), whereas Beermat rolls the spike and crash chance for every flagged drug and then checks availability. The per-drug probabilities and effects are identical; only the RNG draw order differs.
+Per drug the engine draws, in engine (alphabetical) drug order and matching the Beermat order within a drug: the price, the availability roll, the spike roll if spike-flagged (plus the bust-or-addicts pick only when the spike hits an available drug), then the crash roll if crash-flagged. The spike and crash rolls are drawn even for an absent drug and simply have no effect, exactly as in `0x0045d120`.
 
 Drug records as built at `0x0045c260`. `min` and `spread` are the fifth and sixth `0x0045d09c` arguments (`price = Random(spread + 1) + min`, so the maximum is `min + spread`). The crash and spike columns are the byte flags at record offsets `+0x19` and `+0x18`. The engine keeps its own alphabetical drug order (acid, cocaine, crack, ecstasy, ...) rather than the Beermat index order, so RNG draws per drug follow the engine order.
 
@@ -164,7 +164,7 @@ No sound plays for the dealer offers, finances, price events, travel itself, vic
 
 ## Intentional differences
 
-Recorded in `docs/parity-deltas.md` section 5. The location model (one city of six named sub-locations, `cities.txt`) and the borough and city names are not fidelity targets. The per-borough police weights and drug counts in the engine are a separate matter: they affect chase and availability odds, which are game rules, so they are listed as M-03 and M-04 rather than waved through under the location model.
+Recorded in `docs/parity-deltas.md` section 5. The location model (one city of six named sub-locations, `cities.txt`) and the borough and city names are not fidelity targets. The per-borough police weights in the engine are a separate matter: they affect chase odds, which are a game rule, so they are listed as M-04 rather than waved through under the location model. The per-borough drug counts were M-03 and are gone.
 
 ## Oracle checks
 
@@ -182,7 +182,7 @@ Checked on the live oracle (see `CLAUDE.local.md` for how to reach it; none of t
 | --- | --- | --- | --- |
 | M-01 | Drug table names, ranges and flags (fixed, match) | Drug table | TASK-010.02.01 |
 | M-02 | Price spike and crash events (fixed, match) | Drug table | TASK-010.02.02 |
-| M-03 | Drug availability (1/8 absent, location independent) | Drug table | TASK-010.02.03 |
+| M-03 | Drug availability (1/8 absent, location independent; fixed, match) | Drug table | TASK-010.02.03 |
 | M-04 | Chase start chance (1 in 6, flat) | Travel | TASK-010.02.04 |
 | M-05 | Dealer visits, coat and gun prices, payment | Arrival events | TASK-010.02.05 |
 | M-06 | Arrival event table | Arrival events | TASK-010.02.06 |

@@ -10,8 +10,8 @@
 ; width, so widening the window would only stretch it.
 ;
 ; The window is not resizable at all (resizable=false, maximize_disabled=true).
-; Both tables are capped at the twelve drugs of DW_NUM_DRUGS -- the four
-; boroughs with maxDrugs: 12 can trade every drug at once -- and twelve rows
+; Both tables are capped at the twelve drugs of DW_NUM_DRUGS -- every drug
+; can be available at once, at any borough -- and twelve rows
 ; measure 236px against the 329px the tables already get at this height, so
 ; there is no size the player could need that this one does not already cover.
 ; Resizing is also visibly broken on macOS: Godot renders into an unflipped

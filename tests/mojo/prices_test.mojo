@@ -15,7 +15,7 @@ import record
 import prices
 import rules
 import world
-from std.testing import assert_equal, assert_true, TestSuite
+from std.testing import assert_equal, assert_false, assert_true, TestSuite
 
 
 def _fixture_records(name: String) raises -> List[record.Record]:
@@ -45,22 +45,43 @@ def test_fixture_01_replays_step_by_step() raises:
         harness.assert_state_matches(game, steps[i].state)
 
 
-def _constant_script(value: Float64) -> List[Float64]:
+def _price_draws(absent: List[Int], spike: Bool, crash: Bool) -> List[Float64]:
+    # The draw sequence generate_prices consumes: per drug, price, availability,
+    # then the flagged spike and crash rolls (drawn even for an absent drug),
+    # then the bust/addicts pick only for an available spike hit.
+    var table = rules.drugs()
     var script = List[Float64]()
-    for _ in range(200):
-        script.append(value)
+    for i in range(rules.NUM_DRUGS):
+        var available = True
+        for a in absent:
+            if a == i:
+                available = False
+        script.append(0.0)
+        script.append(0.999 if available else 0.0)
+        if table[i].expensive:
+            script.append(0.0 if spike else 0.999)
+            if spike and available:
+                script.append(0.0)
+        if table[i].cheap:
+            script.append(0.0 if crash else 0.999)
     return script^
+
+
+def _all_drugs() -> List[Int]:
+    var out = List[Int]()
+    for i in range(rules.NUM_DRUGS):
+        out.append(i)
+    return out^
 
 
 def test_every_roll_hitting_spikes_and_crashes_each_flagged_drug() raises:
     var game = world.new_game(UInt32(5), 0, -1)
-    game.rng.set_script(_constant_script(0.0))
+    game.rng.set_script(_price_draws(List[Int](), True, True))
     var events = prices.generate_prices(game)
     var table = rules.drugs()
     var expected_events = 0
     for i in range(rules.NUM_DRUGS):
-        if not game.has_price(i):
-            continue
+        assert_true(game.has_price(i))
         ref drug = table[i]
         if drug.expensive:
             expected_events += 1
@@ -81,14 +102,37 @@ def test_every_roll_hitting_spikes_and_crashes_each_flagged_drug() raises:
 
 def test_no_roll_hitting_leaves_every_price_in_its_base_range() raises:
     var game = world.new_game(UInt32(5), 0, -1)
-    game.rng.set_script(_constant_script(0.999))
+    game.rng.set_script(_price_draws(List[Int](), False, False))
     var events = prices.generate_prices(game)
     assert_equal(len(events), 0)
     var table = rules.drugs()
     for i in range(rules.NUM_DRUGS):
-        if game.has_price(i):
-            assert_true(game.price_value[i] >= table[i].min_price)
-            assert_true(game.price_value[i] <= table[i].max_price)
+        assert_true(game.has_price(i))
+        assert_true(game.price_value[i] >= table[i].min_price)
+        assert_true(game.price_value[i] <= table[i].max_price)
+
+
+def test_every_drug_can_be_unavailable_at_once() raises:
+    var game = world.new_game(UInt32(5), 0, -1)
+    game.rng.set_script(_price_draws(_all_drugs(), True, True))
+    var events = prices.generate_prices(game)
+    assert_equal(game.price_count(), 0)
+    assert_equal(len(events), 0)
+
+
+def test_absent_drug_still_consumes_its_event_rolls_but_never_fires_them() raises:
+    # Acid (crash) and cocaine (spike) absent; every other roll hits.
+    var table = rules.drugs()
+    var absent: List[Int] = [0, 1]
+    var script = _price_draws(absent, True, True)
+    var game = world.new_game(UInt32(5), 0, -1)
+    game.rng.set_script(script)
+    var events = prices.generate_prices(game)
+    assert_equal(game.rng._script_pos, len(script))
+    assert_false(game.has_price(0))
+    assert_false(game.has_price(1))
+    for event in events:
+        assert_true(event.drug_index > 1)
 
 
 def test_spike_events_fit_the_event_buffer() raises:

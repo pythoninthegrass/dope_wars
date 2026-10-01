@@ -169,6 +169,7 @@ float64, so save/load stays bit-exact.
   event-count scheme, changing RNG draw order. `DW_PRICE_EVENT_BUST` (2) is a
   new kind for the cops-bust spike text. `MAX_PRICE_EVENTS` grew from 3 to 8,
   so the dump grew from 766 to 846 bytes.
+- **v4 (TASK-010.02.03)**: `dw_generate_prices` rolls each drug's availability (1 in 8 absent, at every location) in place of the per-location shuffled subset, changing RNG draw order. `dw_location_view` lost `min_drugs`, `max_drugs` and `_pad0`, so it shrank from 80 to 68 bytes; `dw_rules_locations_copy` now reports only `id`, `name` and `police`. The dump length is unchanged.
 
 ## Serialization
 
