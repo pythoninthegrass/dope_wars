@@ -1,10 +1,10 @@
 ---
 id: TASK-010.01
 title: 'Extract DFM forms, strings, VMT method map and sound table from DopeWars.exe'
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-09-30 05:01'
-updated_date: '2026-09-30 05:11'
+updated_date: '2026-10-01 03:02'
 labels:
   - reverse-engineering
 dependencies: []
@@ -33,8 +33,6 @@ Build a tested, repeatable extractor for `vendor/dopewars-1999/DopeWars.exe` (PE
 - [ ] #8 tools/re/extract_beermat.py exits 2 with a clear message when the exe is missing
 <!-- AC:END -->
 
-
-
 ## Implementation Plan
 
 <!-- SECTION:PLAN:BEGIN -->
@@ -55,3 +53,9 @@ Build a tested, repeatable extractor for `vendor/dopewars-1999/DopeWars.exe` (PE
 11. Rules: commit nothing derived from the exe (only tools/re/**, taskfiles/re.yml and docs). One-line comments only, none saying "new" or "improved". Follow AGENTS.md. Run `ruff format tools/re` before committing. Conventional commits (`feat(re): ...`, `test(re): ...`), no Claude attribution anywhere. Do not touch CLAUDE.local.md or read any infra details.
 12. Finish: check each acceptance criterion with `task_edit` (`acceptanceCriteriaCheck`), add implementationNotes with the exact commands run and a result summary (form count, method count, sound row count, labels applied), set status Done, and commit. Do not start TASK-010.02.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Split into subtasks TASK-010.01.01 to .04. .01 (extractor skeleton, TPF0 form decoder, re:test and re:extract) is Done: 8 forms decoded from the real exe. .02 (sound table and strings), .03 (VMT method map) and .04 (Ghidra labels and re:apply-labels-check, then close this task) remain To Do. Acceptance criteria #1, #4, #5, #7 and #8 are met so far; check them off when .04 closes this task.
+<!-- SECTION:NOTES:END -->
