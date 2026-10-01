@@ -217,7 +217,7 @@ def _world() -> Pointer[UInt8, origin=MutUntrackedOrigin]:
 
 
 def _config(seed: UInt32, num_days: UInt32 = 0, start_cash: Int32 = -1) -> Config:
-    return Config(UInt16(8), UInt16(0), seed, num_days, start_cash)
+    return Config(UInt16(9), UInt16(0), seed, num_days, start_cash)
 
 
 def _init(

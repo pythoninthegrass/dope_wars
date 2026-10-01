@@ -10,12 +10,10 @@
 #   3. dead
 #   4. the game is over (day >= numDays)
 #
-# Interest is applied on the way out: debt compounds at 10% and is rounded to a
-# whole dollar, bank compounds at 5% (beermat-verified, TASK-009) and is left
-# fractional. That asymmetry is the original's, and it is why bank is a
-# Float64 in the world while debt is always integral.
+# Interest is applied on the way out: debt compounds at 10% and bank at 5%, each
+# rounded to a whole dollar and skipped at a balance of 0 or less (see interest).
 
-import jsmath
+import interest
 import prices
 import result
 import rules
@@ -33,8 +31,8 @@ def travel(mut game: world.World, dest_index: Int) raises -> result.Outcome:
         return result.Outcome(result.ERR_GAME_OVER)
 
     game.day += 1
-    game.debt = Float64(jsmath.js_round(game.debt * (1.0 + rules.DEBT_INTEREST)))
-    game.bank = game.bank * (1.0 + rules.BANK_INTEREST)
+    game.debt = Float64(interest.debt_after_interest(Int64(game.debt)))
+    game.bank = Float64(interest.bank_after_interest(Int64(game.bank)))
     game.location_index = dest_index
     _ = prices.generate_prices(game)
     return result.Outcome(result.OK)
