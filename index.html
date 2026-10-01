@@ -651,12 +651,12 @@
       gunSpace: 4,
       playerArmor: 100,
       locations: [
-        { id: 'bronx', name: 'Bronx', police: 10 },
-        { id: 'ghetto', name: 'Ghetto', police: 5 },
-        { id: 'centralpark', name: 'Central Park', police: 15 },
-        { id: 'manhattan', name: 'Manhattan', police: 90 },
-        { id: 'coneyisland', name: 'Coney Island', police: 20 },
-        { id: 'brooklyn', name: 'Brooklyn', police: 70 },
+        { id: 'bronx', name: 'Bronx' },
+        { id: 'ghetto', name: 'Ghetto' },
+        { id: 'centralpark', name: 'Central Park' },
+        { id: 'manhattan', name: 'Manhattan' },
+        { id: 'coneyisland', name: 'Coney Island' },
+        { id: 'brooklyn', name: 'Brooklyn' },
       ],
       drugs: [
         { id: 'acid', name: 'Acid', min: 1000, max: 4500, cheap: true, expensive: false, crashMessage: 'The market has been flooded with cheap home-made acid!' },
@@ -944,10 +944,9 @@
       return { ok: true, usedBank: false };
     }
 
-    // Cop Chase weighted by the borough's police presence, docs/gameplay.md:94.
+    // Beermat starts a chase on Random(6) == 0, the same at every location (docs/beermat-re.md, M-04).
     function shouldStartChase(state, rng) {
-      const loc = findLocation(state.location);
-      return randInt(rng, 0, 80 + loc.police) >= 50;
+      return randInt(rng, 0, 5) === 0;
     }
 
     function startChase(state, rng) {

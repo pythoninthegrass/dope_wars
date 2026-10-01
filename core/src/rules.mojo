@@ -48,17 +48,10 @@ comptime NUM_DRUGS = 12
 struct Location:
     var id: String
     var name: String
-    var police: Int64
 
-    def __init__(
-        out self,
-        id: String,
-        name: String,
-        police: Int64,
-    ):
+    def __init__(out self, id: String, name: String):
         self.id = id
         self.name = name
-        self.police = police
 
 
 struct Drug:
@@ -88,12 +81,12 @@ struct Drug:
 
 def locations() -> List[Location]:
     return [
-        Location("bronx", "Bronx", 10),
-        Location("ghetto", "Ghetto", 5),
-        Location("centralpark", "Central Park", 15),
-        Location("manhattan", "Manhattan", 90),
-        Location("coneyisland", "Coney Island", 20),
-        Location("brooklyn", "Brooklyn", 70),
+        Location("bronx", "Bronx"),
+        Location("ghetto", "Ghetto"),
+        Location("centralpark", "Central Park"),
+        Location("manhattan", "Manhattan"),
+        Location("coneyisland", "Coney Island"),
+        Location("brooklyn", "Brooklyn"),
     ]
 
 

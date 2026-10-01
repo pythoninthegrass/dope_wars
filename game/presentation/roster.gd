@@ -12,8 +12,8 @@ extends RefCounted
 ## day, prices, inventory) is re-read from the world on every render instead.
 ##
 ## Deliberately not a second copy of the tables: drug ids, names, price bands
-## and borough police weights all come from the core, and this file only holds
-## what it was handed.
+## and borough names all come from the core, and this file only holds what it
+## was handed.
 
 static var _drugs: Array = []
 static var _locations: Array = []

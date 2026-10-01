@@ -143,6 +143,38 @@ function scriptedRng(draws) {
   return rng
 }
 
+describe('shouldStartChase', () => {
+  test('locations carry no police weight', () => {
+    for (const loc of Engine.RULES.locations) assert.equal('police' in loc, false, loc.id)
+  })
+
+  test('starts on a Random(6) == 0 draw at every location, spending one draw', () => {
+    const state = Engine.newGame({ seed: 3 })
+    for (const loc of Engine.RULES.locations) {
+      state.location = loc.id
+      const hit = scriptedRng([0.0])
+      assert.equal(Engine.shouldStartChase(state, hit), true, loc.id)
+      assert.equal(hit.drawn(), 1)
+      // 1/6 is the edge of the first bucket; 1/6 + epsilon rolls a 1
+      assert.equal(Engine.shouldStartChase(state, scriptedRng([0.1666])), true, loc.id)
+      assert.equal(Engine.shouldStartChase(state, scriptedRng([0.1667])), false, loc.id)
+      assert.equal(Engine.shouldStartChase(state, scriptedRng([0.999])), false, loc.id)
+    }
+  })
+
+  test('chase frequency is about 1 in 6 at every location', () => {
+    const n = 12000
+    for (const loc of Engine.RULES.locations) {
+      const state = Engine.newGame({ seed: 5 })
+      state.location = loc.id
+      let hits = 0
+      for (let i = 0; i < n; i++) if (Engine.shouldStartChase(state, state.rng)) hits++
+      const rate = hits / n
+      assert.ok(rate > 0.15 && rate < 0.185, `${loc.id} chase rate ${rate}`)
+    }
+  })
+})
+
 describe('generatePrices', () => {
   test('locations carry no per-borough drug count', () => {
     for (const loc of Engine.RULES.locations) {

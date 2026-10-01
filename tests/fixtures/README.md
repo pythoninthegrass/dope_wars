@@ -58,7 +58,7 @@ Each `.meta.json` sidecar records:
 | `07-finish-scoring` | `finish` score = cash + bank − debt; `insertHighScore` top-10 truncation |
 | `08-serialize-roundtrip` | `serializeState` → `deserializeState` preserves full state |
 | `09-full-run-31day` | 31-day playthrough with deterministic policy (travel to `locations[day % 6]`, buy cheapest per stop) |
-| `10-rolls-and-helpers` | `shouldStartChase` police weighting (incl. the 49/50 threshold), `rollCoatDealerOffer` and `rollGunDealerOffer` range ends, `getFightRatings`, `applyDamage` |
+| `10-rolls-and-helpers` | `shouldStartChase` flat 1 in 6 (incl. the first-sixth threshold), `rollCoatDealerOffer` and `rollGunDealerOffer` range ends, `getFightRatings`, `applyDamage` |
 | `11-finances` | `finances` deposit/withdraw/payLoan, clamping to available cash/bank/debt, amount floor, unknown action |
 | `12-dealer-visits` | the `rollDealerVisits` helper: seeded stream over eight calls, all four scripted combinations + the 0.15 boundary, dead-player draw consumption, chase skip (`index.html:1382-1388`) |
 

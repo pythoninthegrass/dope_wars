@@ -87,7 +87,7 @@ Names are the strings at `0x0045c518`-`0x0045c5c8`.
 | --- | --- | --- | --- | --- |
 | Game length | `0x0045d428`, `0x0045ceb8` | 31 days, day counter starts at 1 | `numDays: 31`, day starts at 1 | match |
 | Start state | `0x0045ceb8` | cash 2000, debt 5500, bank 0, guns 0, health 100, coat 100 | same (`startCash`, `startDebt`, `startHealth`, `startCoatCapacity`) | match |
-| Chase start chance | `0x0045d428` | `Random(6) == 0`, 1 in 6, the same at every location, and a chase suppresses the arrival events and dealers | `randInt(0, 80 + police) >= 50`, weighted by a per-borough police value (5 to 90) | **mismatch M-04** |
+| Chase start chance | `0x0045d428` | `Random(6) == 0`, 1 in 6, the same at every location, and a chase suppresses the arrival events and dealers | `randInt(0, 5) === 0`, 1 in 6 at every location; the arrival sequence rolls the arrival event and dealers only when no chase started | match |
 | New Game gate | `0x0045d428`, `0x0045ceb8` | New Game button and menu item disabled from new game until the first travel made on day 5, so usable from day 6 | New Game is available at any time | **mismatch M-11** |
 | Last-day message and sound | `0x0045d428` | on arrival at day 31 | message text matches (`index.html:1163`); no sound | match for the text, sound in "Sounds" |
 
@@ -164,7 +164,7 @@ No sound plays for the dealer offers, finances, price events, travel itself, vic
 
 ## Intentional differences
 
-Recorded in `docs/parity-deltas.md` section 5. The location model (one city of six named sub-locations, `cities.txt`) and the borough and city names are not fidelity targets. The per-borough police weights in the engine are a separate matter: they affect chase odds, which are a game rule, so they are listed as M-04 rather than waved through under the location model. The per-borough drug counts were M-03 and are gone.
+Recorded in `docs/parity-deltas.md` section 5. The location model (one city of six named sub-locations, `cities.txt`) and the borough and city names are not fidelity targets. The per-borough police weights and drug counts affected game rules rather than the location model, so they were listed as M-04 and M-03; both are gone.
 
 ## Oracle checks
 
@@ -183,7 +183,7 @@ Checked on the live oracle (see `CLAUDE.local.md` for how to reach it; none of t
 | M-01 | Drug table names, ranges and flags (fixed, match) | Drug table | TASK-010.02.01 |
 | M-02 | Price spike and crash events (fixed, match) | Drug table | TASK-010.02.02 |
 | M-03 | Drug availability (1/8 absent, location independent; fixed, match) | Drug table | TASK-010.02.03 |
-| M-04 | Chase start chance (1 in 6, flat) | Travel | TASK-010.02.04 |
+| M-04 | Chase start chance (1 in 6, flat; fixed, match) | Travel | TASK-010.02.04 |
 | M-05 | Dealer visits, coat and gun prices, payment | Arrival events | TASK-010.02.05 |
 | M-06 | Arrival event table | Arrival events | TASK-010.02.06 |
 | M-07 | Run, stay and cop damage | Chase | TASK-010.02.07 |
