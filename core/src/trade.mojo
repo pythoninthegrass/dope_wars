@@ -38,7 +38,9 @@ def buy(mut game: world.World, drug_index: Int, qty: Int64) raises -> result.Out
     var held_avg = game.inv_avg_price_of(drug_index)
     var total_cost = held_avg * Float64(held_qty) + Float64(cost)
     var new_qty = held_qty + qty
-    game.set_inventory(drug_index, new_qty, total_cost / Float64(new_qty))
+    # Beermat's avg cost is a truncating integer, not a float (docs/beermat-re.md M-12).
+    var new_avg = Float64(jsmath.js_floor(total_cost / Float64(new_qty)))
+    game.set_inventory(drug_index, new_qty, new_avg)
     return result.Outcome(result.OK)
 
 

@@ -759,7 +759,8 @@
       const held = state.inventory[drugId] || { qty: 0, avgPrice: 0 };
       const totalCost = held.avgPrice * held.qty + price * qty;
       held.qty += qty;
-      held.avgPrice = totalCost / held.qty;
+      // Beermat's avg cost is a truncating integer, not a float (docs/beermat-re.md M-12).
+      held.avgPrice = Math.floor(totalCost / held.qty);
       state.inventory[drugId] = held;
       return { ok: true };
     }

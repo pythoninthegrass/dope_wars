@@ -372,6 +372,18 @@ describe('buy / sell', () => {
     assert.equal(overflow.ok, false)
   })
 
+  // Beermat computes avg = (qty*price + held*avg) div (held + qty) in integers (docs/beermat-re.md M-12).
+  test('buy truncates the weighted-average cost to an integer', () => {
+    const state = Engine.newGame({ seed: 1 })
+    state.prices = { speed: 100 }
+    Engine.buy(state, 'speed', 3)
+    assert.equal(state.inventory.speed.avgPrice, 100)
+    state.prices = { speed: 101 }
+    Engine.buy(state, 'speed', 2)
+    // (3*100 + 2*101) / 5 = 100.4, truncated to 100.
+    assert.equal(state.inventory.speed.avgPrice, 100)
+  })
+
   test('buy refuses a drug not on offer here', () => {
     const state = Engine.newGame({ seed: 1 })
     state.prices = { speed: 100 }

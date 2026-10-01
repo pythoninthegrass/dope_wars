@@ -40,7 +40,7 @@ Classifications compare each rule with the prototype engine (`index.html`, `<scr
 | Price crash | `0x0045d120` | only for drugs with the crash flag, only if available: `Random(20) == 0` then `price = price div 10`; a fixed message per drug (acid, hashish, ecstasy, weed) | for each available crash-flagged drug: `randInt(0, 19) == 0` divides the price by 10 (integer division) with the fixed per-drug message below; the event is `cheap` | match (M-02, TASK-010.02.02) |
 | Selling an absent drug | `0x0045e884` | refused: "There is no `<drug>` on the market here?" | refused when the price is unset | match |
 | Buying | `0x0045e448` | quantity at most `cash div price`; zero means "Duh ! Check the price of `<drug>` out, dude!"; pockets full means "Erm, your pockets are full, dude."; the dialog default is `min(free space, affordable)` | same floor division and "Duh! Check the price" text | match |
-| Average cost | `0x0045e448` | `(qty * price + held * avg) div (held + qty)`, integer division | float average, no truncation | **mismatch M-12** (display only) |
+| Average cost | `0x0045e448` | `(qty * price + held * avg) div (held + qty)`, integer division | same, truncating division | match (M-12, TASK-010.02.10) |
 
 The crash messages, indexed by the drug-record position at `0x0045d120` (acid 0, hashish 2, ecstasy 4, weed 11); the other drugs have no crash flag:
 
@@ -205,5 +205,5 @@ Checked on the live oracle (see `CLAUDE.local.md` for how to reach it; none of t
 | M-09 | Chase win reward and doctor (fixed, match) | Chase | TASK-010.02.07 |
 | M-10 | Interest rounding (fixed, match) | Money | TASK-010.02.08 |
 | M-11 | New Game locked until day 6 (not ported — intentional, `docs/parity-deltas.md` section 6) | Travel | TASK-010.02.09 |
-| M-12 | Average cost integer division | Drug table | TASK-010.02.10 |
+| M-12 | Average cost integer division (fixed, match) | Drug table | TASK-010.02.10 |
 | M-13 | Score must be above 0 to be recorded | Score | TASK-010.02.11 |
