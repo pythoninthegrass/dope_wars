@@ -87,3 +87,11 @@ Beermat Windows reference (`docs/gameplay.md`) versus the earlier
 Keymash-web-port-derived guess; see `docs/architecture.md`'s "ABI version
 history" for why that bump was breaking (`DW_ABI_VERSION` 1 -> 2) rather than
 additive.
+
+## 5. City names and the location model
+
+**Beermat (`docs/beermat-re.md`):** one city is six named sub-locations, read from `cities.txt` at startup (`TForm1.ReadCities`, `0x0045c6d8`), and the real game has no per-location rules at all: drug availability and chase odds are location-independent.
+
+**Port:** six fixed New York boroughs (`index.html` `RULES.locations`), kept as the port's own setting.
+
+**Approved because:** the borough and city names and the one-city-six-sub-locations model are not fidelity targets, so differences in them are not attributed to rule mismatches and are not ported. The per-borough police weights and drug counts the engine hangs off that model are a separate rule difference, tracked as M-03 and M-04 in `docs/beermat-re.md`.
