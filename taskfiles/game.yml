@@ -31,9 +31,35 @@ tasks:
         done
         true
 
+  # TASK-011. logo.png (repo-root syringe mark) is the project icon; it lives
+  # outside game/, so AGENTS.md's layer-boundary rule means project.godot
+  # can't reference it directly -- it has to be copied into game/content/
+  # first, same as sounds: does for the wav effects.
+  # config/icon only feeds the editor UI and export-time icon generation; it
+  # never touches a running app's Dock icon on macOS. The Dock icon at
+  # runtime comes from config/macos_native_icon, which Godot applies itself
+  # via DisplayServer.set_native_icon() on start -- hence the .icns build
+  # here too, not just the plain .png.
+  icon:
+    desc: "Copy the repo logo into game/content/ as the Godot project icon (+ macOS .icns for the Dock)"
+    sources: [logo.png]
+    generates: [game/content/icon.png, game/content/icon.icns]
+    cmds:
+      - mkdir -p game/content
+      - cp logo.png game/content/icon.png
+      - |
+        set -eu
+        iconset="$(mktemp -d)/icon.iconset"
+        mkdir -p "$iconset"
+        for size in 16 32 128 256 512; do
+          sips -z "$size" "$size" logo.png --out "$iconset/icon_${size}x${size}.png" >/dev/null
+          sips -z "$((size * 2))" "$((size * 2))" logo.png --out "$iconset/icon_${size}x${size}@2x.png" >/dev/null
+        done
+        iconutil -c icns "$iconset" -o game/content/icon.icns
+
   import:
     desc: "Headless Godot import of the game/ project (populates .godot/ cache)"
-    deps: [":extension:build", "sounds"]
+    deps: [":extension:build", "sounds", "icon"]
     dir: game
     cmds:
       - |

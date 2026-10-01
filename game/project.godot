@@ -26,6 +26,8 @@ config/name="Dope Wars"
 config/description="Dope Wars for Windows 1.2.0.0 (1999) ruleset, Mojo core / C ABI / C++ GDExtension / GDScript."
 config/features=PackedStringArray("4.7")
 run/main_scene="res://presentation/main.tscn"
+config/icon="res://content/icon.png"
+config/macos_native_icon="res://content/icon.icns"
 
 [display]
 
