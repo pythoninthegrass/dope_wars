@@ -33,7 +33,7 @@ import travel
 import world as world_mod
 
 
-comptime DW_ABI_VERSION = 3
+comptime DW_ABI_VERSION = 4
 
 # dw_result values (include/dopewars.h). Frozen from ABI v1 onward.
 comptime DW_OK = Int32(0)
@@ -77,9 +77,6 @@ struct LocationView(Copyable, Movable):
     var id: Array[UInt8, 32]
     var name: Array[UInt8, 32]
     var police: UInt32
-    var min_drugs: UInt32
-    var max_drugs: UInt32
-    var _pad0: UInt32
 
 
 @fieldwise_init
@@ -214,7 +211,7 @@ struct HighscoreEntryView(Copyable, Movable):
 # entry points so the asserts are instantiated at compile time.
 def _assert_layouts():
     comptime assert size_of[Config]() == 16, "dw_config layout changed"
-    comptime assert size_of[LocationView]() == 80, "dw_location_view layout changed"
+    comptime assert size_of[LocationView]() == 68, "dw_location_view layout changed"
     comptime assert size_of[DrugView]() == 76, "dw_drug_view layout changed"
     comptime assert size_of[StateView]() == 56, "dw_state_view layout changed"
     comptime assert size_of[InventorySlot]() == 16, "dw_inventory_slot layout changed"
@@ -439,9 +436,6 @@ def dw_rules_locations_copy(
             _cstr_array[32](table[i].id),
             _cstr_array[32](table[i].name),
             UInt32(table[i].police),
-            UInt32(table[i].min_drugs),
-            UInt32(table[i].max_drugs),
-            UInt32(0),
         )
     return DW_OK
 

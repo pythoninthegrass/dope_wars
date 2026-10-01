@@ -342,7 +342,7 @@ func _test_click_rebuilds_table() -> void:
 	var hud := _main.hud()
 	var market := hud.market_table()
 	var traded: Array = world.prices_copy()
-	var drug_index := int(traded[0]["drug_index"])
+	var drug_index := _cheapest_traded(world)
 	var price := _price_of(world, drug_index)
 	await _idle()
 
@@ -936,8 +936,8 @@ func _test_window_pinned() -> void:
 	)
 
 
-# The reason the window needs no resizing: every borough with maxDrugs: 12 can
-# trade all DW_NUM_DRUGS at once, and the coat holds one row per drug, so twelve
+# The reason the window needs no resizing: every borough can trade all
+# DW_NUM_DRUGS at once (each drug is absent only 1 time in 8), and the coat holds one row per drug, so twelve
 # rows is the largest either table ever renders. Asserting it fits without
 # scrolling is what keeps the pinned height honest if a row's height changes.
 func _test_tables_fit_twelve_drugs() -> void:

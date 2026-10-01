@@ -57,7 +57,7 @@ extern "C" {
  * changes. Additive changes (new functions, new appended anonymous-enum
  * constants, new `#define`s that don't invalidate existing struct sizes)
  * do NOT bump this. See `docs/abi-contract.md` for the full policy. */
-#define DW_ABI_VERSION 3u
+#define DW_ABI_VERSION 4u
 
 /* The value above, readable at runtime.
  *
@@ -219,11 +219,8 @@ typedef struct dw_location_view {
     char     id[DW_MAX_LOCATION_ID_LEN];
     char     name[DW_MAX_LOCATION_NAME_LEN];
     uint32_t police;      /* police presence weight; see dw_should_start_chase */
-    uint32_t min_drugs;   /* minimum count of drugs traded on any turn here */
-    uint32_t max_drugs;   /* maximum count of drugs traded on any turn here */
-    uint32_t _pad0;       /* specified-zero */
 } dw_location_view;
-DW_STATIC_ASSERT(sizeof(dw_location_view) == 80, "dw_location_view layout changed");
+DW_STATIC_ASSERT(sizeof(dw_location_view) == 68, "dw_location_view layout changed");
 
 typedef struct dw_drug_view {
     char     id[DW_MAX_DRUG_ID_LEN];

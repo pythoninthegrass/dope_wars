@@ -37,14 +37,14 @@ def test_scalar_rules_match_js() raises:
 
 
 def test_locations_match_js() raises:
-    # id|name|police|minDrugs|maxDrugs, in RULES order.
+    # id|name|police, in RULES order.
     var expected: List[String] = [
-        "bronx|Bronx|10|7|12",
-        "ghetto|Ghetto|5|8|12",
-        "centralpark|Central Park|15|6|12",
-        "manhattan|Manhattan|90|4|10",
-        "coneyisland|Coney Island|20|6|12",
-        "brooklyn|Brooklyn|70|4|11",
+        "bronx|Bronx|10",
+        "ghetto|Ghetto|5",
+        "centralpark|Central Park|15",
+        "manhattan|Manhattan|90",
+        "coneyisland|Coney Island|20",
+        "brooklyn|Brooklyn|70",
     ]
     var table = rules.locations()
     assert_equal(len(table), len(expected))
@@ -53,8 +53,6 @@ def test_locations_match_js() raises:
         assert_equal(table[i].id, String(parts[0]))
         assert_equal(table[i].name, String(parts[1]))
         assert_equal(table[i].police, lexeme.to_int(String(parts[2])))
-        assert_equal(table[i].min_drugs, lexeme.to_int(String(parts[3])))
-        assert_equal(table[i].max_drugs, lexeme.to_int(String(parts[4])))
 
 
 def test_drugs_match_js() raises:
