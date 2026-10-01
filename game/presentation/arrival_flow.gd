@@ -109,13 +109,10 @@ func _present_alert(title_key: String, message: String, icon: String) -> void:
 
 
 func _present_event(event: Dictionary) -> void:
-	var message := Copy.arrival_message(event, Roster.drug_name(int(event.get("drug_index", -1))))
-	var icon := AlertDialog.ICON_SKULL if int(event.get("kind", 0)) == SimWorld.ARRIVAL_FREE_WEED_DEATH else AlertDialog.ICON_WARNING
-	_dialogs.open(AlertDialog.new().present(Copy.DLG_RANDOM_EVENT, message, icon), func(_key: String) -> void:
+	var location_index := int(_world.state_get().get("location_index", 0))
+	var message := Copy.arrival_message(event, Roster.drug_name(int(event.get("drug_index", -1))), Roster.location_name(location_index))
+	_dialogs.open(AlertDialog.new().present(Copy.DLG_RANDOM_EVENT, message, AlertDialog.ICON_WARNING), func(_key: String) -> void:
 		state_changed.emit()
-		if _is_dead():
-			_on_died.call()
-			return
 		_advance()
 	)
 

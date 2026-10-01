@@ -93,8 +93,7 @@ def test_rand_int_is_inclusive_on_both_ends() raises:
 
 
 def test_rand_int_matches_js_on_the_seeded_stream() raises:
-    # randInt(rng, 80, 95) is the mugged-loss roll in rollArrivalEvent and
-    # randInt(rng, 0, i) drives the shuffle, so both matter.
+    # Two different spans off one stream, as the event rolls draw them.
     var source = rng.Rng(UInt32(7))
     var a = rng.rand_int(source, 80, 95)
     var b = rng.rand_int(source, 0, 11)

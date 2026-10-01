@@ -2,7 +2,7 @@
 // generate.mjs (records the return + snapshot) and run.mjs (compares them
 // against the recorded oracle). Any implementation replaying these fixtures
 // needs the same dispatch table plus the same handful of state-shaping
-// helpers (setPrices/setInventory/setField/buyCheapest/...).
+// helpers (setPrices/setPrevPrices/setInventory/setField/buyCheapest/...).
 import { scriptedRng, snapshotState } from './engine-loader.mjs'
 
 export function makeRunStep(Engine) {
@@ -50,6 +50,9 @@ export function makeRunStep(Engine) {
         return Engine.finish(state)
       case 'setPrices':
         state.prices = { ...args }
+        return { ok: true }
+      case 'setPrevPrices':
+        state.prevPrices = { ...args }
         return { ok: true }
       case 'setInventory': {
         const inv = {}

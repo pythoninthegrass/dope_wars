@@ -55,7 +55,7 @@ const ALLOWED = [
   // applyDamage -> health) has no field name, so it lands under `.value`.
   'value',
   // arrival-event and price-event results
-  'type', 'drug', 'qty',
+  'type', 'drug', 'qty', 'blocks',
   // bare-array returns (generatePrices -> [{type,drug,message}]) have no
   // enclosing field name, so their first segment is an array index.
   '*.type', '*.drug', '*.qty',
@@ -75,10 +75,10 @@ const ALLOWED = [
   'inventory', 'prices',
 ]
 
-// setPrices and setInventory take a bare drug id as the key, so their argument
+// setPrices, setPrevPrices and setInventory take a bare drug id as the key, so their argument
 // keys are not enumerable ahead of time. Scoped to those two calls only —
 // widening this to a global 'args.*' would make the whole table a no-op.
-const ARG_KEY_IS_DRUG_ID = new Set(['setPrices', 'setInventory'])
+const ARG_KEY_IS_DRUG_ID = new Set(['setPrices', 'setPrevPrices', 'setInventory'])
 
 function allowed(stripped, call, group) {
   if (group === 'args' && ARG_KEY_IS_DRUG_ID.has(call)) return true
