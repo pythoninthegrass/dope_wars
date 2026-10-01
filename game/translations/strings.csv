@@ -69,7 +69,11 @@ BTN_PAY_LOAN,Pay Loan
 MSG_DEPOSIT_PROMPT,Deposit how much of your ${0} cash?
 MSG_WITHDRAW_PROMPT,Withdraw how much of your ${0} bank balance?
 MSG_PAY_LOAN_PROMPT,Pay down how much of your ${0} debt?
-MSG_PRICE_CHEAP,The market is flooded with cheap {0}!
+MSG_PRICE_BUST,Cops made a big {0} bust!  Prices are outrageous!
+MSG_PRICE_CRASH_ACID,The market has been flooded with cheap home-made acid!
+MSG_PRICE_CRASH_HASHISH,The Marrakesh Express has arrived!
+MSG_PRICE_CRASH_ECSTASY,Rival dealers raided a pharmacy and are selling cheap ecstasy!
+MSG_PRICE_CRASH_WEED,Columbian freighter dusted the Coast Guard!  Weed prices have bottomed out!
 MSG_PRICE_EXPENSIVE,Addicts are buying {0} at outrageous prices!
 MSG_DEALER_FEE_NOTE,Not enough cash — ATM + dealer fee: ${0} (total ${1} from bank)
 MSG_COAT_OFFER,Would you like to buy a trenchcoat with {0} more pockets for ${1}?

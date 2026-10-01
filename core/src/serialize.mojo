@@ -29,8 +29,8 @@ import world
 # + start_cash(17) + health/coat_capacity/guns/location_index(4*8)
 # + dead/last_day_warned(2) + price_order(4+12) + price slots(12*10)
 # + prev_price_order(4+12) + prev price slots(12*9) + inv_order(4+12)
-# + inv slots(12*26) + price_events(4+3*16)
-comptime DUMP_LEN = 766
+# + inv slots(12*26) + price_events(4+8*16)
+comptime DUMP_LEN = 846
 
 
 struct ByteWriter:

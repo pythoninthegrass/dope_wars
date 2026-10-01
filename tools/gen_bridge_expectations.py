@@ -48,8 +48,8 @@ PINNED: dict[str, int] = {
     "dw_rules_debt_interest_bp": 1000,
     "dw_rules_bank_interest_bp": 500,
     "dw_rules_bank_purchase_fee_bp": 2500,
-    "dw_rules_cheap_divide": 4,
-    "dw_rules_expensive_multiply": 4,
+    "dw_rules_cheap_divide": 10,
+    "dw_rules_expensive_multiply": 5,
 }
 
 # ABI length query -> the header macro that defines its value. Read from the

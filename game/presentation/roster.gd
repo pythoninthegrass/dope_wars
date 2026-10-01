@@ -59,6 +59,13 @@ static func sorted_drug_indices() -> Array[int]:
 	return indices
 
 
+static func drug_id(drug_index: int) -> String:
+	_ensure()
+	if drug_index < 0 or drug_index >= _drugs.size():
+		return ""
+	return String(_drugs[drug_index]["id"])
+
+
 static func drug_name(drug_index: int) -> String:
 	_ensure()
 	if drug_index < 0 or drug_index >= _drugs.size():

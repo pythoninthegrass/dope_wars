@@ -101,7 +101,11 @@ const MSG_DEPOSIT_PROMPT := "MSG_DEPOSIT_PROMPT"
 const MSG_WITHDRAW_PROMPT := "MSG_WITHDRAW_PROMPT"
 const MSG_PAY_LOAN_PROMPT := "MSG_PAY_LOAN_PROMPT"
 
-const MSG_PRICE_CHEAP := "MSG_PRICE_CHEAP"
+const MSG_PRICE_BUST := "MSG_PRICE_BUST"
+const MSG_PRICE_CRASH_ACID := "MSG_PRICE_CRASH_ACID"
+const MSG_PRICE_CRASH_HASHISH := "MSG_PRICE_CRASH_HASHISH"
+const MSG_PRICE_CRASH_ECSTASY := "MSG_PRICE_CRASH_ECSTASY"
+const MSG_PRICE_CRASH_WEED := "MSG_PRICE_CRASH_WEED"
 const MSG_PRICE_EXPENSIVE := "MSG_PRICE_EXPENSIVE"
 const MSG_DEALER_FEE_NOTE := "MSG_DEALER_FEE_NOTE"
 const MSG_COAT_OFFER := "MSG_COAT_OFFER"
@@ -227,12 +231,15 @@ static func units_at(price: float) -> String:
 	return t(MSG_UNITS_AT).format([fmt(price)])
 
 
-## The cheap/expensive price-event toasts (index.html:742-745). `drug_name` is
-## the display name out of rules_drugs(), never the id.
-static func price_event_message(kind: int, drug_name: String) -> String:
-	if kind == SimWorld.PRICE_EVENT_EXPENSIVE:
-		return t(MSG_PRICE_EXPENSIVE).format([drug_name])
-	return t(MSG_PRICE_CHEAP).format([drug_name])
+## The price-event toasts: a crash has one fixed line per drug, a spike takes
+## the drug's display name (never its id) in one of two lines.
+static func price_event_message(kind: int, drug_id: String, drug_name: String) -> String:
+	match kind:
+		SimWorld.PRICE_EVENT_BUST:
+			return t(MSG_PRICE_BUST).format([drug_name])
+		SimWorld.PRICE_EVENT_EXPENSIVE:
+			return t(MSG_PRICE_EXPENSIVE).format([drug_name])
+	return t("MSG_PRICE_CRASH_" + drug_id.to_upper())
 
 
 ## The arrival event (index.html:869-927) as a sentence. The core hands over a

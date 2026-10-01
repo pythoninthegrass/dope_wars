@@ -33,7 +33,7 @@ from abi_symbols import (  # noqa: E402
     struct_sizes,
 )
 
-DW_ABI_VERSION = 2
+DW_ABI_VERSION = 3
 
 # Result codes (include/dopewars.h, anonymous enum). Frozen from ABI v1;
 # appended to, never renumbered.
@@ -73,8 +73,8 @@ EXPECTED_RULES = {
     "dw_rules_debt_interest_bp": (ctypes.c_uint32, 1000),
     "dw_rules_bank_interest_bp": (ctypes.c_uint32, 500),
     "dw_rules_bank_purchase_fee_bp": (ctypes.c_uint32, 2500),
-    "dw_rules_cheap_divide": (ctypes.c_uint32, 4),
-    "dw_rules_expensive_multiply": (ctypes.c_uint32, 4),
+    "dw_rules_cheap_divide": (ctypes.c_uint32, 10),
+    "dw_rules_expensive_multiply": (ctypes.c_uint32, 5),
 }
 
 
@@ -252,13 +252,13 @@ def test_dump_len_is_a_fixed_positive_size(abi: Abi, report: Report) -> None:
     events: seed/rng/day/num_days (24B), cash/debt/bank/start_cash as exact
     float decompositions (4x17B), health/coat/guns/location (4x8B), two flags,
     then each order list as count+DW_NUM_DRUGS slots (3x16B), the price/prev/inv
-    dense slots (12x10B, 12x9B, 12x26B), and 3 price-event slots (4+3x16B) =
-    766. core/src/serialize.mojo pins the same number as DUMP_LEN and asserts
+    dense slots (12x10B, 12x9B, 12x26B), and 8 price-event slots (4+8x16B) =
+    846. core/src/serialize.mojo pins the same number as DUMP_LEN and asserts
     it at runtime, so the format and this test move together or not at all.
     """
     got = abi.call("dw_world_dump_len")
     report.expect("dw_world_dump_len() >= 396", got >= 396, f"got {got}")
-    report.expect("dw_world_dump_len() == 766", got == 766, f"got {got}")
+    report.expect("dw_world_dump_len() == 846", got == 846, f"got {got}")
 
 
 def test_world_align_is_a_power_of_two(abi: Abi, report: Report) -> None:

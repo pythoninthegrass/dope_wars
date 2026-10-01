@@ -24,8 +24,9 @@ comptime START_LOCATION = "bronx"
 comptime GUN_DAMAGE = 5
 comptime GUN_SPACE = 4
 comptime PLAYER_ARMOR = 100
-comptime CHEAP_DIVIDE = 4
-comptime EXPENSIVE_MULTIPLY = 4
+comptime CHEAP_DIVIDE = 10
+comptime EXPENSIVE_MULTIPLY = 5
+comptime EVENT_ODDS = 20
 comptime BANK_PURCHASE_FEE = 0.25
 
 comptime COAT_MIN_POCKETS = 10

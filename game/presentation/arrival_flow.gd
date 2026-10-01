@@ -97,7 +97,7 @@ func _advance() -> void:
 			var event: Dictionary = entry["event"]
 			_present_alert(
 				Copy.DLG_WORD_ON_THE_STREET,
-				Copy.price_event_message(int(event["kind"]), Roster.drug_name(int(event["drug_index"]))),
+				Copy.price_event_message(int(event["kind"]), Roster.drug_id(int(event["drug_index"])), Roster.drug_name(int(event["drug_index"]))),
 				AlertDialog.ICON_NEWS
 			)
 		Step.EVENT:

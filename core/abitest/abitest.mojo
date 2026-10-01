@@ -217,7 +217,7 @@ def _world() -> Pointer[UInt8, origin=MutUntrackedOrigin]:
 
 
 def _config(seed: UInt32, num_days: UInt32 = 0, start_cash: Int32 = -1) -> Config:
-    return Config(UInt16(2), UInt16(0), seed, num_days, start_cash)
+    return Config(UInt16(3), UInt16(0), seed, num_days, start_cash)
 
 
 def _init(
@@ -275,7 +275,11 @@ def _prices(ptr: Pointer[UInt8, origin=MutUntrackedOrigin]) raises -> List[Price
 def _drug_in_roster(ptr: Pointer[UInt8, origin=MutUntrackedOrigin]) raises -> Int:
     var slots = _prices(ptr)
     assert_true(len(slots) > 0)
-    return Int(slots[0].drug_index)
+    var cheapest = 0
+    for i in range(len(slots)):
+        if slots[i].price < slots[cheapest].price:
+            cheapest = i
+    return Int(slots[cheapest].drug_index)
 
 
 def _drug_not_in_roster(ptr: Pointer[UInt8, origin=MutUntrackedOrigin]) raises -> Int:
@@ -416,7 +420,7 @@ def test_every_result_code_is_reachable() raises:
     var actual: Int64 = 0
     assert_equal(external_call["dw_finances", Int32](ptr, UInt8(9), Int64(1), Pointer(to=actual)), DW_ERR_INVALID_ARGUMENT)
     # DW_ERR_INVALID_ARGUMENT: buy qty 0
-    assert_equal(external_call["dw_buy", Int32](ptr, UInt32(0), UInt32(0)), DW_ERR_INVALID_ARGUMENT)
+    assert_equal(external_call["dw_buy", Int32](ptr, UInt32(_drug_in_roster(ptr)), UInt32(0)), DW_ERR_INVALID_ARGUMENT)
     # DW_ERR_INVALID_ARGUMENT: travel to the current location
     assert_equal(external_call["dw_travel", Int32](ptr, UInt32(0)), DW_ERR_INVALID_ARGUMENT)
 
@@ -676,8 +680,8 @@ def test_rules_accessors() raises:
     assert_equal(external_call["dw_rules_debt_interest_bp", UInt32](), UInt32(1000))
     assert_equal(external_call["dw_rules_bank_interest_bp", UInt32](), UInt32(500))
     assert_equal(external_call["dw_rules_bank_purchase_fee_bp", UInt32](), UInt32(2500))
-    assert_equal(external_call["dw_rules_cheap_divide", UInt32](), UInt32(4))
-    assert_equal(external_call["dw_rules_expensive_multiply", UInt32](), UInt32(4))
+    assert_equal(external_call["dw_rules_cheap_divide", UInt32](), UInt32(10))
+    assert_equal(external_call["dw_rules_expensive_multiply", UInt32](), UInt32(5))
 
 
 def test_rng_matches_js_oracle() raises:
@@ -810,7 +814,7 @@ def test_combat_flow() raises:
     # beermat-verified (TASK-009): deputies is randInt(2, 11), no longer a
     # deterministic function of day alone -- this is seed 7's actual draw
     # after should_start_chase's one draw.
-    assert_equal(chase.deputies, UInt32(4))
+    assert_equal(chase.deputies, UInt32(3))
     assert_equal(chase.can_fight, UInt8(0))
 
     var ratings = FightRatingsView(UInt32(0), UInt32(0))
