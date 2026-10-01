@@ -94,11 +94,3 @@ additive.
 **Port:** six fixed New York boroughs (`index.html` `RULES.locations`), kept as the port's own setting.
 
 **Approved because:** the borough and city names and the one-city-six-sub-locations model are not fidelity targets, so differences in them are not attributed to rule mismatches and are not ported. The per-borough police weights the engine used to hang off that model were a rule difference (M-04 in `docs/beermat-re.md`) and have been removed.
-
-## 6. Fight round messages
-
-**Beermat (`docs/beermat-re.md`, Chase):** a Fight round sets the status line twice, "You're firing on them! ..." for the shot and then "They're firing on you, man! ..." for the return fire, so only the second is ever visible.
-
-**Port:** the alert after a Fight round shows both lines (the web prototype and the Godot chase flow), so the player can see whether the shot killed a deputy.
-
-**Approved because:** it only adds the shot result to what the player already sees; every roll, draw and outcome is Beermat's.

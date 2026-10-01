@@ -1541,8 +1541,7 @@
           document.getElementById('alertOk').addEventListener('click', () => offerDoctor(res, queue), { once: true });
           return;
         }
-        const shot = res.killed ? "You're firing on them! You killed one!" : "You're firing on them! You missed them!";
-        showAlert('Cop Chase', `${shot} ${copsLine({ hit: res.copHit })}`, res.killed ? '\u{1F4A8}' : '\u{1F4A5}');
+        showAlert('Cop Chase', copsLine({ hit: res.copHit }), '\u{1F4A5}');
         document.getElementById('alertOk').addEventListener('click', again, { once: true });
       });
     }

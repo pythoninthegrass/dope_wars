@@ -186,11 +186,10 @@ func _on_chase_action(key: String, _dialog: ChaseDialog) -> void:
 				return
 			_chase = _chase.duplicate()
 			_chase["deputies"] = int(fight.get("deputies", deputies))
-			var killed := bool(fight.get("killed", false))
 			_present_alert(
 				Copy.DLG_COP_CHASE,
-				Copy.fight_message(killed, bool(fight.get("cop_hit", false))),
-				AlertDialog.ICON_DAGGER if killed else AlertDialog.ICON_BULLET
+				Copy.fight_message(bool(fight.get("cop_hit", false))),
+				AlertDialog.ICON_BULLET
 			)
 			return
 

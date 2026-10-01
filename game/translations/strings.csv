@@ -90,8 +90,6 @@ MSG_CHASE_RUN_MISSED,"You can't get away ! They're firing on you, man! They miss
 MSG_CHASE_RUN_HIT,"You can't get away ! They're firing on you, man! You've been hit!"
 MSG_CHASE_STAY_MISSED,"You stand there like an idiot. They're firing on you, man! They missed!"
 MSG_CHASE_STAY_HIT,"You stand there like an idiot. They're firing on you, man! You've been hit!"
-MSG_CHASE_SHOT_MISSED,You're firing on them! You missed them!
-MSG_CHASE_SHOT_KILLED,You're firing on them! You killed one!
 MSG_CHASE_COPS_MISSED,"They're firing on you, man! They missed!"
 MSG_CHASE_COPS_HIT,"They're firing on you, man! You've been hit!"
 MSG_CHASE_WON,You killed them all!

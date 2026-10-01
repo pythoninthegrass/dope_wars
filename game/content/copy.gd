@@ -126,8 +126,6 @@ const MSG_CHASE_RUN_MISSED := "MSG_CHASE_RUN_MISSED"
 const MSG_CHASE_RUN_HIT := "MSG_CHASE_RUN_HIT"
 const MSG_CHASE_STAY_MISSED := "MSG_CHASE_STAY_MISSED"
 const MSG_CHASE_STAY_HIT := "MSG_CHASE_STAY_HIT"
-const MSG_CHASE_SHOT_MISSED := "MSG_CHASE_SHOT_MISSED"
-const MSG_CHASE_SHOT_KILLED := "MSG_CHASE_SHOT_KILLED"
 const MSG_CHASE_COPS_MISSED := "MSG_CHASE_COPS_MISSED"
 const MSG_CHASE_COPS_HIT := "MSG_CHASE_COPS_HIT"
 const MSG_CHASE_WON := "MSG_CHASE_WON"
@@ -279,12 +277,10 @@ static func chase_intro(deputies: int) -> String:
 	return t(MSG_CHASE_INTRO).format([deputies])
 
 
-## The player's shot, then the cops' return fire: "You're firing on them! You
-## killed one! They're firing on you, man! You've been hit!"
-static func fight_message(killed: bool, cop_hit: bool) -> String:
-	var shot := t(MSG_CHASE_SHOT_KILLED if killed else MSG_CHASE_SHOT_MISSED)
-	var fire := t(MSG_CHASE_COPS_HIT if cop_hit else MSG_CHASE_COPS_MISSED)
-	return "%s %s" % [shot, fire]
+## The cops' return fire after a Fight round; Beermat's status line keeps only
+## this message, not the player's shot.
+static func fight_message(cop_hit: bool) -> String:
+	return t(MSG_CHASE_COPS_HIT if cop_hit else MSG_CHASE_COPS_MISSED)
 
 
 ## "You find a gun and $2500 on Officer Hardass' carcass. Will you pay $1200 to
