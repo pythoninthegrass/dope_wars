@@ -31,11 +31,11 @@ import rules
 import rng as rng_mod
 
 
-comptime MAX_PRICE_EVENTS = 3
+comptime MAX_PRICE_EVENTS = 8
 
 
 struct PriceEvent(Copyable, Movable):
-    # kind is one of PRICE_EVENT_CHEAP / PRICE_EVENT_EXPENSIVE. The JS event
+    # kind is one of PRICE_EVENT_CHEAP (crash) / PRICE_EVENT_EXPENSIVE (spike, addicts text) / PRICE_EVENT_BUST (spike, cops text). The JS event
     # also carries a presentation `message`, which core deliberately drops.
     var kind: Int
     var drug_index: Int
@@ -47,6 +47,7 @@ struct PriceEvent(Copyable, Movable):
 
 comptime PRICE_EVENT_CHEAP = 0
 comptime PRICE_EVENT_EXPENSIVE = 1
+comptime PRICE_EVENT_BUST = 2
 
 
 struct World:

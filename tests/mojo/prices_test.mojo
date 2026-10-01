@@ -13,6 +13,7 @@ import fixtures
 import harness
 import record
 import prices
+import rules
 import world
 from std.testing import assert_equal, assert_true, TestSuite
 
@@ -44,16 +45,62 @@ def test_fixture_01_replays_step_by_step() raises:
         harness.assert_state_matches(game, steps[i].state)
 
 
-def test_roster_order_is_not_drug_index_order() raises:
-    # Guards the reason the order lists exist at all: if the roster happened to
-    # come out in drug-index order, the order comparison above would pass even
-    # with the order lists removed.
+def _constant_script(value: Float64) -> List[Float64]:
+    var script = List[Float64]()
+    for _ in range(200):
+        script.append(value)
+    return script^
+
+
+def test_every_roll_hitting_spikes_and_crashes_each_flagged_drug() raises:
+    var game = world.new_game(UInt32(5), 0, -1)
+    game.rng.set_script(_constant_script(0.0))
+    var events = prices.generate_prices(game)
+    var table = rules.drugs()
+    var expected_events = 0
+    for i in range(rules.NUM_DRUGS):
+        if not game.has_price(i):
+            continue
+        ref drug = table[i]
+        if drug.expensive:
+            expected_events += 1
+            assert_equal(game.price_value[i], drug.min_price * 5)
+        elif drug.cheap:
+            expected_events += 1
+            assert_equal(game.price_value[i], drug.min_price // 10)
+        else:
+            assert_equal(game.price_value[i], drug.min_price)
+    assert_true(expected_events > 0)
+    assert_equal(len(events), expected_events)
+    for event in events:
+        if table[event.drug_index].expensive:
+            assert_equal(event.kind, world.PRICE_EVENT_BUST)
+        else:
+            assert_equal(event.kind, world.PRICE_EVENT_CHEAP)
+
+
+def test_no_roll_hitting_leaves_every_price_in_its_base_range() raises:
+    var game = world.new_game(UInt32(5), 0, -1)
+    game.rng.set_script(_constant_script(0.999))
+    var events = prices.generate_prices(game)
+    assert_equal(len(events), 0)
+    var table = rules.drugs()
+    for i in range(rules.NUM_DRUGS):
+        if game.has_price(i):
+            assert_true(game.price_value[i] >= table[i].min_price)
+            assert_true(game.price_value[i] <= table[i].max_price)
+
+
+def test_spike_events_fit_the_event_buffer() raises:
+    assert_true(world.MAX_PRICE_EVENTS >= 8)
+
+
+def test_roster_comes_out_in_drug_index_order() raises:
+    # Prices are rolled per drug in table order, so the insertion order the
+    # fixtures compare is ascending drug index.
     var game = world.new_game(UInt32(7), 0, -1)
-    var ascending = True
     for i in range(1, game.price_count()):
-        if Int(game.price_order[i]) < Int(game.price_order[i - 1]):
-            ascending = False
-    assert_true(not ascending)
+        assert_true(Int(game.price_order[i]) > Int(game.price_order[i - 1]))
 
 
 def test_prev_prices_track_the_previous_roster() raises:

@@ -38,7 +38,7 @@ const EXPECTED_ASSERTIONS := {
 	"serialize_round_trip": 16,
 	"determinism": 5,
 	"rules_surface": 7,
-	"prev_prices": 16,
+	"prev_prices": 6,
 	"dealer_visits": 10,
 }
 
@@ -170,7 +170,7 @@ func _test_game_step_sequence() -> void:
 
 	var prices: Array = world.prices_copy()
 	_assert(prices.size() > 0, "a fresh game should have a price roster")
-	var drug_index: int = prices[0]["drug_index"]
+	var drug_index: int = _cheapest_slot(prices)["drug_index"]
 
 	var cash_before: int = world.state_get()["cash"]
 	_assert(world.buy(drug_index, 1) == SimWorld.OK, "buy should succeed")
@@ -206,20 +206,23 @@ func _test_game_step_sequence() -> void:
 func _test_partial_sell() -> void:
 	var world := _new_world()
 	var prices: Array = world.prices_copy()
-	var cheapest := int(prices[0]["drug_index"])
-	var cheapest_price := int(prices[0]["price"])
+	var slot := _cheapest_slot(prices)
+	var cheapest := int(slot["drug_index"])
+	var bought := mini(10, int(world.state_get()["cash"]) / int(slot["price"]))
+	_assert(bought > 3, "more than three of the cheapest drug should be affordable at the start (price %d)" % int(slot["price"]))
+	_assert(world.buy(cheapest, bought) == SimWorld.OK, "buying the affordable units of the cheapest drug should succeed")
+	_assert(world.sell(cheapest, 3) == SimWorld.OK, "selling three of the units should succeed")
+	_assert(_held(world, cheapest) == bought - 3, "selling three should leave the rest")
+	_assert(int(world.state_get()["coat_used"]) == bought - 3, "the coat should hold exactly the unsold units")
+
+
+## The lowest-priced slot, so a purchase stays affordable whatever the roster rolled.
+static func _cheapest_slot(prices: Array) -> Dictionary:
+	var cheapest: Dictionary = prices[0]
 	for slot in prices:
-		if int(slot["price"]) < cheapest_price:
-			cheapest = int(slot["drug_index"])
-			cheapest_price = int(slot["price"])
-	_assert(
-		cheapest_price * 10 <= int(world.state_get()["cash"]),
-		"ten of the cheapest drug should be affordable at the start (price %d)" % cheapest_price,
-	)
-	_assert(world.buy(cheapest, 10) == SimWorld.OK, "buying ten of the cheapest drug should succeed")
-	_assert(world.sell(cheapest, 3) == SimWorld.OK, "selling three of the ten should succeed")
-	_assert(_held(world, cheapest) == 7, "selling three of ten should leave seven")
-	_assert(int(world.state_get()["coat_used"]) == 7, "the coat should hold exactly the seven unsold units")
+		if int(slot["price"]) < int(cheapest["price"]):
+			cheapest = slot
+	return cheapest
 
 
 static func _held(world: SimWorld, drug_index: int) -> int:
@@ -232,7 +235,7 @@ static func _held(world: SimWorld, drug_index: int) -> int:
 func _test_serialize_round_trip() -> void:
 	var world := _new_world()
 	var prices: Array = world.prices_copy()
-	_assert(world.buy(prices[0]["drug_index"], 1) == SimWorld.OK, "buy should succeed")
+	_assert(world.buy(_cheapest_slot(prices)["drug_index"], 1) == SimWorld.OK, "buy should succeed")
 	_assert(world.travel(1) == SimWorld.OK, "travel should succeed")
 
 	var dump: Dictionary = world.world_dump()
@@ -318,37 +321,43 @@ func _test_prev_prices() -> void:
 	var world := _new_world()
 	_assert(world.prev_prices_copy().is_empty(), "day 1 should have no previous prices")
 
-	var day_one: Array = world.prices_copy()
-	_assert(world.travel(1) == SimWorld.OK, "travel should succeed")
-
-	var previous: Array = world.prev_prices_copy()
-	var current: Array = world.prices_copy()
-	_assert(previous.size() == day_one.size(), "prev prices should be the roster we left behind")
-	_assert(previous.size() > 0, "there should be previous prices after a travel")
-
 	# The two rosters are independent, so a drug traded now but not before
 	# must not appear in the previous list. That is the case the trend glyph
-	# has to tolerate.
+	# has to tolerate. Which seeds roll differing rosters is not part of the
+	# contract, so walk seeds until one does.
+	var day_one: Array = []
+	var previous: Array = []
 	var current_only: Array[int] = []
-	for slot in current:
-		var found := false
-		for prior in previous:
-			if prior["drug_index"] == slot["drug_index"]:
-				found = true
-				break
-		if not found:
-			current_only.append(int(slot["drug_index"]))
+	var travelled := true
+	for seed in range(7, 40):
+		world = _new_world(seed)
+		day_one = world.prices_copy()
+		travelled = world.travel(1) == SimWorld.OK and travelled
+		previous = world.prev_prices_copy()
+		current_only = []
+		for slot in world.prices_copy():
+			var found := false
+			for prior in previous:
+				if prior["drug_index"] == slot["drug_index"]:
+					found = true
+					break
+			if not found:
+				current_only.append(int(slot["drug_index"]))
+		if not current_only.is_empty():
+			break
+	_assert(travelled, "travel should succeed")
+	_assert(previous.size() == day_one.size(), "prev prices should be the roster we left behind")
+	_assert(previous.size() > 0, "there should be previous prices after a travel")
 	_assert(current_only.size() > 0, "the two rosters should differ, or the trend test proves nothing")
 
 	# Prices carried over verbatim from the day-one roster.
+	var carried_verbatim := true
 	for prior in previous:
 		for original in day_one:
 			if original["drug_index"] == prior["drug_index"]:
-				_assert(
-					original["price"] == prior["price"],
-					"a previous price should equal the day-one price for the same drug",
-				)
+				carried_verbatim = carried_verbatim and original["price"] == prior["price"]
 				break
+	_assert(carried_verbatim, "a previous price should equal the day-one price for the same drug")
 
 
 ## dw_roll_dealer_visits is the one addition that consumes RNG, so the

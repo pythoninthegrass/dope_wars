@@ -84,6 +84,8 @@ def assert_price_event_list_match(
         var expected_kind = world.PRICE_EVENT_CHEAP
         if kind == "expensive":
             expected_kind = world.PRICE_EVENT_EXPENSIVE
+        elif kind == "bust":
+            expected_kind = world.PRICE_EVENT_BUST
         assert_equal(events[i].kind, expected_kind)
         assert_equal(events[i].drug_index, rules.find_drug_index(drug))
 

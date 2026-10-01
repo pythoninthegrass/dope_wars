@@ -57,7 +57,7 @@ extern "C" {
  * changes. Additive changes (new functions, new appended anonymous-enum
  * constants, new `#define`s that don't invalidate existing struct sizes)
  * do NOT bump this. See `docs/abi-contract.md` for the full policy. */
-#define DW_ABI_VERSION 2u
+#define DW_ABI_VERSION 3u
 
 /* The value above, readable at runtime.
  *
@@ -165,12 +165,14 @@ enum {
     DW_ARRIVAL_FLAVOR = 7,
 };
 
-/* dw_price_event.kind — see `index.html:742,745` for the JS oracle's two
- * price-event bands. */
+/* dw_price_event.kind. CHEAP is a price crash (div 10), EXPENSIVE a spike
+ * (x5) announced with the "addicts" text, BUST a spike announced with the
+ * "cops made a big bust" text. See docs/beermat-re.md (M-02). */
 typedef uint8_t dw_price_event_kind;
 enum {
     DW_PRICE_EVENT_CHEAP = 0,
     DW_PRICE_EVENT_EXPENSIVE = 1,
+    DW_PRICE_EVENT_BUST = 2,
 };
 
 /* dw_finances action selector. */

@@ -49,7 +49,7 @@ versioning).
   `extension`:
   - `game/simulation/world.gd` (`class_name SimWorld`) — the *only* `.gd` file
     allowed to name `DopeWarsWorld`. A complete pass-through: every bound
-    method forwards to exactly one extension method, plus all 31 `DW_*`
+    method forwards to exactly one extension method, plus all 32 `DW_*`
     constants re-exported so nothing outside this file needs to name the
     extension class.
   - `game/presentation/` — `main.tscn` + `main.gd` (the only scene; the tree

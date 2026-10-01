@@ -164,6 +164,11 @@ float64, so save/load stays bit-exact.
   (zero RNG draws) to `randInt(2, 11)` (one RNG draw), matching beermat-verified
   play data. Struct layouts and the dump byte count are unchanged from v1 —
   this bump is solely for the RNG-draw-order rule above.
+- **v3 (TASK-010.02.02)**: `dw_generate_prices` rolls a 1-in-20 spike (x5) or
+  crash (div 10) per traded flagged drug instead of the 70% / 40% / 5%
+  event-count scheme, changing RNG draw order. `DW_PRICE_EVENT_BUST` (2) is a
+  new kind for the cops-bust spike text. `MAX_PRICE_EVENTS` grew from 3 to 8,
+  so the dump grew from 766 to 846 bytes.
 
 ## Serialization
 
