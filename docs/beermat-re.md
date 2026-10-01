@@ -118,13 +118,15 @@ The engine still rolls the new prices (and their draws) before the chase, dealer
 | --- | --- | --- | --- | --- |
 | Deputy count | `0x0045d6e4` | `Random(10) + 2`, 2-11 | `randInt(2, 11)` | match |
 | Cop tiers | `0x0045d6e4` | none, a single cop | one cop, "Officer Hardass" | match |
-| Run | `0x0045a878` | `Random(6) < 3`: escape ("You lost them in the alleys."), 50% regardless of guns. On failure the cops fire: `Random(2)`, 1 = hit, 0 = miss | 30% when aggressor, 60% otherwise; on failure always take 3-12 damage | **mismatch M-07** |
-| Stay | `0x0045a9f8` | the cops fire: `Random(2)`, 1 = hit for 5-15, 0 = miss | the Stay button only shows a message; the cops do not fire (`index.html:1512`) | **mismatch M-07** |
-| Cop hit damage | `0x0045a834` | `Random(11) + 5` (5-15), health floored at 0 | run: 3-12; fight: scaled `0-5`, minimum 1 | **mismatch M-07** |
-| Player shot | `0x0045ab38` | `Random(2)`: 1 kills one deputy (plays `DWCopHitByGun`), 0 misses (plays `DWYourGunShot`) | attack roll against defend roll from `80 + guns * 5` against 100 | **mismatch M-08** |
-| Win condition | `0x0045ab38` | the deputy count is decremented per kill and the chase ends when it goes below 0, so `deputies + 1` kills are needed | ends when the count reaches 0 | **mismatch M-08** |
-| Cop return fire in a fight | `0x0045ab38` | only while deputies >= 0 after the shot: `Random(2)`, 1 = hit (5-15) | hit and miss are one roll; the loser takes damage | **mismatch M-08** |
-| Win reward | `0x0045ab38` | guns `+= 1`; cash `+= (Random(1000) + 1000) + Random(1500)`, which is 1000-3499; then "Will you pay $X to have a doctor sew you up?" where X is the first term (1000-1999): yes sets health to 100 and deducts X | none | **mismatch M-09** |
+| Run | `0x0045a878` | `Random(6) < 3`: escape ("You lost them in the alleys."), 50% regardless of guns. On failure the cops fire: `Random(2)`, 1 = hit, 0 = miss | `Random(6) < 3` escapes ("You lost them in the alleys.") whatever the player carries, with no further draw; otherwise the cops fire, `Random(2)` then `Random(11) + 5` damage on a 1 | match (M-07, TASK-010.02.07) |
+| Stay | `0x0045a9f8` | the cops fire: `Random(2)`, 1 = hit for 5-15, 0 = miss | `stayInChase` makes the cops fire exactly as for a failed run; the Stay button calls it (also in the Godot chase dialog, through `dw_stay_in_chase`) | match (M-07) |
+| Cop hit damage | `0x0045a834` | `Random(11) + 5` (5-15), health floored at 0 | `Random(11) + 5` (5-15), health floored at 0, which kills | match (M-07) |
+| Player shot | `0x0045ab38` | `Random(2)`: 1 kills one deputy (plays `DWCopHitByGun`), 0 misses (plays `DWYourGunShot`) | `randInt(0, 1) === 1` kills one deputy, no other term (the attack/defend ratings and the aggressor flag are gone); `fight` is refused without a gun and draws nothing | match (M-08, TASK-010.02.07) |
+| Win condition | `0x0045ab38` | the deputy count is decremented per kill and the chase ends when it goes below 0, so `deputies + 1` kills are needed | the count is decremented per kill and the chase is won when it drops below 0 (the count reaches -1) | match (M-08) |
+| Cop return fire in a fight | `0x0045ab38` | only while deputies >= 0 after the shot: `Random(2)`, 1 = hit (5-15) | only while the count is 0 or more after the shot: `Random(2)`, 1 hits for `Random(11) + 5`; the win draws no return fire | match (M-08) |
+| Win reward | `0x0045ab38` | guns `+= 1`; cash `+= (Random(1000) + 1000) + Random(1500)`, which is 1000-3499; then "Will you pay $X to have a doctor sew you up?" where X is the first term (1000-1999): yes sets health to 100 and deducts X. The dialog is always offered, even at full health, and the binary does not check affordability (cash already includes the reward) | `+1` gun and `randInt(1000, 1999) + randInt(0, 1499)` cash, drawn in that order, in `fight`; `fight` returns the doctor offer (price 1000-1999) and `acceptDoctorOffer` pays it from cash and sets health to 100 (refused if the price exceeds cash) | match (M-09, TASK-010.02.07) |
+
+The messages are the strings at `0x0045a8xx`-`0x0045af20`: Run "You can't get away ! They're firing on you, man! They missed!" or "... You've been hit!", Stay "You stand there like an idiot. They're firing on you, man! They missed!" or "... You've been hit!", Fight "You're firing on them! You missed them!" or "... You killed one!" then "They're firing on you, man! They missed!" or "... You've been hit!", and the win "You killed them all!" followed by the dialog "You find a gun and $T on Officer Hardass' carcass. Will you pay $X to have a doctor sew you up?" (T is the whole reward, X the doctor price). Draw order: Run `Random(6)`, then `Random(2)` and `Random(11)`; Stay `Random(2)`, `Random(11)`; Fight the shot `Random(2)`, then on a win `Random(1000)` (the doctor term) and `Random(1500)`, otherwise `Random(2)` and `Random(11)` for the return fire. The win dialog is a Yes/No box and nothing in the binary checks health or affordability before it is shown. Beermat's status line keeps only the last message of a Fight round, so the port shows the shot and the return fire together in one alert (`docs/parity-deltas.md` section 6).
 
 ## Money
 
@@ -189,9 +191,9 @@ Checked on the live oracle (see `CLAUDE.local.md` for how to reach it; none of t
 | M-04 | Chase start chance (1 in 6, flat; fixed, match) | Travel | TASK-010.02.04 |
 | M-05 | Dealer visits, coat and gun prices, payment (fixed, match) | Arrival events | TASK-010.02.05 |
 | M-06 | Arrival event table (fixed, match) | Arrival events | TASK-010.02.06 |
-| M-07 | Run, stay and cop damage | Chase | TASK-010.02.07 |
-| M-08 | Fight resolution and win condition | Chase | TASK-010.02.07 |
-| M-09 | Chase win reward and doctor | Chase | TASK-010.02.07 |
+| M-07 | Run, stay and cop damage (fixed, match) | Chase | TASK-010.02.07 |
+| M-08 | Fight resolution and win condition (fixed, match) | Chase | TASK-010.02.07 |
+| M-09 | Chase win reward and doctor (fixed, match) | Chase | TASK-010.02.07 |
 | M-10 | Interest rounding | Money | TASK-010.02.08 |
 | M-11 | New Game locked until day 6 | Travel | TASK-010.02.09 |
 | M-12 | Average cost integer division | Drug table | TASK-010.02.10 |
