@@ -47,15 +47,21 @@ tasks:
     cmds:
       - mkdir -p game/content
       - cp logo.png game/content/icon.png
-      - |
-        set -eu
-        iconset="$(mktemp -d)/icon.iconset"
-        mkdir -p "$iconset"
-        for size in 16 32 128 256 512; do
-          sips -z "$size" "$size" logo.png --out "$iconset/icon_${size}x${size}.png" >/dev/null
-          sips -z "$((size * 2))" "$((size * 2))" logo.png --out "$iconset/icon_${size}x${size}@2x.png" >/dev/null
-        done
-        iconutil -c icns "$iconset" -o game/content/icon.icns
+      # icon.icns only feeds config/macos_native_icon (above), which Godot
+      # reads on macOS only; sips/iconutil don't exist on Linux, and the
+      # .icns this step would produce is unused there, so skip it. The
+      # checked-in game/content/icon.icns from the last macOS build is what
+      # a Linux checkout gets instead.
+      - cmd: |
+          set -eu
+          iconset="$(mktemp -d)/icon.iconset"
+          mkdir -p "$iconset"
+          for size in 16 32 128 256 512; do
+            sips -z "$size" "$size" logo.png --out "$iconset/icon_${size}x${size}.png" >/dev/null
+            sips -z "$((size * 2))" "$((size * 2))" logo.png --out "$iconset/icon_${size}x${size}@2x.png" >/dev/null
+          done
+          iconutil -c icns "$iconset" -o game/content/icon.icns
+        platforms: [darwin]
 
   import:
     desc: "Headless Godot import of the game/ project (populates .godot/ cache)"

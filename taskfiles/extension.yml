@@ -21,3 +21,12 @@ tasks:
     cmds:
       - scons platform=macos arch=arm64 target=template_debug
       - scons platform=macos arch=arm64 target=template_release
+
+  build-linux:
+    desc: "Build both template_debug and template_release Linux x86_64 shared libraries"
+    platforms: [linux]
+    deps: [":submodules", ":core:build"]
+    dir: extension
+    cmds:
+      - scons platform=linux target=template_debug
+      - scons platform=linux target=template_release

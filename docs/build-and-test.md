@@ -149,6 +149,35 @@ Runs, in order: `core:test`, `abi:check`, `abi:conformance`,
 `game:boundary-check`, `bridge:test`, `bridge:test:script`, `game:ui-test`,
 `game:smoke-test`. Non-zero exit on any failure.
 
+## Linux
+
+`task check` is green on Linux (verified on AlmaLinux 10.2 x86_64, glibc
+2.39), with no extra host packages beyond what the gate already needs:
+`readelf`, `objcopy`, and `ar` (all part of `binutils`, present on a default
+AlmaLinux/Fedora install) and a C++ toolchain (`g++`) for `extension/SConstruct`.
+Mojo itself requires glibc 2.34 or later (see
+[Mojo's system requirements](https://mojolang.org/docs/requirements)); this is
+older than AlmaLinux 10's floor, so any mainstream current distro should clear
+it.
+
+`game:icon`'s `.icns` generation step (`sips`/`iconutil`) is macOS-only and is
+skipped on Linux via `platforms: [darwin]` — `game/content/icon.icns` is
+checked into git from the last macOS build and only matters to
+`config/macos_native_icon`, which Godot reads on macOS alone.
+
+`task extension:build-linux` builds both `template_debug` and
+`template_release` `.so` files, mirroring `extension:build-macos`. The
+vendored Mojo runtime libraries (`libKGENCompilerRTShared.so`,
+`libAsyncRTRuntimeGlobals.so`, `libMSupportGlobals.so`) land next to
+`libdopewars.linux.*.x86_64.so` in `game/bin/`, resolved at load time through
+a self-relative `$ORIGIN` rpath — confirm with:
+
+```sh
+readelf -d game/bin/libdopewars.linux.template_debug.x86_64.so
+```
+
+which should show `RPATH: [$ORIGIN]` and `NEEDED: [libKGENCompilerRTShared.so]`.
+
 ## Other useful commands
 
 - `task run` — build the full stack and launch the game interactively.

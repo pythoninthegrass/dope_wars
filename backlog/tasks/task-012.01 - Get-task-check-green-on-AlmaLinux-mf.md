@@ -1,9 +1,11 @@
 ---
 id: TASK-012.01
 title: Get task check green on AlmaLinux (mf)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - Claude
 created_date: '2026-10-01 21:00'
+updated_date: '2026-10-01 21:11'
 labels: []
 dependencies: []
 parent_task_id: TASK-012
@@ -34,3 +36,29 @@ Any gate failure caused by a genuine macOS-only assumption in the build/test too
 - [ ] #5 `docs/build-and-test.md` gains a short Linux section noting any host package prerequisites (e.g. `readelf`/`objcopy` availability) discovered while getting the gate green
 - [ ] #6 A full `task check` log from mf is attached to this task's implementation notes
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. On mf, checked out branch task-012-linux-windows-testing (has the new backlog files only; no code changes yet).\n2. Run `mise exec -- task check` and capture full log to scratchpad; triage failures.\n3. Expected/likely fixes based on reading taskfiles/game.yml, extension.yml, SConstruct before running:\n   - `game:icon` task's sips/iconutil step only runs if `.task/checksum` cache is stale; mf already has a `.task/checksum` dir from a prior partial build, so it may or may not trigger. Gate the sips/iconutil block with `platforms: [darwin]` regardless (plain `cp logo.png` step stays unconditional/cross-platform; icon.icns is committed to git and only consumed by Godot's macOS-only native-icon API).\n   - Add `extension:build-linux` (template_debug + template_release), gated `platforms: [linux]`, mirroring `build-macos`.\n   - Verify `readelf -d game/bin/libdopewars.linux.*.so` shows `$ORIGIN` rpath and the vendored KGEN libs sit next to it (SConstruct already has generic Linux logic via readelf/NEEDED walk -- confirm it actually works end to end rather than assuming).\n4. Fix whatever `task check` actually reports beyond these predictions -- do not assume the list above is complete.\n5. Add a short Linux section to docs/build-and-test.md recording host prerequisites discovered (readelf/objcopy package names, etc).\n6. Re-run `task check` to green, attach the log to task notes, verify each AC, then finalize per the finalization guide.
+<!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Ran `task check` on mf against the new branch: failed at `game:icon`'s `sips` step (exit 127, "executable file not found in $PATH"), exactly the predicted macOS-only assumption. Nothing else failed.
+
+Fix: gated the `.icns`-generation `cmd` block in `taskfiles/game.yml`'s `icon` task with `platforms: [darwin]`; the unconditional `cp logo.png game/content/icon.png` step stays cross-platform. `game/content/icon.icns` is already checked into git from the last macOS build, so Linux checkouts still get a valid file, just not regenerated.
+
+Added `taskfiles/extension.yml`'s `build-linux` task (template_debug + template_release), gated `platforms: [linux]`, mirroring `build-macos`. Ran it on mf: clean build, no SConstruct changes needed.
+
+Re-ran `task check` on mf after the fix: exit 0, first clean pass. All test-floor assertion counts present: bridge-test 16 assertions, bridge-test-script 94 assertions, ui-test 539 assertions -- none silently skipped.
+
+Verified AC#3 directly: `readelf -d game/bin/libdopewars.linux.template_debug.x86_64.so` and the `template_release` variant both show `RPATH: [$ORIGIN]` and `NEEDED: [libKGENCompilerRTShared.so]`; the three vendored KGEN `.so` files sit next to it in `game/bin/`.
+
+Noted (not a regression, not fixed): both Linux and macOS `task check` runs print a benign "ERROR: Parse JSON failed... highscore_store.gd:32" and "2 resources still in use at exit" during `game:ui-test`/`game:smoke-test`. Confirmed present on macOS too via a fresh local run, so this is pre-existing Godot/test-harness noise unrelated to this task -- left alone, out of scope here.
+
+Added a "Linux" section to `docs/build-and-test.md` (prerequisites, the `build-linux` task, the icon-task skip rationale, the `readelf` verification command). `task lint` (markdownlint) passes locally.
+
+Confirmed `task check` still exits 0 on macOS after these Taskfile edits (no cross-platform regression).
+<!-- SECTION:NOTES:END -->
