@@ -101,4 +101,12 @@ additive.
 
 **Prototype and Godot port:** New Game is available on every day, including day 1.
 
+## 7. Sound is Godot-only
+
+**Prototype (`index.html`):** the `#engine` script has no sound at all — a deliberate scope decision for that pass (`README.md`), not a fidelity gap.
+
+**Godot port (`game/platform/sound_player.gd`, TASK-010.03):** plays Beermat's ten wav cues (`docs/beermat-re.md`, "Sounds") at the documented trigger points, and the Sounds menu is a checkable Allow Sound item mirroring `AllowSound`'s on-by-default behavior. The wavs themselves are copyrighted and never committed (`task game:sounds` copies them from gitignored `vendor/dopewars-1999/`); the game runs silently, without error, when they are absent.
+
+**Approved because:** the prototype's silence was a scoping choice for `index.html` specifically, not a rule the Godot port needs to preserve — nothing in `docs/gameplay.md` ties sound to a game rule, and the fidelity target here is Beermat's cue table, which the prototype was never meant to match.
+
 **Approved because:** Lance prefers being able to start a new game at any time rather than reproducing Beermat's restart lockout. This is a deliberate divergence, not an unported rule — `docs/beermat-re.md` M-11 stays recorded as the Beermat behavior for reference, but the port will not gate New Game to match it.

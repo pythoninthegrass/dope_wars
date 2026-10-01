@@ -9,6 +9,6 @@
 ## Not done yet
 
 - [ ] Godot port (macOS first, then Linux/Windows desktop, then wasm web build).
-- [ ] Sound.
+- [x] Sound (Godot port only — Beermat's ten wav cues, `game/platform/sound_player.gd`; `index.html` stays silent by design).
 - [ ] Antique-mode ruleset (8 boroughs / 12-drug benmwebb set, Loan Shark + Bank + Gun Shop + Rough Pub locations, hired-help mechanics) — currently only the Keymash/Beermat 6-borough ruleset is implemented.
 - [ ] Difficulty/gun variety (Keymash's Gun Dealer sells one undifferentiated gun; `docs/gameplay.md` documents 4 distinct stock guns and 3 cop tiers that could be modeled later).

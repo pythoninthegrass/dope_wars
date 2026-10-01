@@ -16,9 +16,24 @@ tasks:
       - cmd: godot --path game
         ignore_error: true
 
+  # TASK-010.03. The ten wavs are copyrighted and live only in gitignored
+  # vendor/dopewars-1999/ (see CLAUDE.local.md for how to obtain them); copying
+  # is a no-op, not a failure, when they are absent, so a fresh checkout boots
+  # silently rather than failing the build.
+  sounds:
+    desc: "Copy Beermat's wav effects into game/assets/sound/ when present"
+    cmds:
+      - mkdir -p game/assets/sound
+      - |
+        for wav in gun gun2 youhit cophit Siren bark cashreg hrdpunch wasted uhoh; do
+          src="vendor/dopewars-1999/$wav.wav"
+          [ -f "$src" ] && cp "$src" "game/assets/sound/$wav.wav"
+        done
+        true
+
   import:
     desc: "Headless Godot import of the game/ project (populates .godot/ cache)"
-    deps: [":extension:build"]
+    deps: [":extension:build", "sounds"]
     dir: game
     cmds:
       - |

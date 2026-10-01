@@ -26,8 +26,11 @@ var _next_dealer_seed := 1
 
 # Backstop for a synchronous error in _ready before _finish: it aborts _ready
 # (or the awaited run) and the scene would otherwise spin without ever quitting.
-# A healthy run reaches _finish well under this many frames later.
-const WATCHDOG_FRAMES := 600
+# A healthy run reaches _finish well under this many frames later. TASK-010.03
+# raised this from 600: its seed searches for a mugging, a dog chase, a fought
+# chase and a chase death each burn a few frames per seed tried, on top of the
+# existing chase/dealer searches sharing this one global budget.
+const WATCHDOG_FRAMES := 3000
 
 
 func _ready() -> void:
@@ -65,6 +68,8 @@ const CASES := [
 	"tables_fit_twelve_drugs",
 	"chase_and_doctor",
 	"dealer_dialogs",
+	"sound_cues",
+	"allow_sound_toggle",
 ]
 
 ## Per-case assertion floor. Each case declares the number of assertions it runs
@@ -90,6 +95,8 @@ const CASE_FLOORS := {
 	"tables_fit_twelve_drugs": 4,
 	"chase_and_doctor": 12,
 	"dealer_dialogs": 30,
+	"sound_cues": 7,
+	"allow_sound_toggle": 8,
 }
 
 ## A coarse backstop for the case registry itself: if every case reported but
@@ -130,6 +137,10 @@ func _run() -> void:
 	await _test_chase_and_doctor()
 	_case("dealer_dialogs")
 	await _test_dealer_dialogs()
+	_case("sound_cues")
+	await _test_sound_cues()
+	_case("allow_sound_toggle")
+	await _test_allow_sound_toggle()
 
 
 # docs/layer-boundaries.md:113-114 puts every display string behind tr(). A key
@@ -1181,6 +1192,201 @@ func _test_dealer_dialogs() -> void:
 				)
 			await _drain()
 			_assert(not _main.dialogs().is_open(), "answering the %s dealer should let the arrival finish" % kind)
+
+
+## TASK-010.03. docs/beermat-re.md's "Sounds" table, asserted through an
+## injected RecordingSoundPlayer so the case needs no audio device and no wavs
+## on disk. Covers a buy/sell round trip, the last day, a mugging, a dog chase,
+## and a fought chase; `allow_sound_toggle` below covers muting and persistence.
+## Installed last among the cases, since it permanently swaps _main's sound
+## player.
+func _test_sound_cues() -> void:
+	var recording := RecordingSoundPlayer.new()
+	_main.set_sound_player(recording)
+
+	var world := _fresh(SEED)
+	var drug_index := _cheapest_traded(world)
+	_main.hud().market_drug_pressed(drug_index)
+	await _idle()
+	_main._do_buy()
+	await _idle()
+	var buy_dialog := _main.dialogs().current() as QuantityDialog
+	buy_dialog.set_value(1)
+	_main.dialogs().confirm()
+	await _idle()
+	_assert(recording.played == [SoundPlayer.Cue.CASH_REG], "a buy should play DWCashReg, got %s" % [recording.played])
+
+	_main.hud().coat_drug_pressed(drug_index)
+	await _idle()
+	_main._do_sell()
+	await _idle()
+	(_main.dialogs().current() as QuantityDialog).set_value(1)
+	_main.dialogs().confirm()
+	await _idle()
+	_assert(
+		recording.played == [SoundPlayer.Cue.CASH_REG, SoundPlayer.Cue.CASH_REG],
+		"a sell should play a second DWCashReg, got %s" % [recording.played]
+	)
+
+	# A 2-day game's only travel lands on the last day.
+	_main.start_new_game(SEED, 2)
+	recording.played.clear()
+	_main.hud().borough_pressed(1)
+	await _drain()
+	_assert(recording.played.has(SoundPlayer.Cue.LAST_DAY), "arriving on the last day should play DWLastDay, got %s" % [recording.played])
+
+	_assert(
+		await _find_arrival_sound(recording, "mugged", SoundPlayer.Cue.MUGGED, 2000, 2400),
+		"some seed should trigger a mugging that plays DWMugged"
+	)
+	_assert(
+		await _find_arrival_sound(recording, "Police dogs", SoundPlayer.Cue.POLICE_DOG, 2400, 2800),
+		"some seed should trigger a dog chase that plays DWPoliceDog"
+	)
+	_assert(await _find_fight_sound(recording), "some seed should reach a chase and let Fight be exercised")
+	_assert(await _find_death_sound(recording), "some seed should die in a chase and play DWDead")
+
+
+## Searches fresh seeds starting at `seed_start` for one whose first travel
+## raises an arrival-event alert containing `needle`, then reports whether
+## `cue` was recorded for it. A chase pre-empts the arrival event entirely
+## (docs/beermat-re.md), so a seed that starts one is skipped rather than
+## treated as a miss.
+func _find_arrival_sound(recording: RecordingSoundPlayer, needle: String, cue: int, seed_start: int, seed_end: int) -> bool:
+	for seed_value in range(seed_start, seed_end):
+		_main.dialogs().close()
+		_fresh(seed_value)
+		recording.played.clear()
+		_main.hud().borough_pressed(1)
+		await _idle()
+		var texts: Array[String] = []
+		var saw_chase := false
+		var guard := 0
+		while _main.dialogs().is_open() and guard < 20:
+			guard += 1
+			var current := _main.dialogs().current()
+			if current is ChaseDialog:
+				saw_chase = true
+				break
+			texts.append(_copy_text(current))
+			current.confirm()
+			await _idle()
+		if saw_chase:
+			continue
+		for text in texts:
+			if text.contains(needle):
+				return recording.played.has(cue)
+	return false
+
+
+## Searches fresh seeds for a chase, then fights every round until it ends in a
+## win or a death, reporting whether the siren and at least one of the player's
+## shot cues fired.
+func _find_fight_sound(recording: RecordingSoundPlayer) -> bool:
+	for seed_value in range(3200, 3600):
+		_main.dialogs().close()
+		var world := _fresh(seed_value)
+		# Fight needs at least one gun (dw_fight, include/dopewars.h); without
+		# one the dialog's chaseFight control is a no-op and no shot ever fires.
+		world.accept_gun_offer(0, 0)
+		recording.played.clear()
+		_main.hud().borough_pressed(1)
+		await _idle()
+		var guard := 0
+		while _main.dialogs().is_open() and not (_main.dialogs().current() is ChaseDialog) and guard < 20:
+			guard += 1
+			_main.dialogs().confirm()
+			await _idle()
+		if not (_main.dialogs().current() is ChaseDialog):
+			continue
+
+		var fought := false
+		for _step in range(120):
+			var current := _main.dialogs().current()
+			if current is ChaseDialog:
+				(_find_named(current, "chaseFight") as Button).pressed.emit()
+				fought = true
+			elif current is AlertDialog or current is DoctorDialog:
+				current.confirm()
+			else:
+				break
+			await _idle()
+		if not fought:
+			continue
+		return recording.played.has(SoundPlayer.Cue.COP_CHASE) and (
+			recording.played.has(SoundPlayer.Cue.COP_HIT_BY_GUN) or recording.played.has(SoundPlayer.Cue.YOUR_GUN_SHOT)
+		)
+	return false
+
+
+## Searches fresh seeds for a chase, then repeats Stay until the core reports
+## death, reporting whether DWDead fired.
+func _find_death_sound(recording: RecordingSoundPlayer) -> bool:
+	for seed_value in range(3600, 4000):
+		_main.dialogs().close()
+		var world := _fresh(seed_value)
+		recording.played.clear()
+		_main.hud().borough_pressed(1)
+		await _idle()
+		var guard := 0
+		while _main.dialogs().is_open() and not (_main.dialogs().current() is ChaseDialog) and guard < 20:
+			guard += 1
+			_main.dialogs().confirm()
+			await _idle()
+		if not (_main.dialogs().current() is ChaseDialog):
+			continue
+
+		var died := false
+		for _step in range(200):
+			if bool(world.state_get().get("dead", false)):
+				died = true
+				break
+			var current := _main.dialogs().current()
+			if current is ChaseDialog:
+				(_find_named(current, "chaseStay") as Button).pressed.emit()
+			elif current is AlertDialog:
+				current.confirm()
+			else:
+				break
+			await _idle()
+		if not died:
+			continue
+		return recording.played.has(SoundPlayer.Cue.DEAD)
+	return false
+
+
+## TASK-010.03 AC#2. Toggling the menu's checkbox mutes the active sound player
+## immediately and persists through a fresh SoundSettingsStore read -- the
+## nearest a headless test gets to "across a cold start" without actually
+## restarting the process.
+func _test_allow_sound_toggle() -> void:
+	SoundSettingsStore.new().clear()
+	var world := _fresh(SEED)
+	_assert(_main.hud().allow_sound_checked(), "Allow Sound should default on")
+	_assert(_main.sound_player().allow_sound, "the sound player should start allowed")
+
+	var recording := RecordingSoundPlayer.new()
+	_main.set_sound_player(recording)
+	_main.hud().toggle_allow_sound()
+	_assert(not _main.hud().allow_sound_checked(), "toggling should uncheck Allow Sound")
+	_assert(not recording.allow_sound, "toggling off should mute the sound player")
+
+	var drug_index := _cheapest_traded(world)
+	_main.hud().market_drug_pressed(drug_index)
+	await _idle()
+	_main._do_buy()
+	await _idle()
+	(_main.dialogs().current() as QuantityDialog).set_value(1)
+	_main.dialogs().confirm()
+	await _idle()
+	_assert(recording.played.is_empty(), "a muted buy should record no cues, got %s" % [recording.played])
+	_assert(not SoundSettingsStore.new().load_allow_sound(), "muting should persist to disk")
+
+	_main.hud().toggle_allow_sound()
+	_assert(_main.hud().allow_sound_checked(), "toggling again should re-check Allow Sound")
+	_assert(recording.allow_sound, "toggling on should unmute the sound player")
+	_assert(SoundSettingsStore.new().load_allow_sound(), "unmuting should persist to disk too")
+	SoundSettingsStore.new().clear()
 
 
 ## Starts a fresh game per seed and travels until the first dealer dialog of the

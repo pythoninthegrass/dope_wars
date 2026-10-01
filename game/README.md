@@ -7,8 +7,23 @@ are all assembled in code from there. Split into four layers, matching
 
 - `simulation/` — the only layer allowed to reference the GDExtension class
 - `presentation/` — the game window, tables, dialogs, and the arrival flow
-- `platform/` — keyboard routing, save files, high scores
+- `platform/` — keyboard routing, save files, high scores, sound
 - `content/` — palette, Win98 chrome, and every display string
+
+## Sound
+
+`platform/sound_player.gd` plays Beermat's ten wav cues (`docs/beermat-re.md`,
+"Sounds") at the trigger points the original game uses them: a buy or sell, the
+last day, a cop chase opening or firing, a mugging, a police dog chase, and
+death. The Sounds menu is a checkable Allow Sound item mirroring the
+original's `AllowSound` setting (on by default), persisted by
+`platform/sound_settings_store.gd`.
+
+The wavs are copyrighted and never committed: `task game:sounds` copies them
+from gitignored `vendor/dopewars-1999/` into gitignored `assets/sound/` when
+present, and is a no-op otherwise. `SoundPlayer.play()` is silent when a cue's
+wav is absent, so the game boots and plays normally — just without audio — on
+a checkout that never ran the extraction step.
 
 ## The boundary
 

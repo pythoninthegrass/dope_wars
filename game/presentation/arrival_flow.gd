@@ -30,6 +30,13 @@ var _queue: Array[Dictionary] = []
 var _world: SimWorld
 var _dialogs: DialogHost
 var _on_died: Callable
+var _sound: SoundPlayer
+
+
+## Main owns the one SoundPlayer for the session; this just points at it. No
+## default -- `begin()` is only ever called after Main has set one.
+func set_sound_player(sound: SoundPlayer) -> void:
+	_sound = sound
 
 
 ## `on_died` is invoked instead of continuing the queue when the player dies
@@ -109,6 +116,14 @@ func _present_alert(title_key: String, message: String, icon: String) -> void:
 
 
 func _present_event(event: Dictionary) -> void:
+	# docs/beermat-re.md "Sounds": outcome 1 (mugged) and outcome 3 (dog chase)
+	# are the only two arrival events with a cue; free/found drugs are silent.
+	match int(event.get("kind", SimWorld.ARRIVAL_NONE)):
+		SimWorld.ARRIVAL_MUGGED:
+			_sound.play(SoundPlayer.Cue.MUGGED)
+		SimWorld.ARRIVAL_DOG_CHASE:
+			_sound.play(SoundPlayer.Cue.POLICE_DOG)
+
 	var location_index := int(_world.state_get().get("location_index", 0))
 	var message := Copy.arrival_message(event, Roster.drug_name(int(event.get("drug_index", -1))), Roster.location_name(location_index))
 	_dialogs.open(AlertDialog.new().present(Copy.DLG_RANDOM_EVENT, message, AlertDialog.ICON_WARNING), func(_key: String) -> void:
@@ -138,6 +153,9 @@ func _present_dealer(is_gun: bool) -> void:
 
 
 func _present_chase() -> void:
+	# docs/beermat-re.md "Sounds": DWCopChase plays each time the chase dialog
+	# opens, including every re-presentation after a failed Run/Stay/Fight.
+	_sound.play(SoundPlayer.Cue.COP_CHASE)
 	var state := _world.state_get()
 	var dialog := ChaseDialog.new().present(
 		int(_chase["deputies"]),
@@ -153,6 +171,10 @@ func _on_chase_action(key: String, _dialog: ChaseDialog) -> void:
 	match key:
 		"chaseRun":
 			var run := _world.run_from_chase()
+			# docs/beermat-re.md "Sounds": DWYouHitByGun/DWCopGunShot fire for
+			# the cops' volley on Run and Stay alike; a clean escape draws none.
+			if not bool(run.get("escaped", false)):
+				_sound.play(SoundPlayer.Cue.YOU_HIT_BY_GUN if bool(run.get("hit", false)) else SoundPlayer.Cue.COP_GUN_SHOT)
 			if bool(run.get("dead", false)):
 				_on_died.call()
 				return
@@ -166,6 +188,7 @@ func _on_chase_action(key: String, _dialog: ChaseDialog) -> void:
 			return
 		"chaseStay":
 			var stay := _world.stay_in_chase()
+			_sound.play(SoundPlayer.Cue.YOU_HIT_BY_GUN if bool(stay.get("hit", false)) else SoundPlayer.Cue.COP_GUN_SHOT)
 			if bool(stay.get("dead", false)):
 				_on_died.call()
 				return
@@ -177,12 +200,18 @@ func _on_chase_action(key: String, _dialog: ChaseDialog) -> void:
 			if int(fight.get("result", SimWorld.ERR_INVALID_ARGUMENT)) != SimWorld.OK:
 				_advance()
 				return
-			if bool(fight.get("dead", false)):
-				_on_died.call()
-				return
+			# docs/beermat-re.md "Sounds": the player's own shot always has a
+			# cue (DWCopHitByGun on a kill, DWYourGunShot on a miss); the cops'
+			# return fire (DWYouHitByGun/DWCopGunShot) only follows when the
+			# chase isn't won, since a win ends it before they can fire back.
+			_sound.play(SoundPlayer.Cue.COP_HIT_BY_GUN if bool(fight.get("killed", false)) else SoundPlayer.Cue.YOUR_GUN_SHOT)
 			if bool(fight.get("won", false)):
 				_chase = {}
 				_present_win(int(fight.get("reward", 0)), int(fight.get("doctor_price", 0)))
+				return
+			_sound.play(SoundPlayer.Cue.YOU_HIT_BY_GUN if bool(fight.get("cop_hit", false)) else SoundPlayer.Cue.COP_GUN_SHOT)
+			if bool(fight.get("dead", false)):
+				_on_died.call()
 				return
 			_chase = _chase.duplicate()
 			_chase["deputies"] = int(fight.get("deputies", deputies))

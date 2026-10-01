@@ -25,6 +25,8 @@ var _router: InputRouter
 var _saves := SaveStore.new()
 var _scores := HighscoreStore.new()
 var _arrival := ArrivalFlow.new()
+var _sound := SoundPlayer.new()
+var _sound_settings := SoundSettingsStore.new()
 
 ## Guards a second finish() -- the prototype disables the Finish button
 ## instead (index.html:1635), and dw_finish is const so calling it twice is
@@ -57,6 +59,11 @@ func _ready() -> void:
 	_router = InputRouter.new()
 	_router.intent.connect(_on_intent)
 	add_child(_router)
+
+	add_child(_sound)
+	_sound.allow_sound = _sound_settings.load_allow_sound()
+	_hud.set_allow_sound(_sound.allow_sound)
+	_arrival.set_sound_player(_sound)
 
 	_connect_hud()
 	_arrival.finished.connect(_refresh)
@@ -142,7 +149,13 @@ func _connect_hud() -> void:
 	_hud.exit_requested.connect(_do_exit)
 	_hud.alert_last_day.connect(_show_last_day_alert)
 	_hud.selection_changed.connect(_refresh)
+	_hud.allow_sound_toggled.connect(_on_allow_sound_toggled)
 	_arrival.state_changed.connect(_refresh)
+
+
+func _on_allow_sound_toggled(enabled: bool) -> void:
+	_sound.allow_sound = enabled
+	_sound_settings.save_allow_sound(enabled)
 
 
 ## The prototype saves at the end of every render (index.html:1163), which is
@@ -211,6 +224,7 @@ func _do_buy() -> void:
 	_dialogs.open(dialog, func(key: String) -> void:
 		if key == "qtyOk" and dialog.value() > 0:
 			_world.buy(drug_index, dialog.value())
+			_sound.play(SoundPlayer.Cue.CASH_REG)
 		_refresh()
 	)
 
@@ -229,6 +243,7 @@ func _do_sell() -> void:
 	_dialogs.open(dialog, func(key: String) -> void:
 		if key == "qtyOk" and dialog.value() > 0:
 			_world.sell(drug_index, dialog.value())
+			_sound.play(SoundPlayer.Cue.CASH_REG)
 		_refresh()
 	)
 
@@ -315,6 +330,9 @@ func _do_finish() -> void:
 
 func _handle_death() -> void:
 	_finished = true
+	# docs/beermat-re.md "Sounds": DWDead fires once, at the single point every
+	# chase-death branch (Run, Stay, Fight) funnels through.
+	_sound.play(SoundPlayer.Cue.DEAD)
 	_dialogs.close()
 	_show_score(_world.finish())
 
@@ -367,6 +385,7 @@ func _show_help() -> void:
 
 
 func _show_last_day_alert() -> void:
+	_sound.play(SoundPlayer.Cue.LAST_DAY)
 	_alert(Copy.DLG_LAST_DAY, tr(Copy.MSG_LAST_DAY), AlertDialog.ICON_MONEY)
 
 
@@ -434,3 +453,19 @@ func dialogs() -> DialogHost:
 
 func arrival() -> ArrivalFlow:
 	return _arrival
+
+
+func sound_player() -> SoundPlayer:
+	return _sound
+
+
+## Swaps in a test double (e.g. RecordingSoundPlayer), preserving the current
+## allow_sound value and forwarding the replacement to ArrivalFlow, which holds
+## the only other reference.
+func set_sound_player(sound: SoundPlayer) -> void:
+	sound.allow_sound = _sound.allow_sound
+	remove_child(_sound)
+	_sound.queue_free()
+	_sound = sound
+	add_child(_sound)
+	_arrival.set_sound_player(_sound)

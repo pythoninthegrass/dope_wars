@@ -5,7 +5,7 @@ MENU_FILE,File
 MENU_SCORES,Scores
 MENU_SOUNDS,Sounds
 MENU_HELP,Help
-MENU_NO_SOUND,(no sound in this build)
+ITEM_ALLOW_SOUND,Allow Sound
 ITEM_NEW_GAME,New Game
 ITEM_EXIT,Exit
 ITEM_HIGH_SCORES,High Scores

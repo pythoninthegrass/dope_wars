@@ -27,6 +27,11 @@ signal exit_requested()
 signal buy_drug_selected(drug_index: int)
 signal sell_drug_selected(drug_index: int)
 
+## A click on the Sounds menu's checkbox. Main owns the sound player and the
+## persisted setting; this is the HUD's half of index.html's non-existent
+## equivalent -- the prototype's engine has no sound at all (docs/beermat-re.md).
+signal allow_sound_toggled(enabled: bool)
+
 ## A click on either table changed the selection, so the action buttons and the
 ## two tables' highlights have to be recomputed. index.html:1189 and :1210 both
 ## end their click handler with a full render(); Main listens here and does the
@@ -47,6 +52,13 @@ var selected_sell_drug := -1
 ## still clear and the player is told once more, which is what the JS does too
 ## since the flag only ever gets set on the client.
 var _last_day_warned := false
+
+## The Sounds menu's single checkbox. docs/beermat-re.md: "AllowSound default:
+## on" -- mirrors Main's SoundPlayer.allow_sound, set here without a round trip
+## through the toggle signal so seeding at boot cannot re-write the setting
+## that was just read from it.
+var _allow_sound_checked := true
+var _sounds_popup: PopupMenu
 
 var _title: Label
 var _leds: Dictionary = {}
@@ -160,6 +172,15 @@ func seed_last_day_warning(world: SimWorld) -> void:
 	_last_day_warned = bool(world.state_get().get("last_day_warned", false))
 
 
+## Seeds the checkbox from storage without emitting allow_sound_toggled -- a
+## round trip through the signal would immediately re-save the value Main just
+## read.
+func set_allow_sound(enabled: bool) -> void:
+	_allow_sound_checked = enabled
+	if _sounds_popup != null:
+		_sounds_popup.set_item_checked(0, enabled)
+
+
 func market_table() -> MarketTable:
 	return _market
 
@@ -220,6 +241,15 @@ func market_drug_pressed(drug_index: int) -> void:
 ## Clicks a coat row, going through the table's own selection path.
 func coat_drug_pressed(drug_index: int) -> void:
 	_coat.select_drug(drug_index)
+
+
+func allow_sound_checked() -> bool:
+	return _allow_sound_checked
+
+
+## Clicks the Sounds menu's checkbox as a real click would.
+func toggle_allow_sound() -> void:
+	_on_toggle_allow_sound()
 
 
 # --- construction -----------------------------------------------------------
@@ -290,9 +320,7 @@ func _build_menubar() -> Control:
 	bar.add_child(_menu_button(Copy.MENU_SCORES, [
 		[Copy.ITEM_HIGH_SCORES, "_on_scores"],
 	]))
-	# index.html:534-536: the Sounds menu is present but inert, with one
-	# disabled item saying so.
-	bar.add_child(_menu_button(Copy.MENU_SOUNDS, [[Copy.MENU_NO_SOUND, ""]], true))
+	bar.add_child(_build_sounds_menu())
 	bar.add_child(_menu_button(Copy.MENU_HELP, [
 		[Copy.ITEM_HOW_TO_PLAY, "_on_help"],
 	]))
@@ -300,15 +328,13 @@ func _build_menubar() -> Control:
 	return strip
 
 
-## `items` is a list of [label_key, handler_method] pairs. An empty handler
-## name lists an item that does nothing, which is how the Sounds menu renders
-## in the prototype. The frame is the theme's, not Button's: index.html:109-118
-## draws these as bare text that highlights on hover.
-func _menu_button(label_key: String, items: Array, inert: bool = false) -> Control:
+## `items` is a list of [label_key, handler_method] pairs. The frame is the
+## theme's, not Button's: index.html:109-118 draws these as bare text that
+## highlights on hover.
+func _menu_button(label_key: String, items: Array) -> Control:
 	var root := MenuButton.new()
 	root.name = "Menu" + label_key
 	root.text = tr(label_key)
-	root.disabled = inert
 
 	var popup := root.get_popup()
 	var handlers := {}
@@ -326,6 +352,32 @@ func _menu_button(label_key: String, items: Array, inert: bool = false) -> Contr
 			call(handler)
 	)
 	return root
+
+
+## The original's single checkable Sounds-menu item (`TForm1.EnableSndClick`,
+## docs/beermat-re.md), which the prototype has no counterpart for -- its
+## engine has no sound at all. Built directly on the popup rather than through
+## `_menu_button`, since a checkbox is not a [label, handler] pair.
+func _build_sounds_menu() -> Control:
+	var root := MenuButton.new()
+	root.name = "Menu" + Copy.MENU_SOUNDS
+	root.text = tr(Copy.MENU_SOUNDS)
+
+	var popup := root.get_popup()
+	popup.add_check_item(tr(Copy.ITEM_ALLOW_SOUND), 0)
+	popup.set_item_checked(0, _allow_sound_checked)
+	popup.id_pressed.connect(func(chosen: int) -> void:
+		if chosen == 0:
+			_on_toggle_allow_sound()
+	)
+	_sounds_popup = popup
+	return root
+
+
+func _on_toggle_allow_sound() -> void:
+	_allow_sound_checked = not _allow_sound_checked
+	_sounds_popup.set_item_checked(0, _allow_sound_checked)
+	allow_sound_toggled.emit(_allow_sound_checked)
 
 
 func _on_new_game() -> void:

@@ -30,7 +30,7 @@ The test file extracts `#engine` from `index.html` and evaluates it in `node:vm`
 ### Deliberately out of scope for this pass
 
 - The Godot port itself (macOS/Linux/Windows desktop + wasm web build).
-- Sound.
+- Sound — a deliberate scope decision for `index.html` itself; the Godot port plays Beermat's wav cues (`game/README.md`).
 - Beermat's Discord menu button (Keymash-specific, dropped).
 - Server-authoritative multiplayer / leaderboards — high scores are local-only (`localStorage`).
 
