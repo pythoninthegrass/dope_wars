@@ -500,63 +500,192 @@ describe('finances', () => {
   })
 })
 
+// Random(n) == k as a scripted draw: randInt(rng, 0, n - 1) floors draw * n.
+const rnd = (k, n) => (k + 0.5) / n
+
+function eventState(prevPrices, inventory = {}) {
+  const state = Engine.newGame({ seed: 1 })
+  state.prevPrices = prevPrices
+  state.prices = {}
+  for (const [id, qty] of Object.entries(inventory)) state.inventory[id] = { qty, avgPrice: 0 }
+  return state
+}
+
 describe('arrival events', () => {
-  test('mugging (roll < 10) takes 5-20% of cash', () => {
-    const state = Engine.newGame({ seed: 1 })
-    state.cash = 1000
-    const rng = () => 0.05
-    const ev = Engine.rollArrivalEvent(state, rng)
-    assert.equal(ev.type, 'mugged')
-    assert.ok(state.cash >= 800 && state.cash <= 950)
+  test('the event fires on Random(14) == 0 only, one draw on a miss', () => {
+    const state = eventState({ acid: 1000 })
+    const rng = scriptedRng([rnd(1, 14)])
+    assert.equal(Engine.rollArrivalEvent(state, rng).type, 'none')
+    assert.equal(rng.drawn(), 1)
   })
 
-  test('mugging with $0 subtracts 5% of health instead', () => {
-    const state = Engine.newGame({ seed: 1 })
-    state.cash = 0
-    const healthBefore = state.health
-    const rng = () => 0.05
+  test('cash + bank above 99,999,999 forces the mugging with no event or outcome draw', () => {
+    const state = eventState({ acid: 1000 })
+    state.cash = 60000000
+    state.bank = 40000000
+    const rng = scriptedRng([rnd(0, 2)])
     const ev = Engine.rollArrivalEvent(state, rng)
+    assert.equal(ev.type, 'mugged')
+    assert.equal(rng.drawn(), 1)
+    assert.equal(state.cash, 60000000 - 20000000)
+    assert.equal(ev.amount, 20000000)
+  })
+
+  test('cash + bank of exactly 99,999,999 is not forced', () => {
+    const state = eventState({ acid: 1000 })
+    state.cash = 99999999
+    const rng = scriptedRng([rnd(5, 14)])
+    assert.equal(Engine.rollArrivalEvent(state, rng).type, 'none')
+    assert.equal(rng.drawn(), 1)
+  })
+
+  test('outcome 1 mugs for cash div (Random(2) + 3) and names the location', () => {
+    for (const [pick, kept] of [[0, 667], [1, 750]]) {
+      const state = eventState({ acid: 1000 })
+      state.cash = 1000
+      state.location = 'brooklyn'
+      const rng = scriptedRng([rnd(0, 14), rnd(1, 4), rnd(pick, 2)])
+      const ev = Engine.rollArrivalEvent(state, rng)
+      assert.equal(ev.type, 'mugged')
+      assert.equal(state.cash, kept)
+      assert.equal(ev.amount, 1000 - kept)
+      assert.equal(ev.message, 'You were mugged on the Brooklyn!')
+      assert.equal(rng.drawn(), 3)
+    }
+  })
+
+  test('mugging with no cash takes nothing and leaves health alone', () => {
+    const state = eventState({ acid: 1000 })
+    state.cash = 0
+    const ev = Engine.rollArrivalEvent(state, scriptedRng([rnd(0, 14), rnd(1, 4), rnd(0, 2)]))
     assert.equal(ev.type, 'mugged')
     assert.equal(state.cash, 0)
-    assert.equal(state.health, Math.floor(healthBefore * 0.95))
+    assert.equal(state.health, 100)
   })
 
-  test('free drugs (roll 10-29) adds inventory at $0 cost if coat space allows', () => {
-    const state = Engine.newGame({ seed: 1 })
-    state.prices = { speed: 100 }
-    const cashBefore = state.cash
-    const rng = () => 0.15
+  test('outcome 0 redraws Random(11) until the drug is available, then Random(7) + 2 units', () => {
+    // Beermat order: 2 is hashish (absent), 1 is cocaine (available).
+    const state = eventState({ cocaine: 20000, acid: 1000 }, { cocaine: 10 })
+    state.inventory.cocaine.avgPrice = 100
+    state.location = 'centralpark'
+    const rng = scriptedRng([rnd(0, 14), rnd(0, 4), rnd(2, 11), rnd(1, 11), rnd(3, 7)])
     const ev = Engine.rollArrivalEvent(state, rng)
+    assert.equal(ev.type, 'foundDrugs')
+    assert.equal(ev.drug, 'cocaine')
+    assert.equal(ev.qty, 5)
+    assert.equal(state.inventory.cocaine.qty, 15)
+    assert.equal(state.inventory.cocaine.avgPrice, 66)
+    assert.equal(ev.message, 'You find 5 units of Cocaine on a dead dude in the Central Park!')
+    assert.equal(rng.drawn(), 5)
+  })
+
+  test('found quantity is capped at the free coat space', () => {
+    const state = eventState({ acid: 1000 }, { crack: 97 })
+    const ev = Engine.rollArrivalEvent(state, scriptedRng([rnd(0, 14), rnd(0, 4), rnd(0, 11), rnd(6, 7)]))
+    assert.equal(ev.qty, 3)
+    assert.equal(state.inventory.acid.qty, 3)
+  })
+
+  test('a full coat skips outcomes 0 and 2 before any drug draw', () => {
+    for (const outcome of [0, 2]) {
+      const state = eventState({ acid: 1000 }, { crack: 100 })
+      const rng = scriptedRng([rnd(0, 14), rnd(outcome, 4)])
+      assert.equal(Engine.rollArrivalEvent(state, rng).type, 'none')
+      assert.equal(rng.drawn(), 2)
+    }
+  })
+
+  test('the last drug in Beermat order (weed) is never picked and an empty pool draws nothing', () => {
+    const state = eventState({ weed: 500 })
+    const rng = scriptedRng([rnd(0, 14), rnd(0, 4)])
+    assert.equal(Engine.rollArrivalEvent(state, rng).type, 'none')
+    assert.equal(rng.drawn(), 2)
+    const empty = eventState({})
+    const rng2 = scriptedRng([rnd(0, 14), rnd(2, 4)])
+    assert.equal(Engine.rollArrivalEvent(empty, rng2).type, 'none')
+    assert.equal(rng2.drawn(), 2)
+  })
+
+  test('the drug comes from the market the player left, not the one just rolled', () => {
+    const state = eventState({ acid: 1000 })
+    state.prices = { cocaine: 20000 }
+    const ev = Engine.rollArrivalEvent(state, scriptedRng([rnd(0, 14), rnd(0, 4), rnd(0, 11), rnd(0, 7)]))
+    assert.equal(ev.drug, 'acid')
+  })
+
+  test('a drug held at zero average stays at zero average when more arrives', () => {
+    const state = eventState({ acid: 1000 })
+    Engine.rollArrivalEvent(state, scriptedRng([rnd(0, 14), rnd(0, 4), rnd(0, 11), rnd(0, 7)]))
+    assert.equal(state.inventory.acid.qty, 2)
+    assert.equal(state.inventory.acid.avgPrice, 0)
+  })
+
+  test('outcome 2 gives units under the same rules and omits the quantity from the text', () => {
+    const state = eventState({ speed: 100, acid: 1000 }, { speed: 4 })
+    state.inventory.speed.avgPrice = 90
+    const ev = Engine.rollArrivalEvent(state, scriptedRng([rnd(0, 14), rnd(2, 4), rnd(10, 11), rnd(4, 7)]))
     assert.equal(ev.type, 'freeDrugs')
-    assert.equal(state.cash, cashBefore)
-    assert.ok(state.inventory[ev.drug].qty > 0)
+    assert.equal(ev.drug, 'speed')
+    assert.equal(ev.qty, 6)
+    assert.equal(state.inventory.speed.qty, 10)
+    assert.equal(state.inventory.speed.avgPrice, 36)
+    assert.equal(ev.message, 'You meet a friend! He lays some Speed on you!')
   })
 
-  test('free drugs (roll 10-29) returns none when coat is full', () => {
-    const state = Engine.newGame({ seed: 1 })
-    state.prices = { speed: 100 }
-    // fill the coat completely
-    const drugId = Object.keys(state.prices)[0]
-    state.inventory[drugId] = { qty: state.coatCapacity, avgPrice: 0 }
-    const rng = () => 0.15
+  test('outcome 3 with an empty coat only chases for Random(4) + 2 blocks', () => {
+    const state = eventState({ acid: 1000 })
+    const rng = scriptedRng([rnd(0, 14), rnd(3, 4), rnd(2, 4)])
     const ev = Engine.rollArrivalEvent(state, rng)
-    assert.equal(ev.type, 'none')
+    assert.equal(ev.type, 'dogChase')
+    assert.equal(ev.blocks, 4)
+    assert.equal(ev.qty, 0)
+    assert.equal(ev.message, 'Police dogs chased you for 4 blocks.')
+    assert.equal(rng.drawn(), 3)
   })
 
-  test('instant death event (roll 60-60.5) kills the player', () => {
-    const state = Engine.newGame({ seed: 1 })
-    const rng = () => 0.602
+  test('outcome 3 with drugs held drops min(Random(held) + 1, 10) of a random held drug', () => {
+    // Random(12) picks Beermat index 1 (cocaine, not held) then 3 (heroin); Random(4) = 2 drops.
+    const state = eventState({ acid: 1000 }, { acid: 5, heroin: 30 })
+    const rng = scriptedRng([rnd(0, 14), rnd(3, 4), rnd(1, 12), rnd(3, 12), rnd(2, 4), rnd(14, 30), rnd(0, 4)])
     const ev = Engine.rollArrivalEvent(state, rng)
-    assert.equal(ev.type, 'freeWeedDeath')
-    assert.equal(state.health, 0)
-    assert.equal(state.dead, true)
+    assert.equal(ev.type, 'dogChase')
+    assert.equal(ev.drug, 'heroin')
+    assert.equal(ev.qty, 10)
+    assert.equal(ev.blocks, 2)
+    assert.equal(state.inventory.heroin.qty, 20)
+    assert.equal(ev.message, 'Police dogs chased you for 2 blocks. You dropped some drugs! That\'s a drag, man!')
+    assert.equal(rng.drawn(), 7)
   })
 
-  test('no-op roll (>=65, below dealer/chase thresholds) returns a flavor event', () => {
-    const state = Engine.newGame({ seed: 1 })
-    const rng = () => 0.99
+  test('outcome 3 drops fewer than 10 when Random(held) + 1 is smaller, and removes the entry at zero', () => {
+    const state = eventState({ acid: 1000 }, { acid: 3 })
+    const ev = Engine.rollArrivalEvent(state, scriptedRng([rnd(0, 14), rnd(3, 4), rnd(0, 12), rnd(3, 4), rnd(2, 3), rnd(1, 4)]))
+    assert.equal(ev.qty, 3)
+    assert.equal(state.inventory.acid, undefined)
+  })
+
+  test('outcome 3 keeps the drugs on a Random(4) below 2 and draws no drop quantity', () => {
+    const state = eventState({ acid: 1000 }, { acid: 5 })
+    const rng = scriptedRng([rnd(0, 14), rnd(3, 4), rnd(0, 12), rnd(1, 4), rnd(1, 4)])
     const ev = Engine.rollArrivalEvent(state, rng)
-    assert.ok(['flavor', 'none'].includes(ev.type))
+    assert.equal(ev.qty, 0)
+    assert.equal(ev.blocks, 3)
+    assert.equal(state.inventory.acid.qty, 5)
+    assert.equal(ev.message, 'Police dogs chased you for 3 blocks.')
+    assert.equal(rng.drawn(), 5)
+  })
+
+  test('only the four Beermat outcomes ever happen and none of them kills', () => {
+    const seen = new Set()
+    const rng = Engine.mulberry32(99)
+    for (let i = 0; i < 4000; i++) {
+      const state = eventState({ acid: 1000, crack: 2000 }, { acid: 5 })
+      state.cash = 1000
+      const ev = Engine.rollArrivalEvent(state, Engine.mulberry32(Math.floor(rng() * 2 ** 31)))
+      seen.add(ev.type)
+      assert.equal(state.dead, false)
+    }
+    assert.deepEqual([...seen].sort(), ['dogChase', 'foundDrugs', 'freeDrugs', 'mugged', 'none'])
   })
 })
 

@@ -673,6 +673,10 @@
       ],
       absentOdds: 8,
       eventOdds: 20,
+      arrivalEventOdds: 14,
+      eventWealthCap: 99999999,
+      giftDrugRange: 11,
+      dogDropCap: 10,
       cheapDivide: 10,
       expensiveMultiply: 5,
       dealerOdds: 14,
@@ -838,66 +842,86 @@
       return state.health;
     }
 
-    // Percentile roll on arrival, per docs/gameplay.md:96-107, restricted to
-    // what the Keymash playthrough actually surfaced.
+    // Beermat's drug index order, which its arrival-event rejection loops draw over (docs/beermat-re.md, M-06).
+    const BEERMAT_DRUG_ORDER = ['acid', 'cocaine', 'hashish', 'heroin', 'ecstasy', 'smack', 'opium', 'crack', 'peyote', 'shrooms', 'speed', 'weed'];
+
+    // Random(11) over Beermat's first 11 drugs, redrawn until the drug was traded in the market the player just left.
+    // Weed, index 11, is out of range. Draws nothing when no eligible drug is traded (Beermat would loop forever).
+    function pickDrugFromLeftMarket(state, rng) {
+      const market = state.prevPrices || {};
+      const pool = BEERMAT_DRUG_ORDER.slice(0, RULES.giftDrugRange);
+      if (!pool.some((id) => market[id] != null)) return null;
+      for (;;) {
+        const id = pool[randInt(rng, 0, RULES.giftDrugRange - 1)];
+        if (market[id] != null) return id;
+      }
+    }
+
+    // Random(12) over Beermat's drug order, redrawn until the drug is held. Requires something held.
+    function pickHeldDrug(state, rng) {
+      for (;;) {
+        const id = BEERMAT_DRUG_ORDER[randInt(rng, 0, BEERMAT_DRUG_ORDER.length - 1)];
+        if (state.inventory[id] && state.inventory[id].qty > 0) return id;
+      }
+    }
+
+    // Adds found or given units and dilutes the average cost with integer division; returns the units added.
+    function receiveDrugs(state, drugId, qty) {
+      const held = state.inventory[drugId];
+      const heldQty = held ? held.qty : 0;
+      const granted = addToInventory(state, drugId, qty);
+      const entry = state.inventory[drugId];
+      entry.avgPrice = heldQty === 0 ? 0 : Math.floor(heldQty * entry.avgPrice / (heldQty + granted));
+      return granted;
+    }
+
+    function rollDrugGift(state, rng, outcome) {
+      const space = state.coatCapacity - coatUsed(state);
+      if (space <= 0) return { type: 'none' };
+      const drugId = pickDrugFromLeftMarket(state, rng);
+      if (!drugId) return { type: 'none' };
+      const qty = receiveDrugs(state, drugId, Math.min(randInt(rng, 2, 8), space));
+      const drug = findDrug(drugId);
+      const place = findLocation(state.location).name;
+      return outcome === 0
+        ? { type: 'foundDrugs', drug: drugId, qty, message: `You find ${qty} units of ${drug.name} on a dead dude in the ${place}!` }
+        : { type: 'freeDrugs', drug: drugId, qty, message: `You meet a friend! He lays some ${drug.name} on you!` };
+    }
+
+    function rollMugging(state, rng) {
+      const before = state.cash;
+      state.cash -= Math.floor(state.cash / randInt(rng, 3, 4));
+      const place = findLocation(state.location).name;
+      return { type: 'mugged', amount: before - state.cash, message: `You were mugged on the ${place}!` };
+    }
+
+    function rollPoliceDogs(state, rng) {
+      let drugId = null;
+      let dropped = 0;
+      if (coatUsed(state) > 0) {
+        drugId = pickHeldDrug(state, rng);
+        if (randInt(rng, 0, 3) > 1) dropped = Math.min(randInt(rng, 1, state.inventory[drugId].qty), RULES.dogDropCap);
+      }
+      const blocks = randInt(rng, 2, 5);
+      if (dropped > 0) removeFromInventory(state, drugId, dropped);
+      const base = `Police dogs chased you for ${blocks} blocks.`;
+      return {
+        type: 'dogChase',
+        ...(dropped > 0 ? { drug: drugId } : {}),
+        qty: dropped,
+        blocks,
+        message: dropped > 0 ? `${base} You dropped some drugs! That's a drag, man!` : base,
+      };
+    }
+
+    // Beermat's arrival event (docs/beermat-re.md, M-06): Random(14) == 0, or always once cash + bank passes the wealth cap, when it is the mugging.
     function rollArrivalEvent(state, rng) {
-      const roll = rng() * 100;
-      if (roll < 10) {
-        if (state.cash === 0) {
-          const damage = Math.floor(state.health * 0.05);
-          applyDamage(state, damage);
-          return { type: 'mugged', message: `You were mugged in the subway! They beat you up instead.` };
-        }
-        const pct = randInt(rng, 80, 95) / 100;
-        const before = state.cash;
-        state.cash = Math.floor(state.cash * pct);
-        return { type: 'mugged', message: `You were mugged in the subway! You lost $${before - state.cash}.` };
-      }
-      if (roll < 30) {
-        const drugId = randomTradeableDrug(state, rng);
-        if (!drugId) return { type: 'none' };
-        const amount = randInt(rng, 3, 7);
-        const granted = addToInventory(state, drugId, amount);
-        if (granted === 0) return { type: 'none' };
-        const drug = findDrug(drugId);
-        return { type: 'freeDrugs', drug: drugId, qty: granted, message: `You meet a friend! He lays ${granted} units of ${drug.name} on you!` };
-      }
-      if (roll < 50) {
-        const held = Object.keys(state.inventory);
-        if (held.length > 0 && rng() < 0.5) {
-          const drugId = held[randInt(rng, 0, held.length - 1)];
-          const amount = randInt(rng, 3, 7);
-          const lost = removeFromInventory(state, drugId, amount);
-          const drug = findDrug(drugId);
-          return { type: 'dogChase', drug: drugId, qty: lost, message: `Police dogs chased you! You dropped ${lost} units of ${drug.name}.` };
-        }
-        const drugId = randomTradeableDrug(state, rng);
-        if (!drugId) return { type: 'none' };
-        const amount = randInt(rng, 3, 7);
-        const granted = addToInventory(state, drugId, amount);
-        const drug = findDrug(drugId);
-        return { type: 'foundDrugs', drug: drugId, qty: granted, message: `You found ${granted} units of ${drug.name} on a dead dude in the subway!` };
-      }
-      if (roll < 60) {
-        const candidates = ['weed', 'hashish'].filter((id) => state.inventory[id] && state.inventory[id].qty > 0);
-        if (candidates.length === 0) return { type: 'none' };
-        candidates.sort((a, b) => state.inventory[b].qty - state.inventory[a].qty);
-        const drugId = candidates[0];
-        const amount = randInt(rng, 2, 6);
-        const lost = removeFromInventory(state, drugId, amount);
-        const drug = findDrug(drugId);
-        return { type: 'mamasBrownies', drug: drugId, qty: lost, message: `Mama's brownies! You lost ${lost} units of ${drug.name}.` };
-      }
-      if (roll < 60.5) {
-        applyDamage(state, state.health);
-        return { type: 'freeWeedDeath', message: 'You hallucinated for three days... then you died because your brain disintegrated!' };
-      }
-      if (roll < 75) {
-        const amt = randInt(rng, 1, 10);
-        state.cash = Math.max(0, state.cash - amt);
-        return { type: 'flavor', message: `You stopped to get a bite to eat. That cost you $${amt}.` };
-      }
-      return { type: 'none' };
+      const forced = state.cash + state.bank > RULES.eventWealthCap;
+      if (!forced && randInt(rng, 0, RULES.arrivalEventOdds - 1) !== 0) return { type: 'none' };
+      const outcome = forced ? 1 : randInt(rng, 0, 3);
+      if (outcome === 0 || outcome === 2) return rollDrugGift(state, rng, outcome);
+      if (outcome === 1) return rollMugging(state, rng);
+      return rollPoliceDogs(state, rng);
     }
 
     // One combined dealer chance per non-chase arrival, then an even coat/gun split (docs/beermat-re.md, M-05).
@@ -1376,10 +1400,9 @@
         return;
       }
       if (item.kind === 'event') {
-        showAlert('Random Event', item.event.message, item.event.type === 'freeWeedDeath' ? '☠️' : '⚠️');
+        showAlert('Random Event', item.event.message, '⚠️');
         document.getElementById('alertOk').addEventListener('click', () => {
           render();
-          if (state.dead) { handleDeath(); return; }
           processQueue(queue);
         }, { once: true });
         return;

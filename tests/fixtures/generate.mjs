@@ -18,6 +18,9 @@ import { makeRunStep } from './run-step.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
+// A scripted draw that makes Random(n) return k.
+const rnd = (k, n) => (k + 0.5) / n
+
 // A fixture is:
 //   name: file basename (no extension)
 //   meta: { seed, description, mechanic }
@@ -72,46 +75,52 @@ const FIXTURES = [
   },
   {
     name: '04-arrival-events',
-    meta: { seed: 1, description: 'every rollArrivalEvent branch via scripted RNG', mechanic: 'mugged/freeDrugs/dogChase/foundDrugs/mamasBrownies/freeWeedDeath/flavor/none' },
+    meta: { seed: 1, description: 'every rollArrivalEvent branch via scripted RNG', mechanic: 'Random(14) chance, wealth-cap mugging, Random(4) outcome: found/mugged/friend/police dogs' },
     steps: [
       { call: 'newGame', args: { seed: 1 } },
-      { call: 'setPrices', args: { speed: 100 } },
-      // mugged with cash: roll < 10, then randInt(80,95) for pct
+      { call: 'setPrices', args: { cocaine: 100, acid: 50 } },
+      { call: 'setPrevPrices', args: { cocaine: 100, acid: 50 } },
+      // miss: Random(14) != 0
+      { call: 'rollArrivalEvent', rng: [rnd(1, 14)] },
+      // outcome 1, mugged for cash div 4 then cash div 3
       { call: 'setField', args: { cash: 1000, health: 100 } },
-      { call: 'rollArrivalEvent', rng: [0.05, 0.5] },
-      // mugged with $0: roll < 10, cash === 0 branch
-      { call: 'setField', args: { cash: 0, health: 100 } },
-      { call: 'rollArrivalEvent', rng: [0.05] },
-      // freeDrugs: 10..30, drug pick, qty roll
-      { call: 'setField', args: { cash: 500, health: 100, inventory: {}, coatCapacity: 100 } },
-      { call: 'setPrices', args: { speed: 100 } },
-      { call: 'rollArrivalEvent', rng: [0.15, 0.0, 0.0] },
-      // freeDrugs with full coat -> none
-      { call: 'setField', args: { coatCapacity: 5 } },
-      { call: 'setInventory', args: { speed: 5 } },
-      { call: 'rollArrivalEvent', rng: [0.15, 0.0, 0.5] },
-      // dogChase: 30..50, held inventory, second rng < 0.5
+      { call: 'rollArrivalEvent', rng: [rnd(0, 14), rnd(1, 4), rnd(1, 2)] },
+      { call: 'rollArrivalEvent', rng: [rnd(0, 14), rnd(1, 4), rnd(0, 2)] },
+      // outcome 1 with no cash takes nothing
+      { call: 'setField', args: { cash: 0 } },
+      { call: 'rollArrivalEvent', rng: [rnd(0, 14), rnd(1, 4), rnd(0, 2)] },
+      // wealth cap: forced mugging with no event or outcome draw
+      { call: 'setField', args: { cash: 60000000, bank: 40000000 } },
+      { call: 'rollArrivalEvent', rng: [rnd(1, 2)] },
+      // exactly 99,999,999 is not forced
+      { call: 'setField', args: { cash: 99999999, bank: 0 } },
+      { call: 'rollArrivalEvent', rng: [rnd(5, 14)] },
+      // outcome 0, found: hashish is absent so the pick is redrawn, the average cost dilutes (10 * 100 div 15)
+      { call: 'setField', args: { cash: 5000, bank: 0 } },
+      { call: 'buy', args: { drug: 'cocaine', qty: 10 } },
+      { call: 'setPrevPrices', args: { cocaine: 100, acid: 50 } },
+      { call: 'rollArrivalEvent', rng: [rnd(0, 14), rnd(0, 4), rnd(2, 11), rnd(1, 11), rnd(3, 7)] },
+      // full coat skips outcomes 0 and 2 before any drug draw
+      { call: 'setField', args: { coatCapacity: 15 } },
+      { call: 'rollArrivalEvent', rng: [rnd(0, 14), rnd(0, 4)] },
+      { call: 'rollArrivalEvent', rng: [rnd(0, 14), rnd(2, 4)] },
+      // quantity capped at the free space
+      { call: 'setField', args: { coatCapacity: 17 } },
+      { call: 'rollArrivalEvent', rng: [rnd(0, 14), rnd(0, 4), rnd(1, 11), rnd(6, 7)] },
+      // weed (Beermat index 11) is never picked, so nothing is drawn after the outcome
       { call: 'setField', args: { coatCapacity: 100 } },
-      { call: 'setInventory', args: { speed: 10 } },
-      { call: 'rollArrivalEvent', rng: [0.35, 0.2, 0.0, 0.2] },
-      // foundDrugs: 30..50, no held OR second rng >= 0.5
+      { call: 'setPrevPrices', args: { weed: 500 } },
+      { call: 'rollArrivalEvent', rng: [rnd(0, 14), rnd(0, 4)] },
+      // outcome 2, a friend lays units on the player
+      { call: 'setPrevPrices', args: { speed: 100, acid: 50 } },
+      { call: 'rollArrivalEvent', rng: [rnd(0, 14), rnd(2, 4), rnd(10, 11), rnd(4, 7)] },
+      // outcome 3 with drugs held: redraw until held, drop min(Random(held) + 1, 10)
+      { call: 'rollArrivalEvent', rng: [rnd(0, 14), rnd(3, 4), rnd(2, 12), rnd(1, 12), rnd(2, 4), rnd(16, 17), rnd(0, 4)] },
+      // outcome 3 where the 50% roll keeps the drugs
+      { call: 'rollArrivalEvent', rng: [rnd(0, 14), rnd(3, 4), rnd(1, 12), rnd(0, 4), rnd(1, 4)] },
+      // outcome 3 with an empty coat
       { call: 'setInventory', args: {} },
-      { call: 'setPrices', args: { speed: 100 } },
-      { call: 'rollArrivalEvent', rng: [0.35, 0.0, 0.0] },
-      // mamasBrownies: 50..60 with weed/hashish held
-      { call: 'setInventory', args: { weed: 8 } },
-      { call: 'rollArrivalEvent', rng: [0.55, 0.0] },
-      // mamasBrownies with no weed/hashish -> none
-      { call: 'setInventory', args: { speed: 5 } },
-      { call: 'rollArrivalEvent', rng: [0.55] },
-      // freeWeedDeath: 60..60.5
-      { call: 'setField', args: { health: 100, dead: false } },
-      { call: 'rollArrivalEvent', rng: [0.602] },
-      // flavor: 60.5..75
-      { call: 'setField', args: { health: 100, dead: false, cash: 500 } },
-      { call: 'rollArrivalEvent', rng: [0.70, 0.0] },
-      // none: >= 75
-      { call: 'rollArrivalEvent', rng: [0.99] },
+      { call: 'rollArrivalEvent', rng: [rnd(0, 14), rnd(3, 4), rnd(2, 4)] },
     ],
   },
   {
