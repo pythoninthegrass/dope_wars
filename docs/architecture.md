@@ -32,7 +32,7 @@ versioning).
   `dw_world_size()` bytes and calls `dw_world_init`), `dw_result` return
   codes, `uint8_t`-typedef'd kind enums, `DW_STATIC_ASSERT` on every struct
   sizeof, two-call length-then-fill for every variable-length buffer.
-  `DW_ABI_VERSION` (currently 5 — see "ABI version history" below) bumps on
+  `DW_ABI_VERSION` (currently 6 — see "ABI version history" below) bumps on
   breaking changes only; additive changes don't bump it.
 - **`extension/` — C++ GDExtension shim.** 1:1 forwarding from ABI functions
   to a Godot class (`DopeWarsWorld`, registered in
@@ -49,7 +49,7 @@ versioning).
   `extension`:
   - `game/simulation/world.gd` (`class_name SimWorld`) — the *only* `.gd` file
     allowed to name `DopeWarsWorld`. A complete pass-through: every bound
-    method forwards to exactly one extension method, plus all 32 `DW_*`
+    method forwards to exactly one extension method, plus all 35 `DW_*`
     constants re-exported so nothing outside this file needs to name the
     extension class.
   - `game/presentation/` — `main.tscn` + `main.gd` (the only scene; the tree
@@ -125,6 +125,10 @@ direction.
   `min_drugs` and `max_drugs` (80 -> 68 bytes).
 - **v5** — TASK-010.02.04: `dw_should_start_chase` is a flat 1 in 6 (one
   draw) at every location; `dw_location_view` drops `police` (68 -> 64 bytes).
+- **v6** — TASK-010.02.05: one combined 1-in-14 dealer visit
+  (`dw_roll_dealer_visit`) replaces the two 15% rolls, and the offer structs
+  and accept calls lose the bank fallback; `dw_rules_gun_space` and
+  `dw_rules_bank_purchase_fee_bp` are removed.
 
 ## Mojo LOC share
 

@@ -132,9 +132,9 @@ permanently invisible to the bridge test's completeness check.
   serialization format, dealer-visit chances — all come from the extension,
   never from GDScript. `include/dopewars.h:444-452` and
   `docs/abi-contract.md`'s "Why the draw-owning rules live in the core" section
-  are the worked example: the prototype's two 15% dealer rolls read the world's
+  are the worked example: the prototype's dealer roll read the world's
   RNG from its UI layer, and GDScript cannot reach that stream at all, so they
-  had to become `dw_roll_dealer_visits`.
+  had to become `dw_roll_dealer_visit`.
 - Any duplicate-of-core state. UI mirrors of `dw_world` values are read
   fresh from the extension per-frame or per-event, not cached in GDScript
   fields. The static `dw_rules_*` tables are the sanctioned exception:
