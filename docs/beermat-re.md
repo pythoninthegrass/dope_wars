@@ -132,8 +132,8 @@ The messages are the strings at `0x0045a8xx`-`0x0045af20`: Run "You can't get aw
 
 | Rule | VA | Beermat | Engine | Class |
 | --- | --- | --- | --- | --- |
-| Debt interest | `0x0045e3d4` | once per day advance, only when debt > 0: `debt = Round(debt * 1.1)` with the extended-precision constant at `0x0045e3f8` (`1.1`), ties to even | `Math.round(debt * 1.1)` (ties away from zero in the positive direction) | **mismatch M-10** (ties only) |
-| Bank interest | `0x0045e3a4` | once per day advance, only when bank > 0: `bank = Round(bank * 1.05)`, constant at `0x0045e3c8` (`1.05`), integer result | `bank * 1.05`, fractional dollars kept | **mismatch M-10** |
+| Debt interest | `0x0045e3d4` | once per day advance, only when debt > 0 (`CMP [debt],0; JLE` skips zero and negative): `debt = Round(debt * 1.1)` with the extended-precision constant at `0x0045e3f8` (`1.1`), ties to even | `debtAfterInterest`: integer `debt * 11 / 10` rounded ties to even, skipped at 0 or less; the core's `interest.debt_after_interest` is the same | match (M-10, TASK-010.02.08) |
+| Bank interest | `0x0045e3a4` | once per day advance, only when bank > 0 (`JLE` skip): `bank = Round(bank * 1.05)`, constant at `0x0045e3c8` (`1.05`), integer result | `bankAfterInterest`: whole dollars, the extended-precision product reproduced in integers (see below), skipped at 0 or less; the core's `interest.bank_after_interest` is the same | match (M-10, TASK-010.02.08) |
 | Deposit / withdraw | `0x0045a17c`, `0x0045a214` | any amount up to cash / up to bank | same | match |
 | Pay loan | `0x0045a2ac` | default and maximum `min(cash, debt)` | `min(amount, cash, debt)` | match |
 
@@ -167,6 +167,15 @@ No sound plays for the dealer offers, finances, price events, travel itself, vic
 
 **AllowSound default: on.** The first-run initialiser `0x0045f3a8` runs from `0x0045c260` (called by `FormCreate`, `0x0045e404`) and calls `TForm1.SetRegKeyBool(..., "AllowSound", 1)` when the settings probe `0x004601c8` finds no `Software\Beermat Software\DopeWars\Scores` key. `0x0045c260` then reads the value back into the flag, and `FUN_0043b300` mirrors it onto the check mark of the Sounds menu item (the control at `TForm1+0x338`). The flag's BSS default is 0, so an installation whose registry value is missing or unreadable plays no sound until the item is ticked; a normal first run writes 1. The engine has no sound at all, so this is not a mismatch with the engine but an input to the sound work in TASK-010.
 
+### Interest arithmetic (M-10)
+
+Each handler does `FILD` of the 32-bit balance, `FLD` of an 80-bit constant, `FMULP`, then Delphi's `Round` (`FISTP`, nearest, ties to even) and stores the result. The product is formed in 64-bit-mantissa extended precision, not in Float64, and the two constants are not exactly 1.1 and 1.05: the extended `1.1` is above 1.1 by `0.2 * 2^-63` and the extended `1.05` is below 1.05 by `0.4 * 2^-63`. Float64 cannot stand in for it: the Float64 product `6655 * 1.1` is 7320.5 plus about 6e-13 (the Float64 `1.1` is high), which rounds up to 7321, where the binary's product is exactly 7320.5 and ties to even gives 7320 (the oracle value). The port therefore uses integers, validated against an exact emulation of the extended product over 2 million consecutive balances plus random balances up to 2^31:
+
+- **Debt.** The extended `1.1` is high but its error stays below half an ulp of the product for every balance, so an exact `.5` tie stays an exact tie and `debt * 11 / 10` rounded ties to even is exact.
+- **Bank.** An exact tie only happens for balances that are 10 mod 20 (`bank * 1.05` ends in `.5`). The low extended `1.05` pulls the stored product below the tie by `0.4 * bank * 2^-63`; once that exceeds half an ulp (`4 * bank > 5 * 2^k`, with `2^k` the largest power of two not above the product) the stored value is one ulp under the tie and `FISTP` rounds down instead of to even. So 30 becomes 31 (not 32), 50 becomes 52, 70 becomes 74 and 10 stays 10. Every other balance is more than 0.05 from a tie and rounds to nearest.
+
+Balances at or below 0 skip both handlers (`JLE`), so a negative balance is left untouched. The binary stores the balances as 32-bit integers; the port keeps them as whole-valued doubles, which only differs past 2^31.
+
 ## Intentional differences
 
 Recorded in `docs/parity-deltas.md` section 5. The location model (one city of six named sub-locations, `cities.txt`) and the borough and city names are not fidelity targets. The per-borough police weights and drug counts affected game rules rather than the location model, so they were listed as M-04 and M-03; both are gone.
@@ -176,7 +185,7 @@ Recorded in `docs/parity-deltas.md` section 5. The location model (one city of s
 Checked on the live oracle (see `CLAUDE.local.md` for how to reach it; none of that is recorded here):
 
 - **New Game gate (M-11).** The decompile suggested a control pair at `TForm1+0x330` and `TForm1+0x344` is disabled until day 5. On the oracle, Finances is enabled on day 1 and New Game is greyed on days 1-5 and enabled on day 6, so the pair is the File > New item and the New Game button.
-- **Debt rounding (M-10).** Debt read 5500, 6050, 6655, 7320, 8052, 8857 on days 1-6. `6655 * 1.1 = 7320.5` shows as 7,320, which is ties-to-even (`Math.round` would give 7,321).
+- **Debt rounding (M-10).** Debt read 5500, 6050, 6655, 7320, 8052, 8857 on days 1-6. `6655 * 1.1 = 7320.5` shows as 7,320, which is ties-to-even (`Math.round` would give 7,321). The engine now matches (M-10).
 - **Chase dialog (Chase).** With no gun, Fight is greyed and Run and Stay are enabled; "Officer Hardass and 5 of his deputies are chasing you !" and "You lost them in the alleys." match the decoded strings.
 - **Police dogs (Arrival events).** "Police dogs chased you for 4 blocks." with an empty coat, no drop clause, matches outcome 3.
 - **Prices.** Every price observed on days 1-6 fell inside the decoded ranges (Ecstasy 55, 40, 52; Speed 174, 77, 156; Cocaine 27,133). The samples are too few to separate the decoded ranges from the engine's.
@@ -194,7 +203,7 @@ Checked on the live oracle (see `CLAUDE.local.md` for how to reach it; none of t
 | M-07 | Run, stay and cop damage (fixed, match) | Chase | TASK-010.02.07 |
 | M-08 | Fight resolution and win condition (fixed, match) | Chase | TASK-010.02.07 |
 | M-09 | Chase win reward and doctor (fixed, match) | Chase | TASK-010.02.07 |
-| M-10 | Interest rounding | Money | TASK-010.02.08 |
+| M-10 | Interest rounding (fixed, match) | Money | TASK-010.02.08 |
 | M-11 | New Game locked until day 6 | Travel | TASK-010.02.09 |
 | M-12 | Average cost integer division | Drug table | TASK-010.02.10 |
 | M-13 | Score must be above 0 to be recorded | Score | TASK-010.02.11 |

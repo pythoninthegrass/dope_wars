@@ -142,6 +142,9 @@ direction.
   removed, `dw_stay_in_chase` and `dw_accept_doctor_offer` are new,
   `dw_chase.deputies` is signed (below 0 is a win), and `dw_fight_result`
   grows from 8 to 16 bytes to carry the win reward and the doctor offer.
+- **v9** — TASK-010.02.08: Beermat's interest rounding. `dw_travel` rounds
+  debt and bank interest to whole dollars (ties to even) and skips a balance
+  of 0 or less. No signature, layout or dump-length change.
 
 ## Mojo LOC share
 

@@ -33,7 +33,7 @@ from abi_symbols import (  # noqa: E402
     struct_sizes,
 )
 
-DW_ABI_VERSION = 8
+DW_ABI_VERSION = 9
 
 # Result codes (include/dopewars.h, anonymous enum). Frozen from ABI v1;
 # appended to, never renumbered.

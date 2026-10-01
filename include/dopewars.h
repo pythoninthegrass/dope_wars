@@ -57,7 +57,7 @@ extern "C" {
  * changes. Additive changes (new functions, new appended anonymous-enum
  * constants, new `#define`s that don't invalidate existing struct sizes)
  * do NOT bump this. See `docs/abi-contract.md` for the full policy. */
-#define DW_ABI_VERSION 8u
+#define DW_ABI_VERSION 9u
 
 /* The value above, readable at runtime.
  *
@@ -565,7 +565,8 @@ dw_result dw_buy(dw_world *world, uint32_t drug_index, uint32_t qty);
 dw_result dw_sell(dw_world *world, uint32_t drug_index, uint32_t qty);
 
 /* Travel to `dest_location_index` (`index.html:802-814`): advances the
- * day counter, applies debt/bank compound interest, moves the player,
+ * day counter, applies debt/bank compound interest (whole dollars, rounded
+ * ties-to-even as Beermat does, skipped at a balance of 0 or less), moves the player,
  * and calls dw_generate_prices for the new day. Returns
  * DW_ERR_UNKNOWN_LOCATION if the index is out of range, DW_ERR_GAME_OVER
  * on the last day, DW_ERR_DEAD if the player is dead, or

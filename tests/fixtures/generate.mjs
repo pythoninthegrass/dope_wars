@@ -62,7 +62,7 @@ const FIXTURES = [
   },
   {
     name: '03-travel-interest',
-    meta: { seed: 1, description: 'travel across 5 days', mechanic: '10% debt compounding, 5% bank interest, day advancement' },
+    meta: { seed: 1, description: 'travel across 5 days', mechanic: '10% debt compounding, 5% bank interest, ties-to-even whole dollars, skipped at 0 or less, day advancement' },
     steps: [
       { call: 'newGame', args: { seed: 1 } },
       { call: 'setField', args: { bank: 1000 } },
@@ -71,6 +71,17 @@ const FIXTURES = [
       { call: 'travel', args: { dest: 'manhattan' } },
       { call: 'travel', args: { dest: 'coneyisland' } },
       { call: 'travel', args: { dest: 'brooklyn' } },
+      // ties-to-even debt and the extended-precision bank ties (docs/beermat-re.md, M-10)
+      { call: 'setField', args: { debt: 6655, bank: 30 } },
+      { call: 'travel', args: { dest: 'bronx' } },
+      { call: 'setField', args: { debt: 5, bank: 50 } },
+      { call: 'travel', args: { dest: 'ghetto' } },
+      { call: 'setField', args: { debt: 15, bank: 70 } },
+      { call: 'travel', args: { dest: 'bronx' } },
+      { call: 'setField', args: { debt: 0, bank: 0 } },
+      { call: 'travel', args: { dest: 'ghetto' } },
+      { call: 'setField', args: { debt: -100, bank: -100 } },
+      { call: 'travel', args: { dest: 'bronx' } },
     ],
   },
   {
