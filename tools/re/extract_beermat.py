@@ -7,7 +7,7 @@
 
 """
 Extracts the Delphi form resources from the Beermat "Dope Wars for Windows"
-1.2.0.0 exe into text DFM files (TASK-010.01.01, TASK-010.01.02).
+1.2.0.0 exe into text DFM files (TASK-010.01.01 to .03).
 
 Everything written is derived from copyrighted material, so the default output
 directory sits under the gitignored vendor/dopewars-1999/. Only this tool and
@@ -51,6 +51,12 @@ EXPECTED_SOUNDS = {
     "DWDead": "wasted.wav",
     "DWLastDay": "uhoh.wav",
 }
+
+VMT_SELF_PTR = -76
+VMT_METHOD_TABLE = -52
+VMT_CLASS_NAME = -44
+VMT_PARENT = -36
+CLASS_NAME_RE = re.compile(r"[A-Za-z_]\w*")
 
 VA_NULL, VA_LIST, VA_INT8, VA_INT16, VA_INT32, VA_EXTENDED, VA_STRING, VA_IDENT = range(
     8
@@ -368,6 +374,134 @@ def write_string_outputs(
     return 0
 
 
+@dataclass
+class Image:
+    data: bytes
+    sections: list[tuple[int, int, int]]  # (va, raw offset, raw size)
+
+    @classmethod
+    def from_pe(cls, pe: pefile.PE, data: bytes) -> "Image":
+        base = pe.OPTIONAL_HEADER.ImageBase
+        return cls(
+            data,
+            [
+                (base + s.VirtualAddress, s.PointerToRawData, s.SizeOfRawData)
+                for s in pe.sections
+            ],
+        )
+
+    def offset(self, va: int, count: int = 1) -> int | None:
+        for start, raw, size in self.sections:
+            if start <= va and va + count <= start + size:
+                return raw + va - start
+        return None
+
+    def read(self, va: int, count: int) -> bytes | None:
+        off = self.offset(va, count)
+        return None if off is None else self.data[off : off + count]
+
+    def u16(self, va: int) -> int | None:
+        raw = self.read(va, 2)
+        return None if raw is None else struct.unpack("<H", raw)[0]
+
+    def u32(self, va: int) -> int | None:
+        raw = self.read(va, 4)
+        return None if raw is None else struct.unpack("<I", raw)[0]
+
+    def shortstring(self, va: int) -> str | None:
+        length = self.read(va, 1)
+        if length is None:
+            return None
+        raw = self.read(va + 1, length[0])
+        return None if raw is None else raw.decode("latin-1")
+
+
+@dataclass
+class Vmt:
+    va: int
+    class_name: str
+    parent: int
+    methods: list[tuple[str, int]]
+
+
+def find_vmts(image: Image) -> list[int]:
+    found = []
+    for start, raw, size in image.sections:
+        words = image.data[raw : raw + size - size % 4]
+        for index, (value,) in enumerate(struct.iter_unpack("<I", words)):
+            if value == start + index * 4 - VMT_SELF_PTR:
+                found.append(value)
+    return sorted(found)
+
+
+def read_published_methods(image: Image, table_va: int) -> list[tuple[str, int]]:
+    count = image.u16(table_va)
+    if count is None:
+        raise ValueError(f"unreadable method table at {table_va:#x}")
+    methods = []
+    entry = table_va + 2
+    for _ in range(count):
+        size, code = image.u16(entry), image.u32(entry + 2)
+        name = image.shortstring(entry + 6)
+        if size is None or code is None or name is None:
+            raise ValueError(f"unreadable method entry at {entry:#x}")
+        methods.append((name, code))
+        entry += size
+    return methods
+
+
+def read_vmt(image: Image, va: int) -> Vmt:
+    name_ptr = image.u32(va + VMT_CLASS_NAME)
+    name = image.shortstring(name_ptr) if name_ptr else None
+    if not name or not CLASS_NAME_RE.fullmatch(name):
+        raise ValueError(f"no class name for VMT at {va:#x}")
+    table = image.u32(va + VMT_METHOD_TABLE)
+    return Vmt(
+        va,
+        name,
+        image.u32(va + VMT_PARENT) or 0,
+        read_published_methods(image, table) if table else [],
+    )
+
+
+def read_vmts(image: Image) -> list[Vmt]:
+    vmts = []
+    for va in find_vmts(image):
+        try:
+            vmts.append(read_vmt(image, va))
+        except ValueError:
+            continue
+    return vmts
+
+
+def flatten_methods(vmts: list[Vmt]) -> list[tuple[str, str, int]]:
+    return [(v.class_name, name, code) for v in vmts for name, code in v.methods]
+
+
+def collect_methods(image: Image) -> list[tuple[str, str, int]]:
+    return flatten_methods(read_vmts(image))
+
+
+def unresolved_handlers(
+    forms: list[Component], methods: list[tuple[str, str, int]]
+) -> list[tuple[str, str, str]]:
+    known = {(cls, name.lower()) for cls, name, _ in methods}
+    return [
+        handler
+        for form in forms
+        for handler in collect_handlers(form)
+        if (form.class_name, handler[2].lower()) not in known
+    ]
+
+
+def write_methods(methods: list[tuple[str, str, int]], out: Path) -> None:
+    out.mkdir(parents=True, exist_ok=True)
+    (out / "methods.tsv").write_text(
+        "".join(f"{cls}\t{name}\t{va:08X}\n" for cls, name, va in methods),
+        encoding="utf-8",
+    )
+
+
 def resolve_exe(arg: str | None) -> Path:
     if arg:
         return Path(arg)
@@ -406,11 +540,21 @@ def main(argv: list[str] | None = None) -> int:
             print(f"  {owner}.{event} = {handler}")
     print(f"{len(forms)} forms written to {forms_dir}")
 
+    data = exe.read_bytes()
     image_base = pe.OPTIONAL_HEADER.ImageBase
     strings_status = write_string_outputs(
-        exe.read_bytes(), lambda off: image_base + pe.get_rva_from_offset(off), out
+        data, lambda off: image_base + pe.get_rva_from_offset(off), out
     )
-    return 0 if forms and strings_status == 0 else 1
+
+    vmts = read_vmts(Image.from_pe(pe, data))
+    methods = flatten_methods(vmts)
+    write_methods(methods, out)
+    classes = len({cls for cls, _, _ in methods})
+    print(f"{len(vmts)} VMTs, {classes} classes with {len(methods)} published methods")
+    missing = unresolved_handlers(forms, methods)
+    for owner, event, handler in missing:
+        print(f"error: unresolved handler {owner}.{event} = {handler}", file=sys.stderr)
+    return 0 if forms and strings_status == 0 and methods and not missing else 1
 
 
 if __name__ == "__main__":
