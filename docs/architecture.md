@@ -32,7 +32,7 @@ versioning).
   `dw_world_size()` bytes and calls `dw_world_init`), `dw_result` return
   codes, `uint8_t`-typedef'd kind enums, `DW_STATIC_ASSERT` on every struct
   sizeof, two-call length-then-fill for every variable-length buffer.
-  `DW_ABI_VERSION` (currently 2 — see "ABI version history" below) bumps on
+  `DW_ABI_VERSION` (currently 4 — see "ABI version history" below) bumps on
   breaking changes only; additive changes don't bump it.
 - **`extension/` — C++ GDExtension shim.** 1:1 forwarding from ABI functions
   to a Godot class (`DopeWarsWorld`, registered in
@@ -118,6 +118,11 @@ direction.
   bump rather than an additive change. See `docs/abi-contract.md`'s
   Versioning section for the policy, and `docs/parity-deltas.md` for the
   deltas against the JS prototype these constants correct.
+- **v3** — TASK-010.02.02: per-drug 1-in-20 spike and crash rolls, changing
+  RNG draw order; `MAX_PRICE_EVENTS` 3 -> 8 (dump 766 -> 846 bytes).
+- **v4** — TASK-010.02.03: per-drug 1-in-8 availability roll replaces the
+  per-location drug count, changing RNG draw order; `dw_location_view` drops
+  `min_drugs` and `max_drugs` (80 -> 68 bytes).
 
 ## Mojo LOC share
 
