@@ -45,7 +45,11 @@ def finish(ref game: world.World) -> FinishResult:
     return FinishResult(game.cash + game.bank - game.debt, game.dead, game.day)
 
 
-def insert_high_score(mut scores: List[HighScore], entry: HighScore):
+def insert_high_score(mut scores: List[HighScore], entry: HighScore) -> Bool:
+    # Beermat (docs/beermat-re.md, M-13): a score of 0 or below is never
+    # recorded. Returns whether the entry was inserted.
+    if entry.score <= 0:
+        return False
     scores.append(entry.copy())
     # Stable insertion sort, descending by score: an equal score stays behind
     # the entry it was inserted after, matching the JS stable sort.
@@ -60,3 +64,4 @@ def insert_high_score(mut scores: List[HighScore], entry: HighScore):
             break
     while len(scores) > MAX_HIGH_SCORES:
         _ = scores.pop()
+    return True

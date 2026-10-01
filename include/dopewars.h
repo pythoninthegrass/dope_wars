@@ -57,7 +57,7 @@ extern "C" {
  * changes. Additive changes (new functions, new appended anonymous-enum
  * constants, new `#define`s that don't invalidate existing struct sizes)
  * do NOT bump this. See `docs/abi-contract.md` for the full policy. */
-#define DW_ABI_VERSION 9u
+#define DW_ABI_VERSION 10u
 
 /* The value above, readable at runtime.
  *
@@ -141,6 +141,10 @@ enum {
      * version (wrong length, corrupt scalars, unknown location/drug id in
      * the payload). */
     DW_ERR_SERIALIZATION_FAILED = 13,
+    /* dw_insert_highscore: entry->score is 0 or below, so it is not
+     * recorded (docs/beermat-re.md M-13). *out_count and scores are left
+     * unchanged. */
+    DW_ERR_SCORE_TOO_LOW = 14,
 };
 
 /* ---------------------------------------------------------------------- */
@@ -673,7 +677,9 @@ dw_result dw_finish(const dw_world *world, dw_finish_result *out_result);
  * *out_count receives the new count (<= DW_MAX_HIGHSCORES). The array
  * is sorted in place, highest score first, matching
  * `index.html:1026-1031`. Requires scores_capacity >= DW_MAX_HIGHSCORES;
- * violation returns DW_ERR_BUFFER_TOO_SMALL. */
+ * violation returns DW_ERR_BUFFER_TOO_SMALL. A score of 0 or below is
+ * never recorded (`docs/beermat-re.md` M-13): `scores` and *out_count
+ * are left unchanged and the call returns DW_ERR_SCORE_TOO_LOW. */
 dw_result dw_insert_highscore(dw_highscore_entry *scores, size_t scores_capacity, size_t in_count, const dw_highscore_entry *entry, size_t *out_count);
 
 /* ---------------------------------------------------------------------- */

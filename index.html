@@ -1049,10 +1049,11 @@
     }
 
     function insertHighScore(scores, entry) {
+      if (entry.score <= 0) return false;
       scores.push(entry);
       scores.sort((a, b) => b.score - a.score);
       scores.length = Math.min(scores.length, 10);
-      return scores;
+      return true;
     }
 
     function serializeState(state) {
@@ -1626,7 +1627,13 @@
       document.getElementById('scoreSave').addEventListener('click', () => {
         const name = document.getElementById('scoreName').value.trim() || 'Player';
         const scores = loadScores();
-        E.insertHighScore(scores, { name, score: Math.round(result.score), day: result.day, dead: result.dead, date: new Date().toISOString().slice(0, 10) });
+        const inserted = E.insertHighScore(scores, { name, score: Math.round(result.score), day: result.day, dead: result.dead, date: new Date().toISOString().slice(0, 10) });
+        if (!inserted) {
+          closeDialog();
+          showAlert('Game Over', `${name} was not good enough to get on your highest score list.`, '☠️');
+          document.getElementById('alertOk').addEventListener('click', () => { after && after(); }, { once: true });
+          return;
+        }
         saveScores(scores);
         closeDialog();
         after && after();

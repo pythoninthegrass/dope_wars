@@ -76,8 +76,9 @@ export function makeRunStep(Engine) {
       }
       case 'insertHighScores': {
         const scores = []
+        const offset = args.offset || 0
         for (let i = 0; i < args.count; i++) {
-          Engine.insertHighScore(scores, { name: `p${i}`, score: i * 100, day: 31, dead: false, date: '2026-01-01' })
+          Engine.insertHighScore(scores, { name: `p${i}`, score: i * 100 + offset, day: 31, dead: false, date: '2026-01-01' })
         }
         return { scores }
       }

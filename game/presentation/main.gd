@@ -338,7 +338,9 @@ func _handle_death() -> void:
 
 
 ## index.html:1569-1590. Save writes a row, Skip does not, and both go on to
-## `after` -- the death alert for a death, the new-game form for a finish.
+## `after` -- the death alert for a death, the new-game form for a finish. A
+## score of 0 or below is never recorded (docs/beermat-re.md M-13): Save shows
+## the "not good enough" message instead of persisting.
 func _show_score(result: Dictionary) -> void:
 	var score := int(result.get("score", 0))
 	var day := int(result.get("day", 1))
@@ -347,12 +349,16 @@ func _show_score(result: Dictionary) -> void:
 	var dialog := HighscoreDialog.new().present(score, day, dead)
 	_dialogs.open(dialog, func(key: String) -> void:
 		if key == "scoreSave":
-			_scores.insert(_world, {
-				"name": dialog.entered_name(),
+			var name := dialog.entered_name()
+			var outcome := _scores.insert(_world, {
+				"name": name,
 				"score": score,
 				"day": day,
 				"dead": dead,
 			})
+			if not bool(outcome.get("inserted", false)):
+				_alert(Copy.DLG_GAME_OVER, Copy.score_not_high_enough(name), AlertDialog.ICON_SKULL, func() -> void: _after_score(was_death))
+				return
 		_after_score(was_death)
 	)
 

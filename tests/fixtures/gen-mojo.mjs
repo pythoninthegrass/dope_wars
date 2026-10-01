@@ -67,7 +67,7 @@ const ALLOWED = [
   'scores.*.name', 'scores.*.score', 'scores.*.day', 'scores.*.dead',
   'scores.*.date',
   // fixture arguments
-  'seed', 'action', 'dest', 'offer', 'count', 'cash', 'debt',
+  'seed', 'action', 'dest', 'offer', 'count', 'offset', 'cash', 'debt',
   'bank', 'health', 'coatCapacity', 'guns', 'day', 'location', 'rng',
   'offer.*', 'chase.*', 'pockets', 'price', 'deputies', 'canFight', 'qty',
   'drug', 'amount',

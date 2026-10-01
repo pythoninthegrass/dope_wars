@@ -63,6 +63,7 @@ MSG_COAT_FULL,Your trenchcoat is full! Sell something or buy a bigger coat.
 MSG_BUY_PROMPT,"You can afford {0} units of {1}, and have room in your coat for {2} units."
 MSG_SELL_PROMPT,You have {0} units of {1}.
 MSG_UNITS_AT,units @ ${0}
+MSG_SCORE_NOT_HIGH_ENOUGH,"{0} was not good enough to get on your highest score list."
 FIN_CASH,Cash
 FIN_BANK,Bank
 FIN_DEBT,Debt

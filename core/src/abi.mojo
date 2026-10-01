@@ -33,7 +33,7 @@ import travel
 import world as world_mod
 
 
-comptime DW_ABI_VERSION = 9
+comptime DW_ABI_VERSION = 10
 
 # dw_result values (include/dopewars.h). Frozen from ABI v1 onward.
 comptime DW_OK = Int32(0)
@@ -50,6 +50,7 @@ comptime DW_ERR_INSUFFICIENT_SPACE = Int32(10)
 comptime DW_ERR_GAME_OVER = Int32(11)
 comptime DW_ERR_DEAD = Int32(12)
 comptime DW_ERR_SERIALIZATION_FAILED = Int32(13)
+comptime DW_ERR_SCORE_TOO_LOW = Int32(14)
 
 comptime DW_FINANCES_DEPOSIT = UInt8(0)
 comptime DW_FINANCES_WITHDRAW = UInt8(1)
@@ -1140,7 +1141,8 @@ def dw_insert_highscore(
     var list = List[score.HighScore]()
     for i in range(Int(in_count)):
         list.append(_highscore_from_view(scores.value()[unsafe_offset=i]))
-    score.insert_high_score(list, _highscore_from_view(entry.value()[]))
+    if not score.insert_high_score(list, _highscore_from_view(entry.value()[])):
+        return DW_ERR_SCORE_TOO_LOW
     for i in range(len(list)):
         scores.value()[unsafe_offset=i] = _view_from_highscore(list[i])
     out_count.value()[] = UInt(len(list))

@@ -139,11 +139,12 @@ def _apply_buy_cheapest(mut game: world.World, ref rec: record.Record) raises:
 
 def _apply_insert_high_scores(mut game: world.World, ref rec: record.Record) raises:
     var count = rec.args.int_at("count")
+    var offset = rec.args.int_at("offset") if rec.args.has("offset") else Int64(0)
     var scores = List[score.HighScore]()
     for i in range(Int(count)):
-        score.insert_high_score(
+        _ = score.insert_high_score(
             scores,
-            score.HighScore("p" + String(i), Float64(i * 100), 31, False, "2026-01-01"),
+            score.HighScore("p" + String(i), Float64(i * 100 + Int(offset)), 31, False, "2026-01-01"),
         )
     var expected = rec.ret.children("scores")
     var entries = harness.first_segments(expected)

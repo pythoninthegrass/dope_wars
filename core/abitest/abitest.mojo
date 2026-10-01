@@ -195,6 +195,7 @@ comptime DW_ERR_INSUFFICIENT_SPACE = Int32(10)
 comptime DW_ERR_GAME_OVER = Int32(11)
 comptime DW_ERR_DEAD = Int32(12)
 comptime DW_ERR_SERIALIZATION_FAILED = Int32(13)
+comptime DW_ERR_SCORE_TOO_LOW = Int32(14)
 
 comptime DW_NUM_LOCATIONS = 6
 comptime DW_NUM_DRUGS = 12
@@ -217,7 +218,7 @@ def _world() -> Pointer[UInt8, origin=MutUntrackedOrigin]:
 
 
 def _config(seed: UInt32, num_days: UInt32 = 0, start_cash: Int32 = -1) -> Config:
-    return Config(UInt16(9), UInt16(0), seed, num_days, start_cash)
+    return Config(UInt16(10), UInt16(0), seed, num_days, start_cash)
 
 
 def _init(
@@ -485,6 +486,14 @@ def test_every_result_code_is_reachable() raises:
     var short_buf = List[UInt8]()
     short_buf.append(0)
     assert_equal(_load(ptr, short_buf), DW_ERR_SERIALIZATION_FAILED)
+
+    # DW_ERR_SCORE_TOO_LOW: a score of 0 or below is never recorded (M-13)
+    var scores = List[HighscoreEntryView]()
+    for _ in range(DW_MAX_HIGHSCORES):
+        scores.append(HighscoreEntryView(Array[UInt8, 32](fill=0), Int64(0), UInt32(0), UInt8(0), Array[UInt8, 3](fill=0)))
+    var zero_score = HighscoreEntryView(_cstr_array("dave"), Int64(0), UInt32(31), UInt8(0), Array[UInt8, 3](fill=0))
+    var out_count: UInt = 0
+    assert_equal(external_call["dw_insert_highscore", Int32](scores.unsafe_ptr(), UInt(DW_MAX_HIGHSCORES), UInt(0), Pointer(to=zero_score), Pointer(to=out_count)), DW_ERR_SCORE_TOO_LOW)
 
 
 # ---------------------------------------------------------------------------
@@ -929,6 +938,18 @@ def test_finish_and_highscore() raises:
     var tiny = List[HighscoreEntryView]()
     tiny.append(HighscoreEntryView(Array[UInt8, 32](fill=0), Int64(0), UInt32(0), UInt8(0), Array[UInt8, 3](fill=0)))
     assert_equal(external_call["dw_insert_highscore", Int32](tiny.unsafe_ptr(), UInt(1), UInt(0), Pointer(to=entry), Pointer(to=count)), DW_ERR_BUFFER_TOO_SMALL)
+
+    # A score of 0 or below is rejected (docs/beermat-re.md M-13): the table
+    # and out_count are unchanged.
+    var zero_entry = HighscoreEntryView(_cstr_array("bob"), Int64(0), UInt32(31), UInt8(0), Array[UInt8, 3](fill=0))
+    var before_count: UInt = 1
+    assert_equal(external_call["dw_insert_highscore", Int32](scores.unsafe_ptr(), UInt(DW_MAX_HIGHSCORES), UInt(1), Pointer(to=zero_entry), Pointer(to=before_count)), DW_ERR_SCORE_TOO_LOW)
+    assert_equal(before_count, UInt(1))
+    assert_equal(_bytes_to_string(scores[0].name), "alice")
+
+    var negative_entry = HighscoreEntryView(_cstr_array("carol"), Int64(-1), UInt32(31), UInt8(0), Array[UInt8, 3](fill=0))
+    assert_equal(external_call["dw_insert_highscore", Int32](scores.unsafe_ptr(), UInt(DW_MAX_HIGHSCORES), UInt(1), Pointer(to=negative_entry), Pointer(to=before_count)), DW_ERR_SCORE_TOO_LOW)
+    assert_equal(before_count, UInt(1))
 
 
 def main() raises:

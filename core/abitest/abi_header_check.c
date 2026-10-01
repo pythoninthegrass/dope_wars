@@ -32,7 +32,7 @@ belong in the Python harness. Run through task core:abi-header-check.
 /* The header must define its own dimensional contract, and the test-side
  * constants must agree with it. These are compile-time: a disagreement stops
  * the build rather than turning into a wrong-length buffer at runtime. */
-DW_STATIC_ASSERT(DW_ABI_VERSION == 9u, "DW_ABI_VERSION drifted from the v9 contract");
+DW_STATIC_ASSERT(DW_ABI_VERSION == 10u, "DW_ABI_VERSION drifted from the v10 contract");
 DW_STATIC_ASSERT(DW_NUM_LOCATIONS == 6u, "DW_NUM_LOCATIONS drifted");
 DW_STATIC_ASSERT(DW_NUM_DRUGS == 12u, "DW_NUM_DRUGS drifted");
 DW_STATIC_ASSERT(DW_MAX_HIGHSCORES == 10u, "DW_MAX_HIGHSCORES drifted");
@@ -45,6 +45,7 @@ DW_STATIC_ASSERT(DW_ERR_INVALID_ARGUMENT == 1, "result code renumbered");
 DW_STATIC_ASSERT(DW_ERR_BUFFER_TOO_SMALL == 2, "result code renumbered");
 DW_STATIC_ASSERT(DW_ERR_ABI_VERSION_MISMATCH == 3, "result code renumbered");
 DW_STATIC_ASSERT(DW_ERR_SERIALIZATION_FAILED == 13, "result code renumbered");
+DW_STATIC_ASSERT(DW_ERR_SCORE_TOO_LOW == 14, "result code renumbered");
 
 /* Kind enums are uint8_t typedefs for the same width reason. */
 DW_STATIC_ASSERT(sizeof(dw_arrival_event_kind) == 1, "arrival kind must stay uint8_t");

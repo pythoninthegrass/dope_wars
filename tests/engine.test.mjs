@@ -982,6 +982,15 @@ describe('finish', () => {
     assert.equal(scores[0].score, 1100)
     assert.equal(scores[9].score, 200)
   })
+
+  test('insertHighScore rejects a score of 0 or below (Beermat M-13)', () => {
+    const scores = []
+    assert.equal(Engine.insertHighScore(scores, { name: 'a', score: 0, day: 1, dead: false, date: '2026-01-01' }), false)
+    assert.equal(Engine.insertHighScore(scores, { name: 'b', score: -50, day: 1, dead: false, date: '2026-01-01' }), false)
+    assert.equal(scores.length, 0)
+    assert.equal(Engine.insertHighScore(scores, { name: 'c', score: 1, day: 1, dead: false, date: '2026-01-01' }), true)
+    assert.equal(scores.length, 1)
+  })
 })
 
 describe('dealers (Beermat: one 1-in-14 visit, coat or gun, cash only)', () => {

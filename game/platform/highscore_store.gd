@@ -50,12 +50,17 @@ func load_all() -> Array[Dictionary]:
 	return records
 
 
-## Inserts one score, persists the result, and returns the full ordered table.
+## Inserts one score, persists the result, and returns
+## `{"table": Array[Dictionary], "inserted": bool}`.
+##
+## `inserted` is false when the core refused the entry -- a score of 0 or
+## below (`SimWorld.ERR_SCORE_TOO_LOW`, docs/beermat-re.md M-13) -- in which
+## case `table` is the unchanged previous table.
 ##
 ## `today` is an ISO date (YYYY-MM-DD) in UTC, matching the prototype's
 ## `new Date().toISOString().slice(0, 10)`. Pass "" to read the system clock;
 ## tests pass it explicitly so a run is reproducible.
-func insert(world: SimWorld, entry: Dictionary, today: String = "") -> Array[Dictionary]:
+func insert(world: SimWorld, entry: Dictionary, today: String = "") -> Dictionary:
 	if today.is_empty():
 		today = Time.get_date_string_from_system(true)
 
@@ -70,7 +75,7 @@ func insert(world: SimWorld, entry: Dictionary, today: String = "") -> Array[Dic
 
 	var result := world.insert_highscore(_core_only(previous), _core_row(entry))
 	if int(result.get("result", SimWorld.ERR_INVALID_ARGUMENT)) != SimWorld.OK:
-		return previous
+		return {"table": previous, "inserted": false}
 
 	var scores: Array = result.get("scores", [])
 	var table: Array[Dictionary] = []
@@ -84,7 +89,7 @@ func insert(world: SimWorld, entry: Dictionary, today: String = "") -> Array[Dic
 			"date": String(dates.get(_tuple(row), "")),
 		})
 	_write(table)
-	return table
+	return {"table": table, "inserted": true}
 
 
 static func _has_core_fields(row: Dictionary) -> bool:

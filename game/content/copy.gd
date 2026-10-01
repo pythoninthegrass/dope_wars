@@ -93,6 +93,7 @@ const MSG_COAT_FULL := "MSG_COAT_FULL"
 const MSG_BUY_PROMPT := "MSG_BUY_PROMPT"
 const MSG_SELL_PROMPT := "MSG_SELL_PROMPT"
 const MSG_UNITS_AT := "MSG_UNITS_AT"
+const MSG_SCORE_NOT_HIGH_ENOUGH := "MSG_SCORE_NOT_HIGH_ENOUGH"
 
 const FIN_CASH := "FIN_CASH"
 const FIN_BANK := "FIN_BANK"
@@ -293,6 +294,12 @@ static func doctor_offer(reward: int, price: int) -> String:
 static func final_score(score: int, dead: bool) -> String:
 	var amount := t(MSG_FINAL_SCORE).format([fmt(score)])
 	return t(MSG_FINAL_SCORE_DEAD).format([amount]) if dead else amount
+
+
+## "<name> was not good enough to get on your highest score list."
+## (docs/beermat-re.md M-13).
+static func score_not_high_enough(name: String) -> String:
+	return t(MSG_SCORE_NOT_HIGH_ENOUGH).format([name])
 
 
 ## index.html:1630, which folds the current game's length into the rules text.

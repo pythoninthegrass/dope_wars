@@ -33,7 +33,7 @@ from abi_symbols import (  # noqa: E402
     struct_sizes,
 )
 
-DW_ABI_VERSION = 9
+DW_ABI_VERSION = 10
 
 # Result codes (include/dopewars.h, anonymous enum). Frozen from ABI v1;
 # appended to, never renumbered.
@@ -51,6 +51,7 @@ DW_ERR_INSUFFICIENT_SPACE = 10
 DW_ERR_GAME_OVER = 11
 DW_ERR_DEAD = 12
 DW_ERR_SERIALIZATION_FAILED = 13
+DW_ERR_SCORE_TOO_LOW = 14
 
 # Dimensional constants (include/dopewars.h:66-68).
 DW_NUM_LOCATIONS = 6

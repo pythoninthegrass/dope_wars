@@ -214,7 +214,7 @@ const FIXTURES = [
   },
   {
     name: '07-finish-scoring',
-    meta: { seed: 1, description: 'finish + high score table', mechanic: 'score = cash + bank - debt, top-10 sort/truncate' },
+    meta: { seed: 1, description: 'finish + high score table', mechanic: 'score = cash + bank - debt, top-10 sort/truncate, scores <= 0 rejected (Beermat M-13)' },
     steps: [
       { call: 'newGame', args: { seed: 1 } },
       { call: 'setField', args: { cash: 1000, bank: 500, debt: 200 } },
@@ -222,6 +222,9 @@ const FIXTURES = [
       { call: 'setField', args: { dead: true, cash: 10, bank: 0, debt: 0 } },
       { call: 'finish' },
       { call: 'insertHighScores', args: { count: 12 } },
+      // Beermat only records a score above 0 (M-13): offset -100 against i*100
+      // for i in 0..2 gives scores -100, 0, 100 -- only the last qualifies.
+      { call: 'insertHighScores', args: { count: 3, offset: -100 } },
     ],
   },
   {

@@ -88,7 +88,7 @@ const CASE_FLOORS := {
 	"persistence_round_trip": 16,
 	"finances": 7,
 	"typed_quantity": 21,
-	"endgame_and_highscores": 16,
+	"endgame_and_highscores": 22,
 	"new_game_dialog": 9,
 	"win98_chrome": 82,
 	"window_pinned": 5,
@@ -728,11 +728,38 @@ func _test_typed_quantity() -> void:
 # score entry, and the store keeps a top-10 sorted by score -- with the date
 # surviving the round trip through the core, which drops it.
 func _test_endgame_and_highscores() -> void:
-	var world := _fresh(SEED)
 	var store := HighscoreStore.new()
 	store.clear_all()
 
-	# index.html:1633-1638 -- Finish ends the run and offers the score.
+	# docs/beermat-re.md M-13 -- a score of 0 or below is never recorded. The
+	# rules default (cash 2000, debt 5500) already finishes negative, so the
+	# default fresh game exercises the rejection path with no extra setup.
+	var poor_world := _fresh(SEED)
+	_main._do_finish()
+	await _idle()
+	var poor_dialog := _main.dialogs().current() as HighscoreDialog
+	_assert(poor_dialog != null, "Finish should open the score-entry dialog")
+	var poor_expected := int(poor_world.state_get()["cash"]) + int(poor_world.state_get()["bank"]) - int(poor_world.state_get()["debt"])
+	_assert(poor_expected <= 0, "the rules-default fresh game should finish at or below 0, got %d" % poor_expected)
+
+	_main.dialogs().confirm()
+	await _idle()
+	_assert(
+		_main.dialogs().current() is AlertDialog,
+		"saving a score <= 0 should show the 'not good enough' message instead of persisting"
+	)
+	_assert(
+		_copy_text(_main.dialogs().current()).contains("not good enough"),
+		"the alert should say the score was not good enough, got '%s'" % _copy_text(_main.dialogs().current())
+	)
+	_main.dialogs().confirm()
+	await _idle()
+	_assert(store.load_all().is_empty(), "a score <= 0 should not persist a row")
+
+	# index.html:1633-1638 -- Finish ends the run and offers the score. A
+	# bigger starting cash than the fixed 5500 debt guarantees a positive net
+	# worth, so Save takes the normal path.
+	var world := _fresh(SEED, 6000)
 	_main._do_finish()
 	await _idle()
 	var dialog := _main.dialogs().current() as HighscoreDialog
@@ -743,6 +770,7 @@ func _test_endgame_and_highscores() -> void:
 	# A finish the player did not survive is not marked dead, and the score is
 	# cash + bank - debt (index.html:1021-1024).
 	var expected := int(world.state_get()["cash"]) + int(world.state_get()["bank"]) - int(world.state_get()["debt"])
+	_assert(expected > 0, "this scenario should finish above 0, got %d" % expected)
 	_assert(
 		_copy_text(dialog).contains(Copy.fmt(expected)),
 		"the score dialog should show the net worth %d, got '%s'" % [expected, _copy_text(dialog)]
@@ -1418,9 +1446,10 @@ func _open_dealer(is_gun: bool) -> Dictionary:
 
 ## A fresh game on a fixed seed, so every case is reproducible. Also clears any
 ## save left by an earlier case, or the boot would resume it instead.
-func _fresh(seed_value: int) -> SimWorld:
+## `start_cash` defaults to the rules default (-1 sentinel); debt does not.
+func _fresh(seed_value: int, start_cash: int = -1) -> SimWorld:
 	SaveStore.new().clear()
-	_main.start_new_game(seed_value)
+	_main.start_new_game(seed_value, 0, start_cash)
 	return _main.simulation()
 
 

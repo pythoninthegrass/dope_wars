@@ -142,7 +142,7 @@ The messages are the strings at `0x0045a8xx`-`0x0045af20`: Run "You can't get aw
 | Rule | VA | Beermat | Engine | Class |
 | --- | --- | --- | --- | --- |
 | Final score | `0x004609fc` | `cash + bank - debt`, also computed on death | `cash + bank - debt` | match |
-| Score recorded | `0x004609fc` | only if the score is above 0; otherwise "was not good enough to get on your highest score list" | every score is offered for the list | **mismatch M-13** |
+| Score recorded | `0x004609fc` | only if the score is above 0; otherwise "was not good enough to get on your highest score list" | `insertHighScore` / `dw_insert_highscore` refuse a score of 0 or below, and the UI shows "\<name\> was not good enough to get on your highest score list." instead of persisting | match (M-13, TASK-010.02.11) |
 | List size | `0x004609fc` | 10 entries, a new score ranks above existing entries it strictly beats | 10 entries | match |
 | Storage | `0x0045cd70`, `0x0045cc28` | registry `Software\Beermat Software\DopeWars\Scores\Score<n>`, value encrypted by `0x004604b0` | `localStorage` / `user://` | intentional, `docs/parity-deltas.md` section 3 |
 
@@ -206,4 +206,4 @@ Checked on the live oracle (see `CLAUDE.local.md` for how to reach it; none of t
 | M-10 | Interest rounding (fixed, match) | Money | TASK-010.02.08 |
 | M-11 | New Game locked until day 6 (not ported — intentional, `docs/parity-deltas.md` section 6) | Travel | TASK-010.02.09 |
 | M-12 | Average cost integer division (fixed, match) | Drug table | TASK-010.02.10 |
-| M-13 | Score must be above 0 to be recorded | Score | TASK-010.02.11 |
+| M-13 | Score must be above 0 to be recorded (fixed, match) | Score | TASK-010.02.11 |
