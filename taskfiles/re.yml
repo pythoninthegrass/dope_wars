@@ -71,3 +71,14 @@ tasks:
         out="$(timeout 1800 {{.GHIDRA_RUN}} {{.GHIDRA_HEADLESS}} "$proj" dw -import vendor/dopewars-1999/DopeWars.exe -scriptPath tools/re/ghidra -postScript ApplyLabels.java vendor/dopewars-1999/re/labels.csv -postScript DiscoverFunctions.java -postScript ExportDecompiled.java vendor/dopewars-1999/re/decompiled -deleteProject </dev/null 2>&1)" || { echo "$out"; exit 1; }
         echo "$out" | rg "ApplyLabels:|DiscoverFunctions:|ExportDecompiled:|ERROR"
         uv run tools/re/check_decompiled.py
+
+  disasm:
+    desc: "Print disassembly of functions by hex VA, e.g. task re:disasm -- 0045e3a4,0045e3d4"
+    deps: [extract, _install-ghidra, _install-java]
+    cmds:
+      - |
+        proj="$(mktemp -d)"
+        trap 'rm -rf "$proj"' EXIT
+        out="$(timeout 600 {{.GHIDRA_RUN}} {{.GHIDRA_HEADLESS}} "$proj" dw -import vendor/dopewars-1999/DopeWars.exe -scriptPath tools/re/ghidra -postScript ApplyLabels.java vendor/dopewars-1999/re/labels.csv -postScript DiscoverFunctions.java -postScript DumpListing.java {{.CLI_ARGS}} -deleteProject </dev/null 2>&1)" || { echo "$out"; exit 1; }
+        echo "$out" | rg "ERROR" && exit 1
+        echo "$out" | rg "^INFO  DumpListing.java> LISTING" | sed -E 's/^INFO  DumpListing.java> LISTING //; s/ \(GhidraScript\) *$//'
