@@ -212,16 +212,15 @@ const FIXTURES = [
   },
   {
     name: '10-rolls-and-helpers',
-    meta: { seed: 1, description: 'RNG-driven rolls and pure helpers', mechanic: 'shouldStartChase police weighting, coat/gun dealer offer ranges, getFightRatings, applyDamage' },
+    meta: { seed: 1, description: 'RNG-driven rolls and pure helpers', mechanic: 'shouldStartChase flat 1 in 6, coat/gun dealer offer ranges, getFightRatings, applyDamage' },
     steps: [
       { call: 'newGame', args: { seed: 1 } },
-      // shouldStartChase: randInt(rng, 0, 80 + police) >= 50. Bronx has police 10,
-      // so the span is 0..90 and the threshold sits between 49 and 50.
+      // shouldStartChase: Random(6) == 0, so only the first sixth of [0,1) starts a chase.
       { call: 'shouldStartChase', rng: [0.0] },
-      { call: 'shouldStartChase', rng: [0.54] }, // floor(0.54*91) = 49 -> false
-      { call: 'shouldStartChase', rng: [0.55] }, // floor(0.55*91) = 50 -> true
+      { call: 'shouldStartChase', rng: [0.1666] }, // floor(0.1666*6) = 0 -> true
+      { call: 'shouldStartChase', rng: [0.1667] }, // floor(0.1667*6) = 1 -> false
       { call: 'shouldStartChase', rng: [0.999] },
-      // Manhattan has police 90, so the span widens to 0..170.
+      // The odds do not depend on the location.
       { call: 'travel', args: { dest: 'manhattan' } },
       { call: 'shouldStartChase', rng: [0.0] },
       { call: 'shouldStartChase', rng: [0.999] },
@@ -301,15 +300,15 @@ const FIXTURES = [
       { call: 'rollDealerVisits', rng: [0.1, 0.1] },
       // D) Chase: index.html:1382-1383 pushes the chase and the two dealer
       //    draws in the else branch are never reached. The skip is stated as a
-      //    draw budget rather than inferred from an absent step: Manhattan
-      //    (police 90) makes shouldStartChase spend exactly one draw, so
+      //    draw budget rather than inferred from an absent step:
+      //    shouldStartChase spends exactly one draw at any location, so
       //    repeating the identical roll must land on the same rngState. Had the
       //    chase path also spent the two dealer draws, the second line would be
       //    two draws further along.
       { call: 'setField', args: { location: 'manhattan' } },
-      // 0.5 scales to floor(0.5 * 171) = 85 >= 50, so the chase fires.
-      { call: 'shouldStartChase', rng: [0.5] },
-      { call: 'shouldStartChase', rng: [0.5] },
+      // 0.0 scales to Random(6) == 0, so the chase fires.
+      { call: 'shouldStartChase', rng: [0.0] },
+      { call: 'shouldStartChase', rng: [0.0] },
       // A live twin that *is* offered the dealers spends the two draws the chase
       // path saved, so it lands two draws further along than the chase twin
       // above.
