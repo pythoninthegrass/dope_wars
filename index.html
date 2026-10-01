@@ -775,6 +775,32 @@
       return { ok: true };
     }
 
+    // Round a/b to nearest, ties to even (x87 FISTP), exactly in integers.
+    function roundQuotientTiesEven(a, b) {
+      const q = Math.floor(a / b);
+      const twiceRemainder = 2 * (a - q * b);
+      if (twiceRemainder < b) return q;
+      if (twiceRemainder > b) return q + 1;
+      return q % 2 === 0 ? q : q + 1;
+    }
+
+    // Beermat multiplies by an extended-precision 1.1 and rounds ties to even; integers reproduce it exactly (docs/beermat-re.md, M-10).
+    function debtAfterInterest(debt) {
+      if (debt <= 0) return debt;
+      return roundQuotientTiesEven(debt * 11, 10);
+    }
+
+    // The extended 1.05 sits just below 1.05, so a .5 tie with a large enough balance is stored one ulp under the tie and rounds down.
+    function bankAfterInterest(bank) {
+      if (bank <= 0) return bank;
+      const timesTwenty = bank * 21;
+      const rounded = roundQuotientTiesEven(timesTwenty, 20);
+      if (timesTwenty % 20 !== 10) return rounded;
+      let powerOfTwo = 1;
+      while (powerOfTwo * 2 * 20 <= timesTwenty) powerOfTwo *= 2;
+      return 4 * bank > 5 * powerOfTwo ? Math.floor(timesTwenty / 20) : rounded;
+    }
+
     function travel(state, destId) {
       if (destId === state.location) return { ok: false, reason: 'You are already there.' };
       if (!findLocation(destId)) return { ok: false, reason: 'Unknown location.' };
@@ -782,8 +808,8 @@
       if (state.day >= state.numDays) return { ok: false, reason: 'The game is over.' };
 
       state.day += 1;
-      state.debt = Math.round(state.debt * (1 + RULES.debtInterest));
-      state.bank = state.bank * (1 + RULES.bankInterest);
+      state.debt = debtAfterInterest(state.debt);
+      state.bank = bankAfterInterest(state.bank);
       state.location = destId;
       const priceEvents = generatePrices(state);
       return { ok: true, priceEvents };

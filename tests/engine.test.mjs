@@ -420,8 +420,61 @@ describe('travel', () => {
     assert.equal(state.day, before + 1)
     assert.equal(state.location, 'ghetto')
     assert.equal(state.debt, 6050)
-    assert.equal(state.bank, 1000 * 1.05)
+    assert.equal(state.bank, 1050)
     assert.ok(Object.keys(state.prices).length > 0)
+  })
+
+  // Beermat computes the product in x87 extended precision and rounds with FISTP (ties to even, docs/beermat-re.md M-10).
+  test('debt interest rounds ties to even: 6655 becomes 7320, not 7321', () => {
+    const state = Engine.newGame({ seed: 1 })
+    state.debt = 6655
+    Engine.travel(state, 'ghetto')
+    assert.equal(state.debt, 7320)
+  })
+
+  test('debt interest rounds an odd-floor tie up to the even neighbour', () => {
+    const state = Engine.newGame({ seed: 1 })
+    state.debt = 5
+    Engine.travel(state, 'ghetto')
+    assert.equal(state.debt, 6, '5 * 1.1 = 5.5 -> 6')
+    state.debt = 15
+    Engine.travel(state, 'bronx')
+    assert.equal(state.debt, 16, '15 * 1.1 = 16.5 -> 16')
+  })
+
+  test('bank interest is a whole dollar amount rounded to nearest', () => {
+    const state = Engine.newGame({ seed: 1 })
+    state.bank = 5500
+    Engine.travel(state, 'ghetto')
+    assert.equal(state.bank, 5775)
+    state.bank = 1001
+    Engine.travel(state, 'bronx')
+    assert.equal(state.bank, 1051, '1001 * 1.05 = 1051.05')
+  })
+
+  // The binary's extended 1.05 sits just below 1.05, so a product that lands exactly on .5 can fall below it and round down.
+  test('bank interest matches the extended-precision product on .5 ties', () => {
+    const cases = [[10, 10], [30, 31], [110, 115], [50, 52], [70, 74], [90, 94]]
+    for (const [bank, expected] of cases) {
+      const state = Engine.newGame({ seed: 1 })
+      state.bank = bank
+      Engine.travel(state, 'ghetto')
+      assert.equal(state.bank, expected, `${bank} * 1.05`)
+    }
+  })
+
+  test('interest is skipped when the balance is 0 or negative', () => {
+    const state = Engine.newGame({ seed: 1 })
+    state.debt = 0
+    state.bank = 0
+    Engine.travel(state, 'ghetto')
+    assert.equal(state.debt, 0)
+    assert.equal(state.bank, 0)
+    state.debt = -100
+    state.bank = -100
+    Engine.travel(state, 'bronx')
+    assert.equal(state.debt, -100)
+    assert.equal(state.bank, -100)
   })
 
   test('cannot travel to the current location', () => {
