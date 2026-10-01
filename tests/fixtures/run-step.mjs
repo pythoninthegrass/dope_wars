@@ -38,14 +38,16 @@ export function makeRunStep(Engine) {
         return Engine.shouldStartChase(state, rngArg)
       case 'startChase':
         return Engine.startChase(state, rngArg)
-      case 'getFightRatings':
-        return Engine.getFightRatings(state)
       case 'applyDamage':
         return Engine.applyDamage(state, args.amount)
       case 'runFromChase':
-        return Engine.runFromChase(state, args.chase, args.isAggressor, rngArg)
+        return Engine.runFromChase(state, args.chase, rngArg)
+      case 'stayInChase':
+        return Engine.stayInChase(state, rngArg)
       case 'fight':
         return Engine.fight(state, args.chase, rngArg)
+      case 'acceptDoctorOffer':
+        return Engine.acceptDoctorOffer(state, args.offer)
       case 'finish':
         return Engine.finish(state)
       case 'setPrices':

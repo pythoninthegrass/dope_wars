@@ -690,13 +690,6 @@ describe('arrival events', () => {
 })
 
 describe('combat', () => {
-  test('ratings floor at 10 and scale with guns/armor per gameplay.md', () => {
-    const state = Engine.newGame({ seed: 1 })
-    const ratings = Engine.getFightRatings(state)
-    assert.ok(ratings.attack >= 10)
-    assert.ok(ratings.defend >= 10)
-  })
-
   test('fight is unavailable with 0 guns', () => {
     const state = Engine.newGame({ seed: 1 })
     const chase = Engine.startChase(state, Engine.mulberry32(1))
@@ -710,14 +703,181 @@ describe('combat', () => {
     assert.equal(chase.canFight, true)
   })
 
-  test('running has a base 60% escape chance, 30% if the player is the aggressor', () => {
+  test('Run escapes on Random(6) < 3 with no further draw, regardless of guns', () => {
+    for (const guns of [0, 4]) {
+      for (const k of [0, 1, 2]) {
+        const state = Engine.newGame({ seed: 1 })
+        state.guns = guns
+        const rng = scriptedRng([rnd(k, 6)])
+        const res = Engine.runFromChase(state, { deputies: 3 }, rng)
+        assert.equal(res.escaped, true)
+        assert.equal(state.health, 100)
+        assert.equal(rng.drawn(), 1)
+      }
+    }
+  })
+
+  test('a failed Run draws Random(2) and the cops miss on 0', () => {
+    for (const k of [3, 4, 5]) {
+      const state = Engine.newGame({ seed: 1 })
+      const rng = scriptedRng([rnd(k, 6), rnd(0, 2)])
+      const res = Engine.runFromChase(state, { deputies: 3 }, rng)
+      assert.deepEqual({ ...res }, { escaped: false, hit: false, damage: 0, dead: false })
+      assert.equal(state.health, 100)
+      assert.equal(rng.drawn(), 2)
+    }
+  })
+
+  test('a failed Run that gets shot takes Random(11) + 5 damage', () => {
+    const lo = Engine.newGame({ seed: 1 })
+    const resLo = Engine.runFromChase(lo, { deputies: 3 }, scriptedRng([rnd(3, 6), rnd(1, 2), rnd(0, 11)]))
+    assert.deepEqual({ ...resLo }, { escaped: false, hit: true, damage: 5, dead: false })
+    assert.equal(lo.health, 95)
+    const hi = Engine.newGame({ seed: 1 })
+    const rng = scriptedRng([rnd(5, 6), rnd(1, 2), rnd(10, 11)])
+    const resHi = Engine.runFromChase(hi, { deputies: 3 }, rng)
+    assert.equal(resHi.damage, 15)
+    assert.equal(hi.health, 85)
+    assert.equal(rng.drawn(), 3)
+  })
+
+  test('cop damage floors health at 0 and kills', () => {
     const state = Engine.newGame({ seed: 1 })
-    const chase = Engine.startChase(state, Engine.mulberry32(1))
-    const rngEscape = () => 0.5
-    const rngFail = () => 0.9
-    assert.equal(Engine.runFromChase(state, chase, false, rngEscape).escaped, true)
-    assert.equal(Engine.runFromChase(state, chase, false, rngFail).escaped, false)
-    assert.equal(Engine.runFromChase(state, chase, true, rngEscape).escaped, false)
+    state.health = 7
+    const res = Engine.runFromChase(state, { deputies: 3 }, scriptedRng([rnd(4, 6), rnd(1, 2), rnd(10, 11)]))
+    assert.equal(state.health, 0)
+    assert.equal(res.dead, true)
+    assert.equal(state.dead, true)
+  })
+
+  test('Stay makes the cops fire: Random(2), then Random(11) + 5 on a hit', () => {
+    const miss = Engine.newGame({ seed: 1 })
+    const rngMiss = scriptedRng([rnd(0, 2)])
+    assert.deepEqual({ ...Engine.stayInChase(miss, rngMiss) }, { hit: false, damage: 0, dead: false })
+    assert.equal(miss.health, 100)
+    assert.equal(rngMiss.drawn(), 1)
+    const hit = Engine.newGame({ seed: 1 })
+    const rngHit = scriptedRng([rnd(1, 2), rnd(4, 11)])
+    assert.deepEqual({ ...Engine.stayInChase(hit, rngHit) }, { hit: true, damage: 9, dead: false })
+    assert.equal(hit.health, 91)
+    assert.equal(rngHit.drawn(), 2)
+  })
+
+  test('Stay can kill', () => {
+    const state = Engine.newGame({ seed: 1 })
+    state.health = 5
+    const res = Engine.stayInChase(state, scriptedRng([rnd(1, 2), rnd(0, 11)]))
+    assert.equal(res.dead, true)
+    assert.equal(state.health, 0)
+  })
+
+  test('Fight needs a gun and draws nothing without one', () => {
+    const state = Engine.newGame({ seed: 1 })
+    const rng = scriptedRng([])
+    assert.equal(Engine.fight(state, { deputies: 3 }, rng).ok, false)
+  })
+
+  test('a Fight shot that misses draws Random(2) = 0 and the cops return fire', () => {
+    const state = Engine.newGame({ seed: 1 })
+    state.guns = 1
+    const chase = { deputies: 3 }
+    const rng = scriptedRng([rnd(0, 2), rnd(0, 2)])
+    const res = Engine.fight(state, chase, rng)
+    assert.equal(res.ok, true)
+    assert.equal(res.killed, false)
+    assert.equal(res.copHit, false)
+    assert.equal(res.won, false)
+    assert.equal(chase.deputies, 3)
+    assert.equal(rng.drawn(), 2)
+  })
+
+  test('a Fight shot that kills drops one deputy, then the cops return fire for 5-15', () => {
+    const state = Engine.newGame({ seed: 1 })
+    state.guns = 1
+    const chase = { deputies: 3 }
+    const rng = scriptedRng([rnd(1, 2), rnd(1, 2), rnd(2, 11)])
+    const res = Engine.fight(state, chase, rng)
+    assert.equal(res.killed, true)
+    assert.equal(res.copHit, true)
+    assert.equal(res.damage, 7)
+    assert.equal(chase.deputies, 2)
+    assert.equal(state.health, 93)
+    assert.equal(rng.drawn(), 3)
+  })
+
+  test('Fight return fire can kill the player', () => {
+    const state = Engine.newGame({ seed: 1 })
+    state.guns = 1
+    state.health = 6
+    const res = Engine.fight(state, { deputies: 3 }, scriptedRng([rnd(0, 2), rnd(1, 2), rnd(10, 11)]))
+    assert.equal(res.dead, true)
+    assert.equal(state.health, 0)
+  })
+
+  test('the chase is won when the count goes below 0, so deputies + 1 kills are needed', () => {
+    const state = Engine.newGame({ seed: 1 })
+    state.guns = 1
+    const chase = { deputies: 1 }
+    const first = Engine.fight(state, chase, scriptedRng([rnd(1, 2), rnd(0, 2)]))
+    assert.equal(first.won, false)
+    assert.equal(chase.deputies, 0)
+    const second = Engine.fight(state, chase, scriptedRng([rnd(1, 2), rnd(500, 1000), rnd(0, 1500)]))
+    assert.equal(second.won, true)
+    assert.equal(chase.deputies, -1)
+  })
+
+  test('a win draws no return fire, pays +1 gun and (Random(1000)+1000) + Random(1500) cash', () => {
+    const state = Engine.newGame({ seed: 1 })
+    state.guns = 2
+    state.cash = 100
+    const rng = scriptedRng([rnd(1, 2), rnd(5, 1000), rnd(700, 1500)])
+    const res = Engine.fight(state, { deputies: 0 }, rng)
+    assert.equal(res.won, true)
+    assert.equal(res.copHit, false)
+    assert.equal(res.damage, 0)
+    assert.equal(res.reward, 1005 + 700)
+    assert.deepEqual({ ...res.doctor }, { price: 1005 })
+    assert.equal(state.guns, 3)
+    assert.equal(state.cash, 100 + 1005 + 700)
+    assert.equal(rng.drawn(), 3)
+  })
+
+  test('the win reward ranges from 1000 to 3499 and the doctor price from 1000 to 1999', () => {
+    const lo = Engine.newGame({ seed: 1 })
+    lo.guns = 1
+    const resLo = Engine.fight(lo, { deputies: 0 }, scriptedRng([rnd(1, 2), rnd(0, 1000), rnd(0, 1500)]))
+    assert.equal(resLo.reward, 1000)
+    assert.equal(resLo.doctor.price, 1000)
+    const hi = Engine.newGame({ seed: 1 })
+    hi.guns = 1
+    const resHi = Engine.fight(hi, { deputies: 0 }, scriptedRng([rnd(1, 2), rnd(999, 1000), rnd(1499, 1500)]))
+    assert.equal(resHi.reward, 3498)
+    assert.equal(resHi.doctor.price, 1999)
+  })
+
+  test('the doctor sets health to 100 and charges the price from cash', () => {
+    const state = Engine.newGame({ seed: 1 })
+    state.health = 12
+    state.cash = 5000
+    assert.deepEqual({ ...Engine.acceptDoctorOffer(state, { price: 1500 }) }, { ok: true })
+    assert.equal(state.health, 100)
+    assert.equal(state.cash, 3500)
+  })
+
+  test('the doctor refuses when the price exceeds cash and changes nothing', () => {
+    const state = Engine.newGame({ seed: 1 })
+    state.health = 12
+    state.cash = 100
+    assert.equal(Engine.acceptDoctorOffer(state, { price: 1500 }).ok, false)
+    assert.equal(state.health, 12)
+    assert.equal(state.cash, 100)
+  })
+
+  test('the attack/defend rating model and the aggressor flag are gone', () => {
+    assert.equal(Engine.getFightRatings, undefined)
+    assert.equal('gunDamage' in Engine.RULES, false)
+    assert.equal('playerArmor' in Engine.RULES, false)
+    assert.equal(Engine.runFromChase.length, 3)
   })
 
   test('health reaching 0 marks the player dead', () => {
@@ -726,48 +886,6 @@ describe('combat', () => {
     Engine.applyDamage(state, 50)
     assert.equal(state.health, 0)
     assert.equal(state.dead, true)
-  })
-
-  test('fight hit kills a deputy and does not damage the player', () => {
-    const state = Engine.newGame({ seed: 1 })
-    state.guns = 1
-    const chase = Engine.startChase(state, Engine.mulberry32(1))
-    const deputiesBefore = chase.deputies
-    const healthBefore = state.health
-    // high first call → big attackRoll; low second call → small defendRoll → guaranteed hit
-    let calls = 0
-    const rng = () => calls++ === 0 ? 0.99 : 0.01
-    const res = Engine.fight(state, chase, rng)
-    assert.equal(res.hit, true)
-    assert.equal(chase.deputies, deputiesBefore - 1)
-    assert.equal(state.health, healthBefore)
-  })
-
-  test('fight miss damages the player and does not kill a deputy', () => {
-    const state = Engine.newGame({ seed: 1 })
-    state.guns = 1
-    const chase = Engine.startChase(state, Engine.mulberry32(1))
-    const deputiesBefore = chase.deputies
-    const healthBefore = state.health
-    // low first call → small attackRoll; high second call → big defendRoll → guaranteed miss
-    let calls = 0
-    const rng = () => calls++ === 0 ? 0.01 : 0.99
-    const res = Engine.fight(state, chase, rng)
-    assert.equal(res.hit, false)
-    assert.equal(chase.deputies, deputiesBefore)
-    assert.ok(state.health < healthBefore)
-  })
-
-  test('fight returns won when last deputy is killed', () => {
-    const state = Engine.newGame({ seed: 1 })
-    state.guns = 1
-    const chase = Engine.startChase(state, Engine.mulberry32(1))
-    chase.deputies = 1
-    let calls = 0
-    const rng = () => calls++ === 0 ? 0.99 : 0.01
-    const res = Engine.fight(state, chase, rng)
-    assert.equal(res.won, true)
-    assert.equal(chase.deputies, 0)
   })
 })
 

@@ -150,7 +150,7 @@ const FIXTURES = [
   },
   {
     name: '06-chase-combat',
-    meta: { seed: 1, description: 'chase + combat branches', mechanic: 'startChase, runFromChase escape/fail/aggressor, fight hit/miss/won' },
+    meta: { seed: 1, description: 'chase + combat branches', mechanic: 'startChase, runFromChase, stayInChase, fight kill/miss/win reward, acceptDoctorOffer' },
     steps: [
       { call: 'newGame', args: { seed: 1 } },
       // startChase without gun
@@ -158,24 +158,47 @@ const FIXTURES = [
       // startChase with gun (canFight true)
       { call: 'setField', args: { guns: 1 } },
       { call: 'startChase', rng: [0.5] },
-      // runFromChase escape (defender, rng < 0.60)
+      // runFromChase: Random(6) < 3 escapes with no further draw, guns or not
       { call: 'setField', args: { health: 100 } },
-      { call: 'runFromChase', args: { chase: { deputies: 3 }, isAggressor: false }, rng: [0.5] },
-      // runFromChase fail (defender, rng > 0.60), incurs damage
-      { call: 'setField', args: { health: 100 } },
-      { call: 'runFromChase', args: { chase: { deputies: 3 }, isAggressor: false }, rng: [0.9, 0.5] },
-      // runFromChase aggressor fails (rng > 0.30)
-      { call: 'setField', args: { health: 100 } },
-      { call: 'runFromChase', args: { chase: { deputies: 3 }, isAggressor: true }, rng: [0.5, 0.5] },
-      // fight hit: attackRoll high, defendRoll low
-      { call: 'setField', args: { health: 100, guns: 1 } },
-      { call: 'fight', args: { chase: { deputies: 3 } }, rng: [0.99, 0.01] },
-      // fight miss: attackRoll low, defendRoll high
-      { call: 'setField', args: { health: 100 } },
-      { call: 'fight', args: { chase: { deputies: 3 } }, rng: [0.01, 0.99, 0.99] },
-      // fight kills last deputy -> won
-      { call: 'setField', args: { health: 100 } },
-      { call: 'fight', args: { chase: { deputies: 1 } }, rng: [0.99, 0.01] },
+      { call: 'runFromChase', args: { chase: { deputies: 3 } }, rng: [0.0] },
+      { call: 'runFromChase', args: { chase: { deputies: 3 } }, rng: [0.4999] },
+      { call: 'setField', args: { guns: 0 } },
+      { call: 'runFromChase', args: { chase: { deputies: 3 } }, rng: [0.4] },
+      // runFromChase fails at Random(6) == 3 and the cops miss (Random(2) == 0)
+      { call: 'runFromChase', args: { chase: { deputies: 3 } }, rng: [0.5, 0.2] },
+      // runFromChase fails and the cops hit for the minimum (5) and the maximum (15)
+      { call: 'runFromChase', args: { chase: { deputies: 3 } }, rng: [0.5, 0.5, 0.0] },
+      { call: 'runFromChase', args: { chase: { deputies: 3 } }, rng: [0.99, 0.99, 0.99] },
+      // runFromChase hit that floors health at 0 and kills
+      { call: 'setField', args: { health: 8 } },
+      { call: 'runFromChase', args: { chase: { deputies: 3 } }, rng: [0.7, 0.6, 0.9] },
+      // stayInChase: the cops fire, miss then hit
+      { call: 'setField', args: { health: 100, dead: false } },
+      { call: 'stayInChase', rng: [0.1] },
+      { call: 'stayInChase', rng: [0.5, 0.5] },
+      { call: 'setField', args: { health: 6 } },
+      { call: 'stayInChase', rng: [0.9, 0.9] },
+      // fight: the shot misses and the cops miss
+      { call: 'setField', args: { health: 100, dead: false, guns: 1 } },
+      { call: 'fight', args: { chase: { deputies: 3 } }, rng: [0.2, 0.2] },
+      // fight: the shot kills and the cops hit
+      { call: 'fight', args: { chase: { deputies: 3 } }, rng: [0.5, 0.5, 0.5] },
+      // fight: the shot misses and the cops hit
+      { call: 'fight', args: { chase: { deputies: 3 } }, rng: [0.2, 0.9, 0.0] },
+      // fight: killing the last deputy (count 0 -> -1) wins with +1 gun and the cash reward
+      { call: 'setField', args: { cash: 100 } },
+      { call: 'fight', args: { chase: { deputies: 0 } }, rng: [0.9, 0.0, 0.0] },
+      { call: 'fight', args: { chase: { deputies: 0 } }, rng: [0.9, 0.999, 0.999] },
+      // fight: a kill at count 1 leaves count 0, which is not yet a win, so the cops fire
+      { call: 'fight', args: { chase: { deputies: 1 } }, rng: [0.9, 0.2] },
+      // fight: a miss at count 0 does not win
+      { call: 'fight', args: { chase: { deputies: 0 } }, rng: [0.1, 0.2] },
+      // acceptDoctorOffer: full health, price paid from cash
+      { call: 'setField', args: { health: 20, cash: 5000 } },
+      { call: 'acceptDoctorOffer', args: { offer: { price: 1500 } } },
+      // acceptDoctorOffer refused when cash is short
+      { call: 'setField', args: { health: 20, cash: 1000 } },
+      { call: 'acceptDoctorOffer', args: { offer: { price: 1500 } } },
     ],
   },
   {
@@ -221,7 +244,7 @@ const FIXTURES = [
   },
   {
     name: '10-rolls-and-helpers',
-    meta: { seed: 1, description: 'RNG-driven rolls and pure helpers', mechanic: 'shouldStartChase flat 1 in 6, coat/gun dealer offers, getFightRatings, applyDamage' },
+    meta: { seed: 1, description: 'RNG-driven rolls and pure helpers', mechanic: 'shouldStartChase flat 1 in 6, coat/gun dealer offers, applyDamage' },
     steps: [
       { call: 'newGame', args: { seed: 1 } },
       // shouldStartChase: Random(6) == 0, so only the first sixth of [0,1) starts a chase.
@@ -249,11 +272,6 @@ const FIXTURES = [
       { call: 'rollGunDealerOffer', rng: [0.0] },
       { call: 'setField', args: { cash: 302 } },
       { call: 'rollGunDealerOffer', rng: [0.0, 0.5] },
-      // getFightRatings: attack = 80 + guns*5, defend = 100.
-      { call: 'setField', args: { guns: 0 } },
-      { call: 'getFightRatings' },
-      { call: 'setField', args: { guns: 3 } },
-      { call: 'getFightRatings' },
       // applyDamage returns the new health and sets dead at zero.
       { call: 'setField', args: { guns: 0, health: 100, dead: false } },
       { call: 'applyDamage', args: { amount: 30 } },
@@ -318,7 +336,8 @@ function generate(fixture) {
   let state = null
   const lines = []
   fixture.steps.forEach((step, i) => {
-    const ret = runStep(state, step)
+    // The engine mutates a chase argument in place; the record keeps the input.
+    const ret = runStep(state, { ...step, args: structuredClone(step.args || {}) })
     if (step.call === 'newGame') state = ret
     const record = {
       step: i,

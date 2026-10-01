@@ -27,7 +27,7 @@ Each `.jsonl` line is one engine call plus the expected result:
 Fields:
 
 - `step` — zero-based index; must match the line's position in the file.
-- `call` — one of the engine exports (`newGame`, `generatePrices`, `buy`, `sell`, `travel`, `finances`, `rollArrivalEvent`, `rollDealerVisit`, `rollCoatDealerOffer`, `acceptCoatOffer`, `rollGunDealerOffer`, `acceptGunOffer`, `shouldStartChase`, `startChase`, `getFightRatings`, `applyDamage`, `runFromChase`, `fight`, `finish`) or a runner helper (`setPrices`, `setPrevPrices`, `setInventory`, `setField`, `buyCheapest`, `insertHighScores`, `serializeRoundTrip`).
+- `call` — one of the engine exports (`newGame`, `generatePrices`, `buy`, `sell`, `travel`, `finances`, `rollArrivalEvent`, `rollDealerVisit`, `rollCoatDealerOffer`, `acceptCoatOffer`, `rollGunDealerOffer`, `acceptGunOffer`, `shouldStartChase`, `startChase`, `applyDamage`, `runFromChase`, `stayInChase`, `fight`, `acceptDoctorOffer`, `finish`) or a runner helper (`setPrices`, `setPrevPrices`, `setInventory`, `setField`, `buyCheapest`, `insertHighScores`, `serializeRoundTrip`).
 - `args` — positional-arg bag; each dispatch case unpacks the fields it needs (see `run-step.mjs`).
 - `rng` — optional array of `[0,1)` floats for a scripted RNG. Used by fixtures that force specific arrival-event / combat branches. Full-run fixtures omit `rng` and let the engine consume the seeded `state.rng` (mulberry32) it was born with. A scripted call draws from the array only, so it never advances `state.rng` and its snapshot records `rngState` unchanged; the scaling a call applies is part of the contract (`shouldStartChase` scales by `randInt`'s span, `rollDealerVisit` scales by `randInt` the same way).
 - `expect.return` — deep-equal target for the call's return value.
@@ -54,11 +54,11 @@ Each `.meta.json` sidecar records:
 | `03-travel-interest` | day advancement, 10% debt compounding, 5% bank interest |
 | `04-arrival-events` | every `rollArrivalEvent` branch (the Random(14) chance, the wealth-cap mugging, and the found/mugged/friend/police-dogs outcomes) |
 | `05-dealers` | coat + gun dealers: cash path, pockets drawn on acceptance, no bank fallback, a gun fits in a full coat |
-| `06-chase-combat` | `startChase` w/ + w/o guns; `runFromChase` escape/fail/aggressor; `fight` hit/miss/won |
+| `06-chase-combat` | `startChase` w/ + w/o guns; `runFromChase` escape/miss/hit/death; `stayInChase`; `fight` miss/kill/win reward (deputy count below 0); `acceptDoctorOffer` |
 | `07-finish-scoring` | `finish` score = cash + bank − debt; `insertHighScore` top-10 truncation |
 | `08-serialize-roundtrip` | `serializeState` → `deserializeState` preserves full state |
 | `09-full-run-31day` | 31-day playthrough with deterministic policy (travel to `locations[day % 6]`, buy cheapest per stop) |
-| `10-rolls-and-helpers` | `shouldStartChase` flat 1 in 6 (incl. the first-sixth threshold), `rollCoatDealerOffer` and `rollGunDealerOffer` range ends and the `price < cash` offer rule, `getFightRatings`, `applyDamage` |
+| `10-rolls-and-helpers` | `shouldStartChase` flat 1 in 6 (incl. the first-sixth threshold), `rollCoatDealerOffer` and `rollGunDealerOffer` range ends and the `price < cash` offer rule, `applyDamage` |
 | `11-finances` | `finances` deposit/withdraw/payLoan, clamping to available cash/bank/debt, amount floor, unknown action |
 | `12-dealer-visits` | `rollDealerVisit`: seeded stream over forty calls, the four `Random(4)` outcomes, the 1 in 14 boundary, chase skip |
 
