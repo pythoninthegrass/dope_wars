@@ -53,6 +53,27 @@ describe('engine module shape', () => {
     assert.equal(Engine.RULES.locations.length, 6)
     assert.equal(Engine.RULES.drugs.length, 12)
   })
+
+  test('drug table matches the Beermat records (min, max, crash=cheap, spike=expensive)', () => {
+    const beermat = {
+      acid: [1000, 4500, true, false],
+      cocaine: [15000, 30000, false, true],
+      crack: [1000, 3500, false, false],
+      ecstasy: [10, 60, true, false],
+      hashish: [450, 1350, true, false],
+      heroin: [5000, 14000, false, true],
+      opium: [500, 1300, false, true],
+      peyote: [200, 700, false, false],
+      shrooms: [600, 1350, false, false],
+      smack: [1500, 4500, false, false],
+      speed: [70, 250, false, true],
+      weed: [300, 900, true, false],
+    }
+    assert.deepEqual(Object.keys(beermat).sort(), [...Engine.RULES.drugs.map((d) => d.id)].sort())
+    for (const d of Engine.RULES.drugs) {
+      assert.deepEqual([d.min, d.max, d.cheap, d.expensive], beermat[d.id], d.id)
+    }
+  })
 })
 
 describe('seeded RNG', () => {

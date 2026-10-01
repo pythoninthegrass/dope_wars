@@ -60,18 +60,18 @@ def test_locations_match_js() raises:
 def test_drugs_match_js() raises:
     # id|name|min|max|cheap|expensive, in RULES order.
     var expected: List[String] = [
-        "acid|Acid|1000|4400|t|f",
-        "cocaine|Cocaine|15000|29000|f|t",
-        "crack|Crack|1500|4800|f|f",
-        "ecstasy|Ecstasy|10|75|f|f",
-        "hashish|Hashish|480|1320|t|f",
-        "heroin|Heroin|5500|13500|f|t",
-        "opium|Opium|540|3700|f|t",
-        "peyote|Peyote|220|700|f|f",
-        "shrooms|Shrooms|600|1300|f|f",
-        "smack|Smack|1500|4500|f|t",
-        "speed|Speed|90|250|t|t",
-        "weed|Weed|300|1100|t|f",
+        "acid|Acid|1000|4500|t|f",
+        "cocaine|Cocaine|15000|30000|f|t",
+        "crack|Crack|1000|3500|f|f",
+        "ecstasy|Ecstasy|10|60|t|f",
+        "hashish|Hashish|450|1350|t|f",
+        "heroin|Heroin|5000|14000|f|t",
+        "opium|Opium|500|1300|f|t",
+        "peyote|Peyote|200|700|f|f",
+        "shrooms|Shrooms|600|1350|f|f",
+        "smack|Smack|1500|4500|f|f",
+        "speed|Speed|70|250|f|t",
+        "weed|Weed|300|900|t|f",
     ]
     var table = rules.drugs()
     assert_equal(len(table), len(expected))
