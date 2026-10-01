@@ -1,7 +1,7 @@
 ---
 id: TASK-010.01.03
 title: Parse Delphi VMTs and emit published-method map
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-10-01 01:49'
 labels:
@@ -21,8 +21,14 @@ Third slice of TASK-010.01; depends on the extractor skeleton subtask. Extend to
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 A synthetic fake-VMT test was written first, observed failing, then passes
-- [ ] #2 Running the extractor on the real exe writes OUT/methods.tsv and prints the class count and method count
-- [ ] #3 Handler names found in the decoded forms resolve to a method VA in methods.tsv
-- [ ] #4 `ruff format --check tools/re` passes and nothing derived from the exe is committed
+- [x] #1 A synthetic fake-VMT test was written first, observed failing, then passes
+- [x] #2 Running the extractor on the real exe writes OUT/methods.tsv and prints the class count and method count
+- [x] #3 Handler names found in the decoded forms resolve to a method VA in methods.tsv
+- [x] #4 `ruff format --check tools/re` passes and nothing derived from the exe is committed
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Extended tools/re/extract_beermat.py with an Image section-map reader, find_vmts, read_vmt, read_published_methods, collect_methods, unresolved_handlers and write_methods. The 7 new self-tests (synthetic fake VMT with a published method table) were written first and observed failing, then pass with the earlier tests (25/25). On the real exe the extractor finds 180 VMTs, 8 classes with 64 published methods (TForm1 35, TBuyDlg 5, TCopChaseDlg 5, TFinanceDlg 5, TIntroDlg 5, TAmountDlg 4, TViewHiScoreDlg 4, TBltBitmap 1) and writes methods.tsv. TAboutDlg has a VMT but no published methods, so it is the ninth class from the earlier probe. All 52 event handlers in the decoded forms resolve to a method VA, and the extractor exits non-zero if any does not. ruff format --check tools/re passes; nothing derived from the exe is committed.
+<!-- SECTION:FINAL_SUMMARY:END -->

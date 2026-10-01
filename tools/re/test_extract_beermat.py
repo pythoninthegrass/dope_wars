@@ -290,6 +290,92 @@ def test_write_sounds_missing_row_exits_nonzero() -> None:
         assert (out / "strings.txt").is_file()
 
 
+IMAGE_BASE = 0x400000
+FAKE_SECTION_VA = IMAGE_BASE + 0x1000
+
+
+def fake_image(*, include_methods: bool = True) -> "tuple[eb.Image, int]":
+    """One section mapped at FAKE_SECTION_VA holding a name, a method table and two VMTs."""
+    buf = bytearray(0x200)
+
+    def va(off: int) -> int:
+        return FAKE_SECTION_VA + off
+
+    def put32(off: int, value: int) -> None:
+        buf[off : off + 4] = struct.pack("<I", value)
+
+    buf[0x10:0x1A] = short("TFakeForm1")
+    buf[0x30:0x39] = short("TObject1")
+    methods = [("BuyBtnClick", 0x401234), ("FormActivate", 0x401300)]
+    table = struct.pack("<H", len(methods))
+    for name, code in methods:
+        entry = struct.pack("<I", code) + short(name)
+        table += struct.pack("<H", 2 + len(entry)) + entry
+    buf[0x50 : 0x50 + len(table)] = table
+
+    def vmt(at: int, name_off: int, parent: int, table_off: int | None) -> int:
+        put32(at, va(at + 76))
+        put32(at + 24, va(table_off) if table_off is not None else 0)
+        put32(at + 32, va(name_off))
+        put32(at + 36, 0x70)
+        put32(at + 40, parent)
+        return va(at + 76)
+
+    parent_vmt = vmt(0x100, 0x30, 0, None)
+    child_vmt = vmt(0x150, 0x10, parent_vmt, 0x50 if include_methods else None)
+    return eb.Image(bytes(buf), [(FAKE_SECTION_VA, 0, len(buf))]), child_vmt
+
+
+def test_image_reads_through_section_map() -> None:
+    image, _ = fake_image()
+    assert image.u32(FAKE_SECTION_VA + 0x100) == FAKE_SECTION_VA + 0x100 + 76
+    assert image.shortstring(FAKE_SECTION_VA + 0x10) == "TFakeForm1"
+    assert image.u32(0x12345678) is None
+
+
+def test_find_vmts_locates_self_pointers() -> None:
+    image, child = fake_image()
+    assert eb.find_vmts(image) == [child - 0x50, child]
+
+
+def test_read_vmt_class_parent_and_methods() -> None:
+    image, child = fake_image()
+    vmt = eb.read_vmt(image, child)
+    assert vmt.class_name == "TFakeForm1"
+    assert vmt.parent == child - 0x50
+    assert vmt.methods == [("BuyBtnClick", 0x401234), ("FormActivate", 0x401300)]
+
+
+def test_read_vmt_without_method_table() -> None:
+    image, child = fake_image(include_methods=False)
+    assert eb.read_vmt(image, child).methods == []
+
+
+def test_collect_methods_skips_classes_without_methods() -> None:
+    image, child = fake_image()
+    rows = eb.collect_methods(image)
+    assert rows == [
+        ("TFakeForm1", "BuyBtnClick", 0x401234),
+        ("TFakeForm1", "FormActivate", 0x401300),
+    ]
+
+
+def test_unresolved_handlers_reports_missing_names() -> None:
+    root = eb.decode_tpf0(synthetic_blob())
+    assert eb.unresolved_handlers([root], [("TForm1", "BuyBtnClick", 0x401000)]) == []
+    assert eb.unresolved_handlers([root], [("TForm1", "Other", 0x401000)]) == [
+        ("Form1", "OnClick", "BuyBtnClick")
+    ]
+
+
+def test_write_methods_tsv() -> None:
+    rows = [("TFakeForm1", "BuyBtnClick", 0x401234)]
+    with tempfile.TemporaryDirectory() as tmp:
+        eb.write_methods(rows, Path(tmp))
+        text = (Path(tmp) / "methods.tsv").read_text()
+        assert text == "TFakeForm1\tBuyBtnClick\t00401234\n"
+
+
 def main() -> int:
     tests = [
         (n, f)
