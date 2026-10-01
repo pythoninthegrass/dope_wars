@@ -7,7 +7,7 @@
 
 """
 Extracts the Delphi form resources from the Beermat "Dope Wars for Windows"
-1.2.0.0 exe into text DFM files (TASK-010.01.01 to .03).
+1.2.0.0 exe into text DFM files (TASK-010.01.01 to .04).
 
 Everything written is derived from copyrighted material, so the default output
 directory sits under the gitignored vendor/dopewars-1999/. Only this tool and
@@ -502,6 +502,27 @@ def write_methods(methods: list[tuple[str, str, int]], out: Path) -> None:
     )
 
 
+def sanitize_label(*parts: str) -> str:
+    return "_".join(re.sub(r"[^A-Za-z0-9_]", "_", part) for part in parts)
+
+
+def label_rows(vmts: list[Vmt]) -> list[tuple[int, str]]:
+    methods = [
+        (code, sanitize_label(v.class_name, name))
+        for v in vmts
+        for name, code in v.methods
+    ]
+    return methods + [(v.va, sanitize_label(v.class_name, "VMT")) for v in vmts]
+
+
+def write_labels(vmts: list[Vmt], out: Path) -> None:
+    out.mkdir(parents=True, exist_ok=True)
+    (out / "labels.csv").write_text(
+        "".join(f"{va:08X},{label}\n" for va, label in label_rows(vmts)),
+        encoding="utf-8",
+    )
+
+
 def resolve_exe(arg: str | None) -> Path:
     if arg:
         return Path(arg)
@@ -549,6 +570,8 @@ def main(argv: list[str] | None = None) -> int:
     vmts = read_vmts(Image.from_pe(pe, data))
     methods = flatten_methods(vmts)
     write_methods(methods, out)
+    write_labels(vmts, out)
+    print(f"{len(label_rows(vmts))} labels written to {out / 'labels.csv'}")
     classes = len({cls for cls, _, _ in methods})
     print(f"{len(vmts)} VMTs, {classes} classes with {len(methods)} published methods")
     missing = unresolved_handlers(forms, methods)

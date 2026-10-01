@@ -8,7 +8,7 @@ vars:
   GHIDRA_SHA256: "ddac49f903da9d5bac833e5cc79395098b9c33cfd3279be5f31bd00387d2d4db"
   GHIDRA_JAVA: "temurin-21"
   GHIDRA_ROOT: '{{.HOME}}/.local/opt/ghidra/ghidra_{{.GHIDRA_VERSION}}_PUBLIC'
-  GHIDRA_HEADLESS: '{{if eq OS "darwin"}}$(brew --prefix ghidra)/libexec/support/analyzeHeadless{{else}}{{.GHIDRA_ROOT}}/support/analyzeHeadless{{end}}'
+  GHIDRA_HEADLESS: '{{if eq OS "darwin"}}/opt/homebrew/opt/ghidra/libexec/support/analyzeHeadless{{else}}{{.GHIDRA_ROOT}}/support/analyzeHeadless{{end}}'
   GHIDRA_RUN: "mise exec java@{{.GHIDRA_JAVA}} --"
 
 tasks:
@@ -48,3 +48,14 @@ tasks:
     desc: "Extract forms from vendor/dopewars-1999/DopeWars.exe into the gitignored vendor/dopewars-1999/re/"
     cmds:
       - uv run tools/re/extract_beermat.py
+
+  apply-labels-check:
+    desc: "Import DopeWars.exe into a throwaway Ghidra project and apply the extracted labels"
+    deps: [extract, _install-ghidra, _install-java]
+    cmds:
+      - |
+        proj="$(mktemp -d)"
+        trap 'rm -rf "$proj"' EXIT
+        out="$(timeout 600 {{.GHIDRA_RUN}} {{.GHIDRA_HEADLESS}} "$proj" dw -import vendor/dopewars-1999/DopeWars.exe -scriptPath tools/re/ghidra -postScript ApplyLabels.java vendor/dopewars-1999/re/labels.csv -deleteProject </dev/null 2>&1)" || { echo "$out"; exit 1; }
+        echo "$out" | rg "ApplyLabels:|ERROR"
+        if echo "$out" | rg -q "ERROR"; then exit 1; fi
