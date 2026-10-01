@@ -376,6 +376,31 @@ def test_write_methods_tsv() -> None:
         assert text == "TFakeForm1\tBuyBtnClick\t00401234\n"
 
 
+def test_sanitize_label_replaces_illegal_characters() -> None:
+    assert eb.sanitize_label("TForm1", "BuyBtnClick") == "TForm1_BuyBtnClick"
+    assert eb.sanitize_label("TFake.Form", "On-Click$1") == "TFake_Form_On_Click_1"
+
+
+def test_label_rows_methods_then_vmt_per_vmt() -> None:
+    vmts = [
+        eb.Vmt(0x450000, "TFakeForm1", 0x440000, [("BuyBtnClick", 0x401234)]),
+        eb.Vmt(0x440000, "TObject", 0, []),
+    ]
+    assert eb.label_rows(vmts) == [
+        (0x401234, "TFakeForm1_BuyBtnClick"),
+        (0x450000, "TFakeForm1_VMT"),
+        (0x440000, "TObject_VMT"),
+    ]
+
+
+def test_write_labels_csv() -> None:
+    vmts = [eb.Vmt(0x450000, "TFakeForm1", 0, [("BuyBtnClick", 0x401234)])]
+    with tempfile.TemporaryDirectory() as tmp:
+        eb.write_labels(vmts, Path(tmp))
+        text = (Path(tmp) / "labels.csv").read_text()
+        assert text == "00401234,TFakeForm1_BuyBtnClick\n00450000,TFakeForm1_VMT\n"
+
+
 def main() -> int:
     tests = [
         (n, f)
