@@ -17,7 +17,7 @@ of `task check`), fails if any script outside `simulation/` names
 `DopeWarsWorld` — the GDExtension class registered in
 `extension/src/register_types.cpp`. `simulation/world.gd` (`class_name SimWorld`)
 is the single pass-through wrapper: every method forwards to exactly one
-extension method and does nothing else, and it re-exports all 32 `DW_*`
+extension method and does nothing else, and it re-exports all 35 `DW_*`
 constants so a caller never names the extension class merely to compare a
 result code.
 

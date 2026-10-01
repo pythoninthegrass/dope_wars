@@ -5,16 +5,14 @@ extends RefCounted
 ## instead of the prototype's recursive `processQueue` closure chain
 ## (index.html:1378-1470).
 ##
-## The order is the prototype's, and the order is load-bearing because every
-## step draws from the one world RNG stream:
+## The order is Beermat's, and the order is load-bearing because every step
+## draws from the one world RNG stream:
 ##
 ##   1. one toast per cheap/expensive price event, cheapest to draw no news
-##   2. if should_start_chase fired, the chase -- and nothing else. The
-##      prototype's `else` at index.html:1383 skips the arrival event *and*
-##      both dealer rolls entirely, so the RNG stream lines up.
-##   3. otherwise one arrival event, unless it rolled NONE
-##   4. then the coat and gun dealer visits, drawn together by
-##      dw_roll_dealer_visits so the pair cannot be reordered or half-skipped
+##   2. if should_start_chase fired, the chase -- and nothing else. A chase
+##      skips the dealer and the arrival event entirely.
+##   3. otherwise the dealer visit roll, then (once that dealer's dialog is
+##      done) the arrival event, rolled lazily so a purchase comes first
 ##
 ## The chase is a state rather than a queue entry because it is not linear:
 ## Run and Stay re-present it, and only a win or a death ends it.
@@ -22,7 +20,7 @@ extends RefCounted
 signal state_changed()
 signal finished()
 
-enum Step { TOAST, EVENT, COAT_DEALER, GUN_DEALER }
+enum Step { TOAST, EVENT_ROLL, COAT_DEALER, GUN_DEALER }
 
 ## The live chase, or {} when none is unresolved. Carries the deputy count
 ## and whether the player may fight, both read off dw_start_chase.
@@ -65,21 +63,14 @@ func _build() -> void:
 		_chase.erase("result")
 		return
 
-	var arrival := _world.roll_arrival_event()
-	if int(arrival.get("result", SimWorld.ERR_INVALID_ARGUMENT)) == SimWorld.OK \
-			and int(arrival.get("kind", SimWorld.ARRIVAL_NONE)) != SimWorld.ARRIVAL_NONE:
-		_queue.append({"step": Step.EVENT, "event": arrival})
-
-	# Both draws happen here regardless of what the event was, and regardless
-	# of whether the player died in it -- that is the point of routing them
-	# through one ABI call.
-	var visits := _world.roll_dealer_visits()
-	if int(visits.get("result", SimWorld.ERR_INVALID_ARGUMENT)) != SimWorld.OK:
-		return
-	if bool(visits.get("coat_visit", false)):
-		_queue.append({"step": Step.COAT_DEALER})
-	if bool(visits.get("gun_visit", false)):
-		_queue.append({"step": Step.GUN_DEALER})
+	var visit := _world.roll_dealer_visit()
+	if int(visit.get("result", SimWorld.ERR_INVALID_ARGUMENT)) == SimWorld.OK:
+		match int(visit.get("kind", SimWorld.DEALER_NONE)):
+			SimWorld.DEALER_COAT:
+				_queue.append({"step": Step.COAT_DEALER})
+			SimWorld.DEALER_GUN:
+				_queue.append({"step": Step.GUN_DEALER})
+	_queue.append({"step": Step.EVENT_ROLL})
 
 
 func _advance() -> void:
@@ -100,8 +91,13 @@ func _advance() -> void:
 				Copy.price_event_message(int(event["kind"]), Roster.drug_id(int(event["drug_index"])), Roster.drug_name(int(event["drug_index"]))),
 				AlertDialog.ICON_NEWS
 			)
-		Step.EVENT:
-			_present_event(entry["event"])
+		Step.EVENT_ROLL:
+			var arrival := _world.roll_arrival_event()
+			if int(arrival.get("result", SimWorld.ERR_INVALID_ARGUMENT)) == SimWorld.OK \
+					and int(arrival.get("kind", SimWorld.ARRIVAL_NONE)) != SimWorld.ARRIVAL_NONE:
+				_present_event(arrival)
+			else:
+				_advance()
 		Step.COAT_DEALER:
 			_present_dealer(false)
 		Step.GUN_DEALER:
@@ -125,18 +121,20 @@ func _present_event(event: Dictionary) -> void:
 
 
 func _present_dealer(is_gun: bool) -> void:
-	var state := _world.state_get()
 	var offer := _world.roll_gun_dealer_offer() if is_gun else _world.roll_coat_dealer_offer()
+	if not bool(offer.get("offered", false)):
+		_advance()
+		return
 	var dialog := DealerDialog.new()
 	dialog.offer = offer
-	dialog.present(is_gun, _world, int(state.get("cash", 0)), int(state.get("bank", 0)))
+	dialog.present(is_gun)
 
 	_dialogs.open(dialog, func(key: String) -> void:
-		if key == "dealerBuy" and dialog.can_buy:
+		if key == "dealerBuy":
 			if is_gun:
-				_world.accept_gun_offer(dialog.price(), int(offer.get("damage", 0)), int(offer.get("space", 0)))
+				_world.accept_gun_offer(dialog.price(), dialog.name_index())
 			else:
-				_world.accept_coat_offer(dialog.pockets(), dialog.price())
+				_world.accept_coat_offer(dialog.price())
 		state_changed.emit()
 		_advance()
 	)
