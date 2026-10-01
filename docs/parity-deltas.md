@@ -94,3 +94,11 @@ additive.
 **Port:** six fixed New York boroughs (`index.html` `RULES.locations`), kept as the port's own setting.
 
 **Approved because:** the borough and city names and the one-city-six-sub-locations model are not fidelity targets, so differences in them are not attributed to rule mismatches and are not ported. The per-borough police weights the engine used to hang off that model were a rule difference (M-04 in `docs/beermat-re.md`) and have been removed.
+
+## 6. New Game available at any time, not gated until day 6
+
+**Beermat (`docs/beermat-re.md`, M-11):** the New Game button and the File > New menu item are disabled from the start of a game until the first travel made on day 5, so a restart is only possible from day 6. Finances is enabled from day 1.
+
+**Prototype and Godot port:** New Game is available on every day, including day 1.
+
+**Approved because:** Lance prefers being able to start a new game at any time rather than reproducing Beermat's restart lockout. This is a deliberate divergence, not an unported rule — `docs/beermat-re.md` M-11 stays recorded as the Beermat behavior for reference, but the port will not gate New Game to match it.

@@ -88,7 +88,7 @@ Names are the strings at `0x0045c518`-`0x0045c5c8`.
 | Game length | `0x0045d428`, `0x0045ceb8` | 31 days, day counter starts at 1 | `numDays: 31`, day starts at 1 | match |
 | Start state | `0x0045ceb8` | cash 2000, debt 5500, bank 0, guns 0, health 100, coat 100 | same (`startCash`, `startDebt`, `startHealth`, `startCoatCapacity`) | match |
 | Chase start chance | `0x0045d428` | `Random(6) == 0`, 1 in 6, the same at every location, and a chase suppresses the arrival events and dealers | `randInt(0, 5) === 0`, 1 in 6 at every location; the arrival sequence rolls the arrival event and dealers only when no chase started | match |
-| New Game gate | `0x0045d428`, `0x0045ceb8` | New Game button and menu item disabled from new game until the first travel made on day 5, so usable from day 6 | New Game is available at any time | **mismatch M-11** |
+| New Game gate | `0x0045d428`, `0x0045ceb8` | New Game button and menu item disabled from new game until the first travel made on day 5, so usable from day 6 | New Game is available at any time | intentional, `docs/parity-deltas.md` section 6 (M-11) |
 | Last-day message and sound | `0x0045d428` | on arrival at day 31 | message text matches (`index.html:1163`); no sound | match for the text, sound in "Sounds" |
 
 ## Arrival events and dealers
@@ -204,6 +204,6 @@ Checked on the live oracle (see `CLAUDE.local.md` for how to reach it; none of t
 | M-08 | Fight resolution and win condition (fixed, match) | Chase | TASK-010.02.07 |
 | M-09 | Chase win reward and doctor (fixed, match) | Chase | TASK-010.02.07 |
 | M-10 | Interest rounding (fixed, match) | Money | TASK-010.02.08 |
-| M-11 | New Game locked until day 6 | Travel | TASK-010.02.09 |
+| M-11 | New Game locked until day 6 (not ported — intentional, `docs/parity-deltas.md` section 6) | Travel | TASK-010.02.09 |
 | M-12 | Average cost integer division | Drug table | TASK-010.02.10 |
 | M-13 | Score must be above 0 to be recorded | Score | TASK-010.02.11 |
