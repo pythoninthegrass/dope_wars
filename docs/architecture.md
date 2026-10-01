@@ -32,7 +32,7 @@ versioning).
   `dw_world_size()` bytes and calls `dw_world_init`), `dw_result` return
   codes, `uint8_t`-typedef'd kind enums, `DW_STATIC_ASSERT` on every struct
   sizeof, two-call length-then-fill for every variable-length buffer.
-  `DW_ABI_VERSION` (currently 4 — see "ABI version history" below) bumps on
+  `DW_ABI_VERSION` (currently 5 — see "ABI version history" below) bumps on
   breaking changes only; additive changes don't bump it.
 - **`extension/` — C++ GDExtension shim.** 1:1 forwarding from ABI functions
   to a Godot class (`DopeWarsWorld`, registered in
@@ -123,6 +123,8 @@ direction.
 - **v4** — TASK-010.02.03: per-drug 1-in-8 availability roll replaces the
   per-location drug count, changing RNG draw order; `dw_location_view` drops
   `min_drugs` and `max_drugs` (80 -> 68 bytes).
+- **v5** — TASK-010.02.04: `dw_should_start_chase` is a flat 1 in 6 (one
+  draw) at every location; `dw_location_view` drops `police` (68 -> 64 bytes).
 
 ## Mojo LOC share
 

@@ -94,4 +94,4 @@ additive.
 
 **Port:** six fixed New York boroughs (`index.html` `RULES.locations`), kept as the port's own setting.
 
-**Approved because:** the borough and city names and the one-city-six-sub-locations model are not fidelity targets, so differences in them are not attributed to rule mismatches and are not ported. The per-borough police weights the engine hangs off that model are a separate rule difference, tracked as M-04 in `docs/beermat-re.md`.
+**Approved because:** the borough and city names and the one-city-six-sub-locations model are not fidelity targets, so differences in them are not attributed to rule mismatches and are not ported. The per-borough police weights the engine used to hang off that model were a rule difference (M-04 in `docs/beermat-re.md`) and have been removed.
