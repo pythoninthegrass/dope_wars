@@ -1,9 +1,10 @@
 ---
 id: TASK-010
 title: Reverse engineer beermat DopeWars.exe for fidelity and sound
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-30 05:01'
+updated_date: '2026-10-01 19:37'
 labels:
   - reverse-engineering
 dependencies: []
@@ -30,7 +31,7 @@ Constraints and decisions:
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Subtasks .01 (extraction tooling), .02 (decompilation and findings doc) and .03 (Godot SFX) are Done
-- [ ] #2 Every rule delta found between the binary and the engine is either fixed under its own approved subtask or recorded as intentional in docs/parity-deltas.md
-- [ ] #3 No infra details from CLAUDE.local.md appear in any committed file or backlog task
+- [x] #1 Subtasks .01 (extraction tooling), .02 (decompilation and findings doc) and .03 (Godot SFX) are Done
+- [x] #2 Every rule delta found between the binary and the engine is either fixed under its own approved subtask or recorded as intentional in docs/parity-deltas.md
+- [x] #3 No infra details from CLAUDE.local.md appear in any committed file or backlog task
 <!-- AC:END -->

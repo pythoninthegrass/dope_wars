@@ -3,11 +3,11 @@ id: TASK-010.02
 title: >-
   Decompile DopeWars.exe rule handlers and document findings in
   docs/beermat-re.md
-status: In Progress
+status: Done
 assignee:
   - Claude
 created_date: '2026-09-30 05:01'
-updated_date: '2026-10-01 06:17'
+updated_date: '2026-10-01 19:37'
 labels:
   - reverse-engineering
 dependencies: []
