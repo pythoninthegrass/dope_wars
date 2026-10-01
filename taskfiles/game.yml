@@ -29,7 +29,7 @@ tasks:
         exit 1
     status:
       # Once .godot/ exists, `godot --path game` handles incremental
-      # reimports on its own; skip the slow headless pass on every
+      # asset reimports on its own; skip the slow headless pass on every
       # `task run`/`task dev` restart so the dev loop stays fast. A fresh
       # checkout (no .godot/ yet) has never built the global class name
       # cache, which crashes on first launch (script types like SimWorld
@@ -41,6 +41,14 @@ tasks:
       # downstream test then fails on a missing translation load.
       - test -d .godot
       - test -f translations/strings.en.translation
+      # Godot only registers a new `class_name` script in the global class
+      # cache during an import pass, so a checkout that gained one since the
+      # last import fails to parse the scripts that name it. Stale when any
+      # class_name in game/ is missing from the cache.
+      - |
+        for c in $(grep -rhoE '^class_name +[A-Za-z0-9_]+' --include='*.gd' --exclude-dir=.godot --exclude-dir=addons . | awk '{print $2}'); do
+          grep -q "\"class\": &\"$c\"" .godot/global_script_class_cache.cfg || exit 1
+        done
 
   smoke-test:
     desc: "Boot the real game headlessly and verify it comes up without script errors"
