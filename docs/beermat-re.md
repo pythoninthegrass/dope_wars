@@ -33,8 +33,8 @@ Classifications compare each rule with the prototype engine (`index.html`, `<scr
 
 | Rule | VA | Beermat | Engine | Class |
 | --- | --- | --- | --- | --- |
-| Drug records | `0x0045c260` (calls `0x0045d09c` 12 times) | see table below | `index.html:641-705` RULES.drugs | **mismatch M-01** |
-| Price roll | `0x0045d120` | `price = Random(spread + 1) + min`, re-rolled for all 12 drugs on every arrival and at new game | `randInt(min, max)` per listed drug | match for the formula, see M-01 for the numbers |
+| Drug records | `0x0045c260` (calls `0x0045d09c` 12 times) | see table below | `index.html:641-705` RULES.drugs, same min/max as Beermat; the crash flag is stored as `cheap` and the spike flag as `expensive` | match (M-01, TASK-010.02.01) |
+| Price roll | `0x0045d120` | `price = Random(spread + 1) + min`, re-rolled for all 12 drugs on every arrival and at new game | `randInt(min, max)` per listed drug | match, including the numbers (M-01) |
 | Availability | `0x0045d120` | each drug is independently absent with probability 1/8 (`Random(8) == 0` clears the available flag), at every location | per-location count `minDrugs..maxDrugs` of a random subset; Bronx 7-12, Ghetto 8-12, Central Park 6-12, Manhattan 4-10, Coney Island 6-12, Brooklyn 4-11 | **mismatch M-03** |
 | Price spike | `0x0045d120` | only for drugs with the spike flag, only if available: `Random(20) == 0` then `price *= 5`; the message is `Random(2)` between "Cops made a big `<drug>` bust!  Prices are outrageous!" and "Addicts are buying `<drug>` at outrageous prices!" | `x4`, drawn from a 70% / 40% / 5% event-count scheme, message "Addicts are buying ..." only | **mismatch M-02** |
 | Price crash | `0x0045d120` | only for drugs with the crash flag, only if available: `Random(20) == 0` then `price = price div 10`; a fixed message per drug (acid, hashish, ecstasy, weed) | `floor(base / 4)`, message "The market is flooded with cheap `<drug>`!" for every cheap drug | **mismatch M-02** |
@@ -42,22 +42,22 @@ Classifications compare each rule with the prototype engine (`index.html`, `<scr
 | Buying | `0x0045e448` | quantity at most `cash div price`; zero means "Duh ! Check the price of `<drug>` out, dude!"; pockets full means "Erm, your pockets are full, dude."; the dialog default is `min(free space, affordable)` | same floor division and "Duh! Check the price" text | match |
 | Average cost | `0x0045e448` | `(qty * price + held * avg) div (held + qty)`, integer division | float average, no truncation | **mismatch M-12** (display only) |
 
-Drug records as built at `0x0045c260`. `min` and `spread` are the fifth and sixth `0x0045d09c` arguments (`price = Random(spread + 1) + min`, so the maximum is `min + spread`). The crash and spike columns are the byte flags at record offsets `+0x19` and `+0x18`.
+Drug records as built at `0x0045c260`. `min` and `spread` are the fifth and sixth `0x0045d09c` arguments (`price = Random(spread + 1) + min`, so the maximum is `min + spread`). The crash and spike columns are the byte flags at record offsets `+0x19` and `+0x18`. The engine keeps its own alphabetical drug order (acid, cocaine, crack, ecstasy, ...) rather than the Beermat index order, so RNG draws per drug follow the engine order.
 
 | Index | Drug | Beermat min | Beermat max | Crash (div 10) | Spike (x5) | Engine min-max | Engine flags |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| 0 | Acid | 1000 | 4500 | yes | no | 1000-4400 | cheap |
-| 1 | Cocaine | 15000 | 30000 | no | yes | 15000-29000 | expensive |
-| 2 | Hashish | 450 | 1350 | yes | no | 480-1320 | cheap |
-| 3 | Heroin | 5000 | 14000 | no | yes | 5500-13500 | expensive |
-| 4 | Ecstasy | 10 | 60 | yes | no | 10-75 | none |
-| 5 | Smack | 1500 | 4500 | no | no | 1500-4500 | expensive |
-| 6 | Opium | 500 | 1300 | no | yes | 540-3700 | expensive |
-| 7 | Crack | 1000 | 3500 | no | no | 1500-4800 | none |
-| 8 | Peyote | 200 | 700 | no | no | 220-700 | none |
-| 9 | Shrooms | 600 | 1350 | no | no | 600-1300 | none |
-| 10 | Speed | 70 | 250 | no | yes | 90-250 | cheap and expensive |
-| 11 | Weed | 300 | 900 | yes | no | 300-1100 | cheap |
+| 0 | Acid | 1000 | 4500 | yes | no | 1000-4500 | cheap (crash) |
+| 1 | Cocaine | 15000 | 30000 | no | yes | 15000-30000 | expensive (spike) |
+| 2 | Hashish | 450 | 1350 | yes | no | 450-1350 | cheap (crash) |
+| 3 | Heroin | 5000 | 14000 | no | yes | 5000-14000 | expensive (spike) |
+| 4 | Ecstasy | 10 | 60 | yes | no | 10-60 | cheap (crash) |
+| 5 | Smack | 1500 | 4500 | no | no | 1500-4500 | none |
+| 6 | Opium | 500 | 1300 | no | yes | 500-1300 | expensive (spike) |
+| 7 | Crack | 1000 | 3500 | no | no | 1000-3500 | none |
+| 8 | Peyote | 200 | 700 | no | no | 200-700 | none |
+| 9 | Shrooms | 600 | 1350 | no | no | 600-1350 | none |
+| 10 | Speed | 70 | 250 | no | yes | 70-250 | expensive (spike) |
+| 11 | Weed | 300 | 900 | yes | no | 300-900 | cheap (crash) |
 
 Names are the strings at `0x0045c518`-`0x0045c5c8`.
 
@@ -169,7 +169,7 @@ Checked on the live oracle (see `CLAUDE.local.md` for how to reach it; none of t
 
 | ID | Rule | Section | Subtask |
 | --- | --- | --- | --- |
-| M-01 | Drug table names, ranges and flags | Drug table | TASK-010.02.01 |
+| M-01 | Drug table names, ranges and flags (fixed, match) | Drug table | TASK-010.02.01 |
 | M-02 | Price spike and crash events | Drug table | TASK-010.02.02 |
 | M-03 | Drug availability (1/8 absent, location independent) | Drug table | TASK-010.02.03 |
 | M-04 | Chase start chance (1 in 6, flat) | Travel | TASK-010.02.04 |

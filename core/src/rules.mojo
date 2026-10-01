@@ -103,18 +103,18 @@ def locations() -> List[Location]:
 
 def drugs() -> List[Drug]:
     return [
-        Drug("acid", "Acid", 1000, 4400, True, False),
-        Drug("cocaine", "Cocaine", 15000, 29000, False, True),
-        Drug("crack", "Crack", 1500, 4800, False, False),
-        Drug("ecstasy", "Ecstasy", 10, 75, False, False),  # beermat-verified (TASK-009): was 800-2200
-        Drug("hashish", "Hashish", 480, 1320, True, False),
-        Drug("heroin", "Heroin", 5500, 13500, False, True),
-        Drug("opium", "Opium", 540, 3700, False, True),
-        Drug("peyote", "Peyote", 220, 700, False, False),
-        Drug("shrooms", "Shrooms", 600, 1300, False, False),
-        Drug("smack", "Smack", 1500, 4500, False, True),  # beermat-verified (TASK-009): was 3500-10000
-        Drug("speed", "Speed", 90, 250, True, True),
-        Drug("weed", "Weed", 300, 1100, True, False),
+        Drug("acid", "Acid", 1000, 4500, True, False),
+        Drug("cocaine", "Cocaine", 15000, 30000, False, True),
+        Drug("crack", "Crack", 1000, 3500, False, False),
+        Drug("ecstasy", "Ecstasy", 10, 60, True, False),
+        Drug("hashish", "Hashish", 450, 1350, True, False),
+        Drug("heroin", "Heroin", 5000, 14000, False, True),
+        Drug("opium", "Opium", 500, 1300, False, True),
+        Drug("peyote", "Peyote", 200, 700, False, False),
+        Drug("shrooms", "Shrooms", 600, 1350, False, False),
+        Drug("smack", "Smack", 1500, 4500, False, False),
+        Drug("speed", "Speed", 70, 250, False, True),
+        Drug("weed", "Weed", 300, 900, True, False),
     ]
 
 
