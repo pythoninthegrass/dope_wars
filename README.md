@@ -41,3 +41,4 @@ The test file extracts `#engine` from `index.html` and evaluates it in `node:vm`
 - [Drug Wars](https://en.wikipedia.org/wiki/Drug_Wars_(video_game)): OG by John E. Dell
 - [DSEG](https://github.com/keshikan/DSEG) by keshikan: the Godot HUD's LED value font (`game/assets/fonts/dseg7-classic/`), SIL Open Font License 1.1
 - [Oldschool PC Font Pack](https://int10h.org/oldschool-pc-fonts/) by VileR: the Godot HUD's LED label font, Px437 IBM VGA 8x16 (`game/assets/fonts/px437-ibm-vga/`), CC BY-SA 4.0
+- [Dong Gyu Yang Avatar - Syringe Icon](https://thenounproject.com/icon/syringe-8463548/)
