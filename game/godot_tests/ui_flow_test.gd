@@ -62,6 +62,7 @@ const CASES := [
 	"win98_chrome",
 	"window_pinned",
 	"tables_fit_twelve_drugs",
+	"chase_and_doctor",
 ]
 
 ## Per-case assertion floor. Each case declares the number of assertions it runs
@@ -71,7 +72,7 @@ const CASES := [
 ## only caught a case that ran zero assertions; a case that died on its second
 ## check sailed past it. Keep these in sync when a case gains or loses a check.
 const CASE_FLOORS := {
-	"translation_keys_resolve": 218,
+	"translation_keys_resolve": 234,
 	"new_game_boot": 22,
 	"keyboard_shortcuts": 21,
 	"buy_sell_round_trip": 18,
@@ -85,6 +86,7 @@ const CASE_FLOORS := {
 	"win98_chrome": 82,
 	"window_pinned": 5,
 	"tables_fit_twelve_drugs": 4,
+	"chase_and_doctor": 12,
 }
 
 ## A coarse backstop for the case registry itself: if every case reported but
@@ -121,6 +123,8 @@ func _run() -> void:
 	_test_window_pinned()
 	_case("tables_fit_twelve_drugs")
 	await _test_tables_fit_twelve_drugs()
+	_case("chase_and_doctor")
+	await _test_chase_and_doctor()
 
 
 # docs/layer-boundaries.md:113-114 puts every display string behind tr(). A key
@@ -1031,6 +1035,93 @@ static func _copy_text(node: Object) -> String:
 		for child in current.get_children():
 			stack.append(child)
 	return " ".join(parts)
+
+
+# The chase flow: Stay makes the cops fire, Fight ends in a win that pays out
+# and offers the doctor, and the doctor's Yes restores health for the price. The
+# chase is reached by searching for a seed whose first arrival starts one, then
+# fighting until the doctor dialog opens; the searching asserts nothing, so the
+# assertion count does not depend on which seed is found.
+func _test_chase_and_doctor() -> void:
+	var stay_text := ""
+	var stay_health := 100
+	var doctor: DoctorDialog = null
+	var world: SimWorld = null
+	for seed_value in range(1, 400):
+		_main.dialogs().close()
+		world = _fresh(seed_value)
+		world.accept_gun_offer(0, 0)
+		_main.hud().borough_pressed(1)
+		await _idle()
+		var guard := 0
+		while _main.dialogs().is_open() and not (_main.dialogs().current() is ChaseDialog) and guard < 20:
+			guard += 1
+			_main.dialogs().confirm()
+			await _idle()
+		if not (_main.dialogs().current() is ChaseDialog):
+			continue
+
+		var stay_button := _find_named(_main.dialogs().current(), "chaseStay") as Button
+		stay_button.pressed.emit()
+		await _idle()
+		stay_text = _copy_text(_main.dialogs().current())
+		stay_health = int(world.state_get()["health"])
+		_main.dialogs().confirm()
+		await _idle()
+
+		for _step in range(120):
+			var current := _main.dialogs().current()
+			if current is DoctorDialog:
+				doctor = current as DoctorDialog
+				break
+			if current is ChaseDialog:
+				(_find_named(current, "chaseFight") as Button).pressed.emit()
+			elif current is AlertDialog:
+				current.confirm()
+			else:
+				break
+			await _idle()
+		if doctor != null:
+			break
+
+	_assert(doctor != null, "some seed should win a chase and reach the doctor dialog")
+	if doctor == null:
+		return
+	_assert(stay_text.contains("firing on you"), "Stay should show the cops firing, got '%s'" % stay_text)
+	_assert(
+		stay_text.contains("You've been hit") == (stay_health < 100),
+		"the Stay message should say hit exactly when health dropped (health %d)" % stay_health
+	)
+	var state := world.state_get()
+	_assert(int(state["guns"]) == 2, "winning a chase should add one gun, got %d" % int(state["guns"]))
+	_assert(doctor.reward >= 1000 and doctor.reward <= 3499, "the reward should be 1000-3499, got %d" % doctor.reward)
+	_assert(doctor.price >= 1000 and doctor.price <= 1999 and doctor.price <= doctor.reward, "the doctor should cost the first reward term, got %d of %d" % [doctor.price, doctor.reward])
+	_assert(int(state["cash"]) == 2000 + doctor.reward, "the reward should be paid before the doctor is answered, cash %d" % int(state["cash"]))
+	var offer_text := _copy_text(doctor)
+	_assert(
+		offer_text.contains("$%d" % doctor.reward) and offer_text.contains("Will you pay $%d to have a doctor sew you up?" % doctor.price),
+		"the offer should name the reward and the doctor's price, got '%s'" % offer_text
+	)
+
+	var price := doctor.price
+	var reward := doctor.reward
+	doctor.confirm()
+	await _idle()
+	state = world.state_get()
+	_assert(int(state["health"]) == 100, "Yes should restore health to 100, got %d" % int(state["health"]))
+	_assert(int(state["cash"]) == 2000 + reward - price, "Yes should charge the doctor's price, cash %d" % int(state["cash"]))
+	# Any price-event toast queued before the chase is shown once it ends.
+	await _drain()
+	_assert(not _main.dialogs().is_open() and not _main.arrival().is_active(), "answering the doctor should finish the chase")
+
+	# No keeps the money: Escape on the dialog is the No button.
+	var standalone := DoctorDialog.new().present(2500, 1200)
+	var answers: Array[String] = []
+	standalone.action.connect(func(key: String) -> void: answers.append(key))
+	standalone.cancel()
+	standalone.confirm()
+	_assert(answers == ["doctorNo", "doctorYes"], "Escape should answer No and Enter should answer Yes, got %s" % [answers])
+	standalone.free()
 
 
 ## A fresh game on a fixed seed, so every case is reproducible. Also clears any

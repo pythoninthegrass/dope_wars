@@ -30,8 +30,6 @@ const ABI = {
 	"rules_default_start_health": {"value": 100, "c_type": "int32_t", "width": "int32"},
 	"rules_default_start_coat_capacity": {"value": 100, "c_type": "int32_t", "width": "int32"},
 	"rules_default_start_location_index": {"value": 0, "c_type": "int32_t", "width": "int32"},
-	"rules_gun_damage": {"value": 5, "c_type": "uint32_t", "width": "uint32"},
-	"rules_player_armor": {"value": 100, "c_type": "uint32_t", "width": "uint32"},
 	"rules_debt_interest_bp": {"value": 1000, "c_type": "uint32_t", "width": "uint32"},
 	"rules_bank_interest_bp": {"value": 500, "c_type": "uint32_t", "width": "uint32"},
 	"rules_cheap_divide": {"value": 10, "c_type": "uint32_t", "width": "uint32"},
@@ -46,5 +44,5 @@ const ABI = {
 # ABI identity, read from the header's DW_ABI_VERSION #define. Not a copy:
 # a bump to the header moves this, and a shim still reporting the old value
 # fails the bridge test.
-const DW_ABI_VERSION: int = 7
+const DW_ABI_VERSION: int = 8
 

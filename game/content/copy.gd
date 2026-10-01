@@ -53,6 +53,8 @@ const BTN_DECLINE := "BTN_DECLINE"
 const BTN_RUN := "BTN_RUN"
 const BTN_STAY := "BTN_STAY"
 const BTN_FIGHT := "BTN_FIGHT"
+const BTN_YES := "BTN_YES"
+const BTN_NO := "BTN_NO"
 const BTN_SAVE_SCORE := "BTN_SAVE_SCORE"
 const BTN_SKIP := "BTN_SKIP"
 const BTN_START_GAME := "BTN_START_GAME"
@@ -75,6 +77,7 @@ const DLG_RANDOM_EVENT := "DLG_RANDOM_EVENT"
 const DLG_COAT_DEALER := "DLG_COAT_DEALER"
 const DLG_GUN_DEALER := "DLG_GUN_DEALER"
 const DLG_COP_CHASE := "DLG_COP_CHASE"
+const DLG_DOCTOR := "DLG_DOCTOR"
 const DLG_YOU_DIED := "DLG_YOU_DIED"
 const DLG_GAME_OVER := "DLG_GAME_OVER"
 const DLG_HIGH_SCORES := "DLG_HIGH_SCORES"
@@ -119,11 +122,16 @@ const GUN_NAME_KEYS: Array[String] = [GUN_NAME_BARETTA, GUN_NAME_38_SPECIAL, GUN
 
 const MSG_CHASE_INTRO := "MSG_CHASE_INTRO"
 const MSG_CHASE_ESCAPED := "MSG_CHASE_ESCAPED"
-const MSG_CHASE_FIRED_ON := "MSG_CHASE_FIRED_ON"
-const MSG_CHASE_STAND_GROUND := "MSG_CHASE_STAND_GROUND"
+const MSG_CHASE_RUN_MISSED := "MSG_CHASE_RUN_MISSED"
+const MSG_CHASE_RUN_HIT := "MSG_CHASE_RUN_HIT"
+const MSG_CHASE_STAY_MISSED := "MSG_CHASE_STAY_MISSED"
+const MSG_CHASE_STAY_HIT := "MSG_CHASE_STAY_HIT"
+const MSG_CHASE_SHOT_MISSED := "MSG_CHASE_SHOT_MISSED"
+const MSG_CHASE_SHOT_KILLED := "MSG_CHASE_SHOT_KILLED"
+const MSG_CHASE_COPS_MISSED := "MSG_CHASE_COPS_MISSED"
+const MSG_CHASE_COPS_HIT := "MSG_CHASE_COPS_HIT"
 const MSG_CHASE_WON := "MSG_CHASE_WON"
-const MSG_CHASE_HIT_DEPUTY := "MSG_CHASE_HIT_DEPUTY"
-const MSG_CHASE_DAMAGE := "MSG_CHASE_DAMAGE"
+const MSG_DOCTOR_OFFER := "MSG_DOCTOR_OFFER"
 const MSG_YOU_DIED := "MSG_YOU_DIED"
 
 const MSG_FINAL_SCORE := "MSG_FINAL_SCORE"
@@ -271,12 +279,18 @@ static func chase_intro(deputies: int) -> String:
 	return t(MSG_CHASE_INTRO).format([deputies])
 
 
-## "You hit a deputy! 2 left." or "You got hit for 4 damage!"
-## (index.html:1521).
-static func fight_message(hit: bool, deputies: int, damage: int) -> String:
-	if hit:
-		return t(MSG_CHASE_HIT_DEPUTY).format([deputies])
-	return t(MSG_CHASE_DAMAGE).format([damage])
+## The player's shot, then the cops' return fire: "You're firing on them! You
+## killed one! They're firing on you, man! You've been hit!"
+static func fight_message(killed: bool, cop_hit: bool) -> String:
+	var shot := t(MSG_CHASE_SHOT_KILLED if killed else MSG_CHASE_SHOT_MISSED)
+	var fire := t(MSG_CHASE_COPS_HIT if cop_hit else MSG_CHASE_COPS_MISSED)
+	return "%s %s" % [shot, fire]
+
+
+## "You find a gun and $2500 on Officer Hardass' carcass. Will you pay $1200 to
+## have a doctor sew you up?" (the totals are the plain integers Beermat shows).
+static func doctor_offer(reward: int, price: int) -> String:
+	return t(MSG_DOCTOR_OFFER).format([reward, price])
 
 
 ## "Final score: $12,345 (dead)" (index.html:1573).
