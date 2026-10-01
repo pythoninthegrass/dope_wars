@@ -76,9 +76,10 @@ public:
 	// Chase / combat
 	Dictionary should_start_chase();
 	Dictionary start_chase();
-	Dictionary get_fight_ratings();
-	Dictionary run_from_chase(int deputies, bool is_aggressor);
+	Dictionary run_from_chase();
+	Dictionary stay_in_chase();
 	Dictionary fight(int deputies);
+	Dictionary accept_doctor_offer(int price);
 	Dictionary apply_damage(int amount);
 
 	// Endgame
@@ -99,8 +100,6 @@ public:
 	static int rules_default_start_health();
 	static int rules_default_start_coat_capacity();
 	static int rules_default_start_location_index();
-	static int rules_gun_damage();
-	static int rules_player_armor();
 	static int rules_debt_interest_bp();
 	static int rules_bank_interest_bp();
 	static int rules_cheap_divide();

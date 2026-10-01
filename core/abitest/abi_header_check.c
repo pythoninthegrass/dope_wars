@@ -32,7 +32,7 @@ belong in the Python harness. Run through task core:abi-header-check.
 /* The header must define its own dimensional contract, and the test-side
  * constants must agree with it. These are compile-time: a disagreement stops
  * the build rather than turning into a wrong-length buffer at runtime. */
-DW_STATIC_ASSERT(DW_ABI_VERSION == 7u, "DW_ABI_VERSION drifted from the v7 contract");
+DW_STATIC_ASSERT(DW_ABI_VERSION == 8u, "DW_ABI_VERSION drifted from the v8 contract");
 DW_STATIC_ASSERT(DW_NUM_LOCATIONS == 6u, "DW_NUM_LOCATIONS drifted");
 DW_STATIC_ASSERT(DW_NUM_DRUGS == 12u, "DW_NUM_DRUGS drifted");
 DW_STATIC_ASSERT(DW_MAX_HIGHSCORES == 10u, "DW_MAX_HIGHSCORES drifted");
@@ -110,8 +110,6 @@ static void *const dw_implemented_surface[] = {
     (void *) &dw_rules_default_start_health,
     (void *) &dw_rules_default_start_coat_capacity,
     (void *) &dw_rules_default_start_location_index,
-    (void *) &dw_rules_gun_damage,
-    (void *) &dw_rules_player_armor,
     (void *) &dw_rules_debt_interest_bp,
     (void *) &dw_rules_bank_interest_bp,
     (void *) &dw_rules_cheap_divide,

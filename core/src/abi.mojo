@@ -33,7 +33,7 @@ import travel
 import world as world_mod
 
 
-comptime DW_ABI_VERSION = 7
+comptime DW_ABI_VERSION = 8
 
 # dw_result values (include/dopewars.h). Frozen from ABI v1 onward.
 comptime DW_OK = Int32(0)
@@ -156,31 +156,42 @@ struct GunOfferView(Copyable, Movable):
 
 @fieldwise_init
 struct ChaseView(Copyable, Movable):
-    var deputies: UInt32
+    var deputies: Int32
     var can_fight: UInt8
     var _pad0: Array[UInt8, 3]
 
 
 @fieldwise_init
-struct FightRatingsView(Copyable, Movable):
-    var attack: UInt32
-    var defend: UInt32
+struct RunResultView(Copyable, Movable):
+    var escaped: UInt8
+    var hit: UInt8
+    var dead: UInt8
+    var _pad0: UInt8
+    var damage_taken: Int32
 
 
 @fieldwise_init
-struct RunResultView(Copyable, Movable):
-    var escaped: UInt8
-    var _pad0: Array[UInt8, 3]
+struct StayResultView(Copyable, Movable):
+    var hit: UInt8
+    var dead: UInt8
+    var _pad0: Array[UInt8, 2]
     var damage_taken: Int32
+
+
+@fieldwise_init
+struct DoctorOfferView(Copyable, Movable):
+    var price: Int32
 
 
 @fieldwise_init
 struct FightResultView(Copyable, Movable):
-    var hit: UInt8
+    var killed: UInt8
+    var cop_hit: UInt8
     var dead: UInt8
     var won: UInt8
-    var _pad0: UInt8
     var damage_taken: Int32
+    var reward: Int32
+    var doctor: DoctorOfferView
 
 
 @fieldwise_init
@@ -214,9 +225,10 @@ def _assert_layouts():
     comptime assert size_of[CoatOfferView]() == 8, "dw_coat_offer layout changed"
     comptime assert size_of[GunOfferView]() == 12, "dw_gun_offer layout changed"
     comptime assert size_of[ChaseView]() == 8, "dw_chase layout changed"
-    comptime assert size_of[FightRatingsView]() == 8, "dw_fight_ratings layout changed"
     comptime assert size_of[RunResultView]() == 8, "dw_run_result layout changed"
-    comptime assert size_of[FightResultView]() == 8, "dw_fight_result layout changed"
+    comptime assert size_of[StayResultView]() == 8, "dw_stay_result layout changed"
+    comptime assert size_of[DoctorOfferView]() == 4, "dw_doctor_offer layout changed"
+    comptime assert size_of[FightResultView]() == 16, "dw_fight_result layout changed"
     comptime assert size_of[FinishResultView]() == 16, "dw_finish_result layout changed"
     comptime assert size_of[HighscoreEntryView]() == 48, "dw_highscore_entry layout changed"
 
@@ -364,16 +376,6 @@ def dw_rules_default_start_coat_capacity() abi("C") -> Int32:
 @export("dw_rules_default_start_location_index")
 def dw_rules_default_start_location_index() abi("C") -> Int32:
     return Int32(rules.find_location_index(rules.START_LOCATION))
-
-
-@export("dw_rules_gun_damage")
-def dw_rules_gun_damage() abi("C") -> UInt32:
-    return UInt32(rules.GUN_DAMAGE)
-
-
-@export("dw_rules_player_armor")
-def dw_rules_player_armor() abi("C") -> UInt32:
-    return UInt32(rules.PLAYER_ARMOR)
 
 
 @export("dw_rules_debt_interest_bp")
@@ -988,7 +990,7 @@ def dw_start_chase(
         var chase = combat.start_chase(game)
         out_chase.value().unsafe_write(
             ChaseView(
-                UInt32(chase.deputies),
+                Int32(chase.deputies),
                 UInt8(1) if game.guns > 0 else UInt8(0),
                 Array[UInt8, 3](fill=0),
             )
@@ -998,39 +1000,44 @@ def dw_start_chase(
         return DW_ERR_INVALID_ARGUMENT
 
 
-@export("dw_get_fight_ratings")
-def dw_get_fight_ratings(
-    world: OptionalPointer[world_mod.World, origin=ImmUntrackedOrigin],
-    out_ratings: OptionalPointer[FightRatingsView, origin=MutUntrackedOrigin],
-) abi("C") -> Int32:
-    if not world or not out_ratings:
-        return DW_ERR_INVALID_ARGUMENT
-    var ratings = combat.get_fight_ratings(world.value()[])
-    out_ratings.value().unsafe_write(
-        FightRatingsView(UInt32(ratings.attack), UInt32(ratings.defend))
-    )
-    return DW_OK
-
-
 @export("dw_run_from_chase")
 def dw_run_from_chase(
     world: OptionalPointer[world_mod.World, origin=MutUntrackedOrigin],
-    chase: OptionalPointer[ChaseView, origin=MutUntrackedOrigin],
-    is_aggressor: UInt8,
     out_result: OptionalPointer[RunResultView, origin=MutUntrackedOrigin],
 ) abi("C") -> Int32:
-    if not world or not chase or not out_result:
+    if not world or not out_result:
         return DW_ERR_INVALID_ARGUMENT
-    var before = world.value()[].health
-    var core_chase = combat.Chase(Int64(chase.value()[].deputies))
     try:
-        var escaped = combat.run_from_chase(world.value()[], core_chase, is_aggressor != 0)
-        var damage = before - world.value()[].health
+        var outcome = combat.run_from_chase(world.value()[])
         out_result.value().unsafe_write(
             RunResultView(
-                UInt8(1) if escaped else UInt8(0),
-                Array[UInt8, 3](fill=0),
-                Int32(damage),
+                UInt8(1) if outcome.escaped else UInt8(0),
+                UInt8(1) if outcome.fire.hit else UInt8(0),
+                UInt8(1) if outcome.fire.dead else UInt8(0),
+                UInt8(0),
+                Int32(outcome.fire.damage),
+            )
+        )
+        return DW_OK
+    except:
+        return DW_ERR_INVALID_ARGUMENT
+
+
+@export("dw_stay_in_chase")
+def dw_stay_in_chase(
+    world: OptionalPointer[world_mod.World, origin=MutUntrackedOrigin],
+    out_result: OptionalPointer[StayResultView, origin=MutUntrackedOrigin],
+) abi("C") -> Int32:
+    if not world or not out_result:
+        return DW_ERR_INVALID_ARGUMENT
+    try:
+        var fire = combat.stay_in_chase(world.value()[])
+        out_result.value().unsafe_write(
+            StayResultView(
+                UInt8(1) if fire.hit else UInt8(0),
+                UInt8(1) if fire.dead else UInt8(0),
+                Array[UInt8, 2](fill=0),
+                Int32(fire.damage),
             )
         )
         return DW_OK
@@ -1046,22 +1053,39 @@ def dw_fight(
 ) abi("C") -> Int32:
     if not world or not chase or not out_result:
         return DW_ERR_INVALID_ARGUMENT
+    if world.value()[].guns <= 0:
+        return DW_ERR_INVALID_ARGUMENT
     var core_chase = combat.Chase(Int64(chase.value()[].deputies))
     try:
         var outcome = combat.fight(world.value()[], core_chase)
-        chase.value()[].deputies = UInt32(core_chase.deputies)
+        chase.value()[].deputies = Int32(core_chase.deputies)
         out_result.value().unsafe_write(
             FightResultView(
-                UInt8(1) if outcome.hit else UInt8(0),
-                UInt8(1) if outcome.dead else UInt8(0),
+                UInt8(1) if outcome.killed else UInt8(0),
+                UInt8(1) if outcome.fire.hit else UInt8(0),
+                UInt8(1) if outcome.fire.dead else UInt8(0),
                 UInt8(1) if outcome.won else UInt8(0),
-                UInt8(0),
-                Int32(outcome.damage),
+                Int32(outcome.fire.damage),
+                Int32(outcome.reward),
+                DoctorOfferView(Int32(outcome.doctor.price)),
             )
         )
         return DW_OK
     except:
         return DW_ERR_INVALID_ARGUMENT
+
+
+@export("dw_accept_doctor_offer")
+def dw_accept_doctor_offer(
+    world: OptionalPointer[world_mod.World, origin=MutUntrackedOrigin],
+    offer: OptionalPointer[DoctorOfferView, origin=ImmUntrackedOrigin],
+) abi("C") -> Int32:
+    if not world or not offer:
+        return DW_ERR_INVALID_ARGUMENT
+    var code = combat.accept_doctor_offer(
+        world.value()[], combat.DoctorOffer(Int64(offer.value()[].price))
+    )
+    return _map_purchase_code(code)
 
 
 @export("dw_apply_damage")

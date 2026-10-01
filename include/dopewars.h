@@ -57,7 +57,7 @@ extern "C" {
  * changes. Additive changes (new functions, new appended anonymous-enum
  * constants, new `#define`s that don't invalidate existing struct sizes)
  * do NOT bump this. See `docs/abi-contract.md` for the full policy. */
-#define DW_ABI_VERSION 7u
+#define DW_ABI_VERSION 8u
 
 /* The value above, readable at runtime.
  *
@@ -331,38 +331,55 @@ DW_STATIC_ASSERT(sizeof(dw_gun_offer) == 12, "dw_gun_offer layout changed");
 /* ---------------------------------------------------------------------- */
 
 typedef struct dw_chase {
-    uint32_t deputies;    /* >= 0; when 0 the chase is won */
+    int32_t  deputies;    /* below 0 when the chase is won (deputies + 1 kills) */
     uint8_t  can_fight;   /* 0 or 1; equals (guns > 0) at start_chase time */
     uint8_t  _pad0[3];    /* specified-zero */
 } dw_chase;
 DW_STATIC_ASSERT(sizeof(dw_chase) == 8, "dw_chase layout changed");
 
-typedef struct dw_fight_ratings {
-    uint32_t attack;
-    uint32_t defend;
-} dw_fight_ratings;
-DW_STATIC_ASSERT(sizeof(dw_fight_ratings) == 8, "dw_fight_ratings layout changed");
-
-/* Populated by dw_run_from_chase. */
+/* Populated by dw_run_from_chase. When `escaped` is 0 the cops fired: `hit`
+ * says whether the volley landed, `damage_taken` is 5-15 on a hit and 0
+ * otherwise, and `dead` means health reached zero. */
 typedef struct dw_run_result {
     uint8_t  escaped;      /* 0 or 1 */
-    uint8_t  _pad0[3];     /* specified-zero */
-    int32_t  damage_taken; /* 0 when escaped */
+    uint8_t  hit;          /* 0 or 1; always 0 when escaped */
+    uint8_t  dead;         /* 0 or 1 */
+    uint8_t  _pad0;        /* specified-zero */
+    int32_t  damage_taken;
 } dw_run_result;
 DW_STATIC_ASSERT(sizeof(dw_run_result) == 8, "dw_run_result layout changed");
 
-/* Populated by dw_fight. `won` means the last deputy just fell.
- * `dead` means the player's health hit zero on this exchange. `hit`
- * distinguishes a successful attack roll from a whiff-then-take-damage
- * result (see `index.html:1005-1019`). */
-typedef struct dw_fight_result {
+/* Populated by dw_stay_in_chase: one volley from the cops. */
+typedef struct dw_stay_result {
     uint8_t  hit;          /* 0 or 1 */
     uint8_t  dead;         /* 0 or 1 */
+    uint8_t  _pad0[2];     /* specified-zero */
+    int32_t  damage_taken;
+} dw_stay_result;
+DW_STATIC_ASSERT(sizeof(dw_stay_result) == 8, "dw_stay_result layout changed");
+
+/* The doctor offered after a chase win: restores health to 100 for `price`
+ * (1000-1999), paid from cash. Always offered after a win. */
+typedef struct dw_doctor_offer {
+    int32_t  price;
+} dw_doctor_offer;
+DW_STATIC_ASSERT(sizeof(dw_doctor_offer) == 4, "dw_doctor_offer layout changed");
+
+/* Populated by dw_fight. `killed` is the player's shot. `won` means the
+ * deputy count dropped below 0; then `reward` is the cash gained (1000-3499),
+ * `doctor` is the offer, and the cops did not return fire. Otherwise the cops
+ * returned fire: `cop_hit` and `damage_taken` (5-15 on a hit), and `dead` means
+ * health reached zero. */
+typedef struct dw_fight_result {
+    uint8_t  killed;       /* 0 or 1 */
+    uint8_t  cop_hit;      /* 0 or 1 */
+    uint8_t  dead;         /* 0 or 1 */
     uint8_t  won;          /* 0 or 1 */
-    uint8_t  _pad0;        /* specified-zero */
-    int32_t  damage_taken; /* 0 when hit == 1 */
+    int32_t  damage_taken;
+    int32_t  reward;       /* 0 unless won */
+    dw_doctor_offer doctor; /* price 0 unless won */
 } dw_fight_result;
-DW_STATIC_ASSERT(sizeof(dw_fight_result) == 8, "dw_fight_result layout changed");
+DW_STATIC_ASSERT(sizeof(dw_fight_result) == 16, "dw_fight_result layout changed");
 
 /* ---------------------------------------------------------------------- */
 /* Endgame                                                                 */
@@ -399,8 +416,6 @@ int64_t  dw_rules_default_start_debt(void);
 int32_t  dw_rules_default_start_health(void);
 int32_t  dw_rules_default_start_coat_capacity(void);
 int32_t  dw_rules_default_start_location_index(void);
-uint32_t dw_rules_gun_damage(void);
-uint32_t dw_rules_player_armor(void);
 /* Fixed-point interest rates: numerator over 10000. debt = 1000 -> 10.00%. */
 uint32_t dw_rules_debt_interest_bp(void);
 uint32_t dw_rules_bank_interest_bp(void);
@@ -611,30 +626,34 @@ dw_result dw_accept_gun_offer(dw_world *world, const dw_gun_offer *offer);
 dw_result dw_should_start_chase(dw_world *world, uint8_t *out_should_start);
 
 /* Populate *out_chase for a chase that dw_should_start_chase just
- * approved (`index.html:977-985`). Deputy count is a function of the
- * current day. Does not draw from the RNG stream. */
+ * approved (`index.html:977-985`). The deputy count is Random(10) + 2 (2-11)
+ * and is not scaled by the day. */
 dw_result dw_start_chase(const dw_world *world, dw_chase *out_chase);
 
-/* Snapshot the player's attack/defend ratings for a live chase
- * (`index.html:987-993`). Does not draw from the RNG stream. */
-dw_result dw_get_fight_ratings(const dw_world *world, dw_fight_ratings *out_ratings);
+/* Run from the chase (docs/beermat-re.md, M-07): Random(6) < 3 escapes with
+ * no further draw, whatever the player carries. Otherwise the cops fire:
+ * Random(2), 1 hits for Random(11) + 5 damage, health floored at 0. */
+dw_result dw_run_from_chase(dw_world *world, dw_run_result *out_result);
 
-/* Attempt to run from an active chase (`index.html:995-1003`).
- * `is_aggressor` = 1 when the player has been trading blows this chase
- * (which lowers the escape chance to 30%). Applies damage on a failed
- * run before returning. */
-dw_result dw_run_from_chase(dw_world *world, dw_chase *chase, uint8_t is_aggressor, dw_run_result *out_result);
+/* Stay in the chase: the cops fire, as for a failed run. */
+dw_result dw_stay_in_chase(dw_world *world, dw_stay_result *out_result);
 
-/* Exchange one round of fire with the chase (`index.html:1005-1019`).
- * On a hit, one deputy falls (chase->deputies is decremented in place).
- * On a miss, the player takes damage. `won` in the result is set when
- * chase->deputies has reached zero on this exchange. */
+/* Fire on the cops (M-08). Needs at least one gun: DW_ERR_INVALID_ARGUMENT,
+ * with no draw, when guns == 0. The shot (Random(2)) kills one deputy on 1,
+ * decrementing chase->deputies in place. When chase->deputies is below 0 the
+ * chase is won: +1 gun, cash += (Random(1000) + 1000) + Random(1500), and
+ * out_result->doctor carries the offer (M-09). Otherwise the cops return
+ * fire. */
 dw_result dw_fight(dw_world *world, dw_chase *chase, dw_fight_result *out_result);
+
+/* Take the doctor's offer: pay offer->price from cash and set health to 100.
+ * Returns DW_ERR_INSUFFICIENT_CASH, with no state change, when the price
+ * exceeds cash. */
+dw_result dw_accept_doctor_offer(dw_world *world, const dw_doctor_offer *offer);
 
 /* Apply arbitrary damage to the player (`index.html:861-865`). Used by
  * event flows that inflict damage outside a chase; also called
- * internally by dw_roll_arrival_event / dw_run_from_chase / dw_fight
- * so consumers rarely invoke it directly. `*out_health` receives the
+ * internally by the chase calls, so consumers rarely invoke it directly. `*out_health` receives the
  * clamped post-damage health value. */
 dw_result dw_apply_damage(dw_world *world, int32_t amount, int32_t *out_health);
 
