@@ -3,10 +3,7 @@
 # Ported from shouldStartChase / startChase / getFightRatings / runFromChase /
 # fight in index.html:971-1019.
 #
-# shouldStartChase is weighted by the borough's police presence: the roll is
-# randInt(0, 80 + police) and a chase starts at 50 or above. So the Bronx
-# (police 10) starts a chase on 41 of 91 outcomes and Manhattan (police 90) on
-# 121 of 171 -- the weighting is the whole point of the location table.
+# shouldStartChase is Beermat's Random(6) == 0: a flat 1 in 6 at every location.
 #
 # fight compares one attack roll against one defend roll. A hit removes a
 # deputy; a miss costs the player health, scaled by armour. The damage formula
@@ -52,9 +49,7 @@ struct FightResult(Copyable, Movable):
 
 
 def should_start_chase(mut game: world.World) raises -> Bool:
-    var location_table = rules.locations()
-    var police = location_table[game.location_index].police
-    return rng_mod.rand_int(game.rng, 0, 80 + police) >= 50
+    return rng_mod.rand_int(game.rng, 0, 5) == 0
 
 
 def start_chase(mut game: world.World) raises -> Chase:

@@ -253,7 +253,7 @@ func world_load(bytes: PackedByteArray) -> int:
 ## the whole surface enumerable from one object.
 
 
-## Array of {id, name, police}. Static table, so this
+## Array of {id, name}. Static table, so this
 ## works without an initialized world.
 func rules_locations() -> Array:
 	return _world.rules_locations()

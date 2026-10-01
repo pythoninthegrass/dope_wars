@@ -32,7 +32,7 @@ belong in the Python harness. Run through task core:abi-header-check.
 /* The header must define its own dimensional contract, and the test-side
  * constants must agree with it. These are compile-time: a disagreement stops
  * the build rather than turning into a wrong-length buffer at runtime. */
-DW_STATIC_ASSERT(DW_ABI_VERSION == 4u, "DW_ABI_VERSION drifted from the v4 contract");
+DW_STATIC_ASSERT(DW_ABI_VERSION == 5u, "DW_ABI_VERSION drifted from the v5 contract");
 DW_STATIC_ASSERT(DW_NUM_LOCATIONS == 6u, "DW_NUM_LOCATIONS drifted");
 DW_STATIC_ASSERT(DW_NUM_DRUGS == 12u, "DW_NUM_DRUGS drifted");
 DW_STATIC_ASSERT(DW_MAX_HIGHSCORES == 10u, "DW_MAX_HIGHSCORES drifted");
