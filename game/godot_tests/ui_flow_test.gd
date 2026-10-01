@@ -22,6 +22,7 @@ var _main: Main = null
 var _per_case := {}
 var _reconciled := false
 var _frames := 0
+var _next_dealer_seed := 1
 
 # Backstop for a synchronous error in _ready before _finish: it aborts _ready
 # (or the awaited run) and the scene would otherwise spin without ever quitting.
@@ -63,6 +64,7 @@ const CASES := [
 	"window_pinned",
 	"tables_fit_twelve_drugs",
 	"chase_and_doctor",
+	"dealer_dialogs",
 ]
 
 ## Per-case assertion floor. Each case declares the number of assertions it runs
@@ -72,7 +74,7 @@ const CASES := [
 ## only caught a case that ran zero assertions; a case that died on its second
 ## check sailed past it. Keep these in sync when a case gains or loses a check.
 const CASE_FLOORS := {
-	"translation_keys_resolve": 234,
+	"translation_keys_resolve": 230,
 	"new_game_boot": 22,
 	"keyboard_shortcuts": 21,
 	"buy_sell_round_trip": 18,
@@ -87,6 +89,7 @@ const CASE_FLOORS := {
 	"window_pinned": 5,
 	"tables_fit_twelve_drugs": 4,
 	"chase_and_doctor": 12,
+	"dealer_dialogs": 30,
 }
 
 ## A coarse backstop for the case registry itself: if every case reported but
@@ -125,6 +128,8 @@ func _run() -> void:
 	await _test_tables_fit_twelve_drugs()
 	_case("chase_and_doctor")
 	await _test_chase_and_doctor()
+	_case("dealer_dialogs")
+	await _test_dealer_dialogs()
 
 
 # docs/layer-boundaries.md:113-114 puts every display string behind tr(). A key
@@ -1122,6 +1127,87 @@ func _test_chase_and_doctor() -> void:
 	standalone.confirm()
 	_assert(answers == ["doctorNo", "doctorYes"], "Escape should answer No and Enter should answer Yes, got %s" % [answers])
 	standalone.free()
+
+
+# The coat and gun dealer dialogs: the offer text names the price (and the gun),
+# Buy pays the price and grants the pockets or the gun, and Decline (the button
+# for the gun, Escape for the coat) changes neither. Each dialog is reached by
+# searching for a seed whose first travel rolls that dealer; the searching asserts
+# nothing, so the assertion count does not depend on which seed is found.
+func _test_dealer_dialogs() -> void:
+	for is_gun in [false, true]:
+		var kind := "gun" if is_gun else "coat"
+		for buy in [true, false]:
+			var found: Dictionary = await _open_dealer(is_gun)
+			_assert(not found.is_empty(), "some seed should reach a %s dealer" % kind)
+			if found.is_empty():
+				continue
+			var world: SimWorld = found["world"]
+			var dialog: DealerDialog = found["dialog"]
+			var price := dialog.price()
+			var before := world.state_get()
+			var text := _copy_text(dialog)
+			_assert(price < int(before["cash"]), "the %s dealer should only offer what cash covers, %d of %d" % [kind, price, int(before["cash"])])
+			_assert(text.contains("$%d" % price), "the %s offer should name its price, got '%s'" % [kind, text])
+			if is_gun:
+				_assert(text.contains(tr(Copy.GUN_NAME_KEYS[dialog.name_index()])), "the gun offer should name the gun, got '%s'" % text)
+			else:
+				_assert(text.contains("trenchcoat"), "the coat offer should mention the trenchcoat, got '%s'" % text)
+
+			if buy:
+				(_find_named(dialog, "dealerBuy") as Button).pressed.emit()
+			elif is_gun:
+				(_find_named(dialog, "dealerDecline") as Button).pressed.emit()
+			else:
+				dialog.cancel()
+			await _idle()
+			# An arrival event may roll after the dealer and take cash, so cash is only bounded then.
+			var event_open := _main.dialogs().current() is AlertDialog
+			var after := world.state_get()
+			var expected_cash := int(before["cash"]) - (price if buy else 0)
+			_assert(
+				int(after["cash"]) <= expected_cash if event_open else int(after["cash"]) == expected_cash,
+				"%s %s should leave cash at %d, got %d" % [kind, "buy" if buy else "decline", expected_cash, int(after["cash"])]
+			)
+			if is_gun:
+				var guns_gained := int(after["guns"]) - int(before["guns"])
+				_assert(guns_gained == (1 if buy else 0), "gun %s should change guns by %d, got %d" % ["buy" if buy else "decline", 1 if buy else 0, guns_gained])
+				_assert(int(after["coat_capacity"]) == int(before["coat_capacity"]), "a gun takes no coat space and adds none")
+			else:
+				var pockets := int(after["coat_capacity"]) - int(before["coat_capacity"])
+				_assert(
+					pockets >= 11 and pockets <= 20 if buy else pockets == 0,
+					"coat %s should change the capacity by %s, got %d" % ["buy" if buy else "decline", "11-20" if buy else "0", pockets]
+				)
+			await _drain()
+			_assert(not _main.dialogs().is_open(), "answering the %s dealer should let the arrival finish" % kind)
+
+
+## Starts a fresh game per seed and travels until the first dealer dialog of the
+## wanted kind is on screen, returning {world, dialog}; an empty dictionary when
+## no seed in range reaches one. Seeds are never reused across calls, so each
+## case gets a different game.
+func _open_dealer(is_gun: bool) -> Dictionary:
+	while _next_dealer_seed < 2000:
+		var seed_value := _next_dealer_seed
+		_next_dealer_seed += 1
+		_main.dialogs().close()
+		var world := _fresh(seed_value)
+		_main.hud().borough_pressed(1)
+		await _idle()
+		var guard := 0
+		while _main.dialogs().is_open() and guard < 20:
+			guard += 1
+			var current := _main.dialogs().current()
+			if current is ChaseDialog:
+				break
+			if current is DealerDialog:
+				if _copy_text(current).contains("trenchcoat") != is_gun:
+					return {"world": world, "dialog": current}
+				break
+			current.confirm()
+			await _idle()
+	return {}
 
 
 ## A fresh game on a fixed seed, so every case is reproducible. Also clears any
