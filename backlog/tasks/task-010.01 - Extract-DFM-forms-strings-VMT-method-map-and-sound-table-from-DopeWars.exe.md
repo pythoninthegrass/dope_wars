@@ -1,10 +1,10 @@
 ---
 id: TASK-010.01
 title: 'Extract DFM forms, strings, VMT method map and sound table from DopeWars.exe'
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-09-30 05:01'
-updated_date: '2026-10-01 03:02'
+updated_date: '2026-10-01 03:40'
 labels:
   - reverse-engineering
 dependencies: []
@@ -23,14 +23,14 @@ Build a tested, repeatable extractor for `vendor/dopewars-1999/DopeWars.exe` (PE
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 A self-test built on a synthetic TPF0 blob passes and was written before the extractor
-- [ ] #2 Running the extractor on the real exe prints the 10-row AppEvent to wav table
-- [ ] #3 Running the extractor on the real exe lists the named forms and their event handlers, and emits a Ghidra label script
-- [ ] #4 Extractor outputs are written under a gitignored directory and nothing derived from the exe is committed
-- [ ] #5 `task re:test` runs the self-test and `task re:extract` runs the extractor; both targets have a desc
-- [ ] #6 `task re:apply-labels-check` imports the real exe into a throwaway Ghidra project, applies OUT/labels.csv via tools/re/ghidra/ApplyLabels.java, exits 0 with no ERROR script lines, and logs the applied label count
-- [ ] #7 `ruff format --check tools/re` passes
-- [ ] #8 tools/re/extract_beermat.py exits 2 with a clear message when the exe is missing
+- [x] #1 A self-test built on a synthetic TPF0 blob passes and was written before the extractor
+- [x] #2 Running the extractor on the real exe prints the 10-row AppEvent to wav table
+- [x] #3 Running the extractor on the real exe lists the named forms and their event handlers, and emits a Ghidra label script
+- [x] #4 Extractor outputs are written under a gitignored directory and nothing derived from the exe is committed
+- [x] #5 `task re:test` runs the self-test and `task re:extract` runs the extractor; both targets have a desc
+- [x] #6 `task re:apply-labels-check` imports the real exe into a throwaway Ghidra project, applies OUT/labels.csv via tools/re/ghidra/ApplyLabels.java, exits 0 with no ERROR script lines, and logs the applied label count
+- [x] #7 `ruff format --check tools/re` passes
+- [x] #8 tools/re/extract_beermat.py exits 2 with a clear message when the exe is missing
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -57,5 +57,15 @@ Build a tested, repeatable extractor for `vendor/dopewars-1999/DopeWars.exe` (PE
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
-Split into subtasks TASK-010.01.01 to .04. .01 (extractor skeleton, TPF0 form decoder, re:test and re:extract) is Done: 8 forms decoded from the real exe. .02 (sound table and strings), .03 (VMT method map) and .04 (Ghidra labels and re:apply-labels-check, then close this task) remain To Do. Acceptance criteria #1, #4, #5, #7 and #8 are met so far; check them off when .04 closes this task.
+Split into subtasks TASK-010.01.01 to .04, all Done.
+
+Commands run (from the TASK-010.01 worktree, vendor/dopewars-1999/ present and gitignored):
+- `uv run tools/re/test_extract_beermat.py` / `task re:test`: 28/28 passed (new label tests observed failing 25/28 first).
+- `task re:apply-labels-check` (runs re:extract, then `timeout 600 mise exec java@temurin-21 -- /opt/homebrew/opt/ghidra/libexec/support/analyzeHeadless <tmpproj> dw -import vendor/dopewars-1999/DopeWars.exe -scriptPath tools/re/ghidra -postScript ApplyLabels.java vendor/dopewars-1999/re/labels.csv -deleteProject </dev/null`): exit 0, no ERROR lines.
+- `uv run tools/re/extract_beermat.py --exe /nonexistent/x.exe`: exit 2 with a clear message.
+- `ruff format --check tools/re`: 2 files already formatted.
+
+Results on the real exe: 8 forms (with event handlers), 7624 strings, 10 AppEvent sound rows, 180 VMTs, 8 classes with 64 published methods, 244 labels written and applied in Ghidra (40 functions created, 0 failures). Every form event handler resolves to a published method. All outputs live under the gitignored vendor/dopewars-1999/re/; only tools/re/**, taskfiles/re.yml and backlog files are committed.
+
+Gotchas: Ghidra's launch.sh stalls (SIGTTIN) when run under `timeout` unless stdin is </dev/null; go-task's shell returned 1 for `! cmd | rg -q`, so the check uses an explicit `if`. GHIDRA_HEADLESS on darwin now uses the absolute /opt/homebrew/opt/ghidra path instead of `brew --prefix`.
 <!-- SECTION:NOTES:END -->
