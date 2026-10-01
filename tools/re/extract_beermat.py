@@ -7,7 +7,7 @@
 
 """
 Extracts the Delphi form resources from the Beermat "Dope Wars for Windows"
-1.2.0.0 exe into text DFM files (TASK-010.01.01).
+1.2.0.0 exe into text DFM files (TASK-010.01.01, TASK-010.01.02).
 
 Everything written is derived from copyrighted material, so the default output
 directory sits under the gitignored vendor/dopewars-1999/. Only this tool and
@@ -18,8 +18,10 @@ Usage: uv run tools/re/extract_beermat.py [--exe PATH] [--out DIR]
 
 import argparse
 import os
+import re
 import struct
 import sys
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -33,6 +35,22 @@ RT_RCDATA = 10
 TPF0_MAGIC = b"TPF0"
 FLAG_PREFIX_MASK = 0xF0
 FLAG_CHILD_POS = 0x02
+
+MIN_STRING_LEN = 4
+SOUND_CURRENT_RE = re.compile(r"AppEvents\\Schemes\\Apps\\DopeWars\\(\w+)\\\.current")
+EVENT_LABEL_PREFIX = "AppEvents\\EventLabels\\"
+EXPECTED_SOUNDS = {
+    "DWCopGunShot": "gun.wav",
+    "DWYourGunShot": "gun2.wav",
+    "DWYouHitByGun": "youhit.wav",
+    "DWCopHitByGun": "cophit.wav",
+    "DWCopChase": "siren.wav",
+    "DWPoliceDog": "bark.wav",
+    "DWCashReg": "cashreg.wav",
+    "DWMugged": "hrdpunch.wav",
+    "DWDead": "wasted.wav",
+    "DWLastDay": "uhoh.wav",
+}
 
 VA_NULL, VA_LIST, VA_INT8, VA_INT16, VA_INT32, VA_EXTENDED, VA_STRING, VA_IDENT = range(
     8
@@ -300,6 +318,56 @@ def read_forms(pe: pefile.PE) -> list[Component]:
     return forms
 
 
+def scan_strings(data: bytes) -> list[tuple[int, str]]:
+    return [
+        (m.start(), m.group().decode("ascii"))
+        for m in re.finditer(rb"[\x20-\x7e]{%d,}" % MIN_STRING_LEN, data)
+    ]
+
+
+def parse_sounds(strings: list[tuple[int, str]]) -> list[tuple[str, str, str]]:
+    found: dict[str, tuple[str, str]] = {}
+    for i in range(len(strings) - 3):
+        wav, current, label, event_label = (text for _, text in strings[i : i + 4])
+        match = SOUND_CURRENT_RE.fullmatch(current)
+        if not wav.lower().endswith(".wav") or not match:
+            continue
+        event = match.group(1)
+        if event_label == EVENT_LABEL_PREFIX + event:
+            found[event] = (wav, label)
+    problems = [
+        f"{event}: expected {wav}, found {found[event][0] if event in found else 'nothing'}"
+        for event, wav in EXPECTED_SOUNDS.items()
+        if event not in found or found[event][0].lower() != wav
+    ]
+    if problems:
+        raise ValueError("AppEvent table mismatch: " + "; ".join(problems))
+    return [(event, *found[event]) for event in EXPECTED_SOUNDS]
+
+
+def write_string_outputs(
+    data: bytes, offset_to_va: Callable[[int], int], out: Path
+) -> int:
+    out.mkdir(parents=True, exist_ok=True)
+    strings = scan_strings(data)
+    (out / "strings.txt").write_text(
+        "".join(f"{offset_to_va(off):08X}\t{text}\n" for off, text in strings),
+        encoding="utf-8",
+    )
+    print(f"{len(strings)} strings written to {out / 'strings.txt'}")
+    try:
+        rows = parse_sounds(strings)
+    except ValueError as err:
+        print(f"error: {err}", file=sys.stderr)
+        return 1
+    (out / "sounds.tsv").write_text(
+        "".join("\t".join(row) + "\n" for row in rows), encoding="utf-8"
+    )
+    for event, wav, label in rows:
+        print(f"{event}\t{wav}\t{label}")
+    return 0
+
+
 def resolve_exe(arg: str | None) -> Path:
     if arg:
         return Path(arg)
@@ -337,7 +405,12 @@ def main(argv: list[str] | None = None) -> int:
         for owner, event, handler in collect_handlers(form):
             print(f"  {owner}.{event} = {handler}")
     print(f"{len(forms)} forms written to {forms_dir}")
-    return 0 if forms else 1
+
+    image_base = pe.OPTIONAL_HEADER.ImageBase
+    strings_status = write_string_outputs(
+        exe.read_bytes(), lambda off: image_base + pe.get_rva_from_offset(off), out
+    )
+    return 0 if forms and strings_status == 0 else 1
 
 
 if __name__ == "__main__":

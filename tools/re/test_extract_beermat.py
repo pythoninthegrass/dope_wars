@@ -176,6 +176,120 @@ def test_main_missing_exe_exits_2() -> None:
         assert eb.main(["--exe", str(missing), "--out", tmp]) == 2
 
 
+SOUND_LABELS = {
+    "DWCopGunShot": "Cops Gun",
+    "DWYourGunShot": "Your Gun",
+    "DWYouHitByGun": "You Hit By Bullet",
+    "DWCopHitByGun": "Cop Hit By Bullet",
+    "DWCopChase": "Cops Start Chasing You",
+    "DWPoliceDog": "Police Dog",
+    "DWCashReg": "Cash Register",
+    "DWMugged": "Mugged",
+    "DWDead": "Death Rattle",
+    "DWLastDay": "Last Day Warning",
+}
+SOUND_WAVS = {
+    "DWCopGunShot": "gun.wav",
+    "DWYourGunShot": "gun2.wav",
+    "DWYouHitByGun": "youhit.wav",
+    "DWCopHitByGun": "cophit.wav",
+    "DWCopChase": "siren.wav",
+    "DWPoliceDog": "bark.wav",
+    "DWCashReg": "cashreg.wav",
+    "DWMugged": "hrdpunch.wav",
+    "DWDead": "wasted.wav",
+    "DWLastDay": "uhoh.wav",
+}
+
+
+def sound_entry(event: str, wav: str, label: str) -> list[str]:
+    return [
+        wav,
+        rf"AppEvents\Schemes\Apps\DopeWars\{event}\.current",
+        label,
+        rf"AppEvents\EventLabels\{event}",
+    ]
+
+
+def sound_strings(skip: str | None = None) -> list[str]:
+    out = ["AllowSound"]
+    for event, wav in SOUND_WAVS.items():
+        if event != skip:
+            out += sound_entry(event, wav, SOUND_LABELS[event])
+    return out
+
+
+def pack_strings(texts: list[str]) -> bytes:
+    return b"\x00\x01" + b"\x00".join(t.encode("latin-1") for t in texts) + b"\x00ZZ"
+
+
+def test_scan_strings_min_length_and_offsets() -> None:
+    blob = b"\x00abc\x00abcd\x00\xffxyz12\x01ab\x00"
+    assert eb.scan_strings(blob) == [(5, "abcd"), (11, "xyz12")]
+
+
+def test_parse_sounds_pairs_wav_with_following_event() -> None:
+    strings = eb.scan_strings(pack_strings(sound_strings()))
+    rows = eb.parse_sounds(strings)
+    assert len(rows) == 10, rows
+    assert rows == [(e, SOUND_WAVS[e], SOUND_LABELS[e]) for e in SOUND_WAVS]
+
+
+def test_parse_sounds_ignores_unrelated_strings() -> None:
+    texts = ["Software\\Beermat Software\\DopeWars\\Settings\\", "readme.wav"]
+    strings = eb.scan_strings(pack_strings(texts + sound_strings()))
+    assert len(eb.parse_sounds(strings)) == 10
+
+
+def test_parse_sounds_matches_wav_case_insensitively() -> None:
+    texts = sound_strings()
+    texts[texts.index("siren.wav")] = "Siren.wav"
+    rows = eb.parse_sounds(eb.scan_strings(pack_strings(texts)))
+    assert ("DWCopChase", "Siren.wav", "Cops Start Chasing You") in rows
+
+
+def test_parse_sounds_missing_row_raises() -> None:
+    strings = eb.scan_strings(pack_strings(sound_strings(skip="DWMugged")))
+    try:
+        eb.parse_sounds(strings)
+    except ValueError as err:
+        assert "DWMugged" in str(err), err
+        return
+    raise AssertionError("a missing AppEvent row was accepted")
+
+
+def test_parse_sounds_wrong_wav_raises() -> None:
+    texts = sound_strings()
+    texts[texts.index("bark.wav")] = "meow.wav"
+    try:
+        eb.parse_sounds(eb.scan_strings(pack_strings(texts)))
+    except ValueError as err:
+        assert "DWPoliceDog" in str(err), err
+        return
+    raise AssertionError("a wrong wav was accepted")
+
+
+def test_write_sounds_outputs_tsv_and_strings() -> None:
+    data = pack_strings(sound_strings())
+    with tempfile.TemporaryDirectory() as tmp:
+        out = Path(tmp)
+        assert eb.write_string_outputs(data, lambda off: 0x400000 + off, out) == 0
+        tsv = (out / "sounds.tsv").read_text().splitlines()
+        assert len(tsv) == 10, tsv
+        assert tsv[0] == "DWCopGunShot\tgun.wav\tCops Gun"
+        strings = (out / "strings.txt").read_text().splitlines()
+        assert strings[0] == "00400002\tAllowSound", strings[0]
+        assert len(strings) == len(sound_strings())
+
+
+def test_write_sounds_missing_row_exits_nonzero() -> None:
+    data = pack_strings(sound_strings(skip="DWDead"))
+    with tempfile.TemporaryDirectory() as tmp:
+        out = Path(tmp)
+        assert eb.write_string_outputs(data, lambda off: off, out) == 1
+        assert (out / "strings.txt").is_file()
+
+
 def main() -> int:
     tests = [
         (n, f)
