@@ -62,11 +62,11 @@ void DopeWarsWorld::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("finances", "action", "amount"), &DopeWarsWorld::finances);
 
 	ClassDB::bind_method(D_METHOD("roll_arrival_event"), &DopeWarsWorld::roll_arrival_event);
+	ClassDB::bind_method(D_METHOD("roll_dealer_visit"), &DopeWarsWorld::roll_dealer_visit);
 	ClassDB::bind_method(D_METHOD("roll_coat_dealer_offer"), &DopeWarsWorld::roll_coat_dealer_offer);
-	ClassDB::bind_method(D_METHOD("accept_coat_offer", "pockets", "price"), &DopeWarsWorld::accept_coat_offer);
+	ClassDB::bind_method(D_METHOD("accept_coat_offer", "price"), &DopeWarsWorld::accept_coat_offer);
 	ClassDB::bind_method(D_METHOD("roll_gun_dealer_offer"), &DopeWarsWorld::roll_gun_dealer_offer);
-	ClassDB::bind_method(D_METHOD("accept_gun_offer", "price", "damage", "space"), &DopeWarsWorld::accept_gun_offer);
-	ClassDB::bind_method(D_METHOD("roll_dealer_visits"), &DopeWarsWorld::roll_dealer_visits);
+	ClassDB::bind_method(D_METHOD("accept_gun_offer", "price", "name_index"), &DopeWarsWorld::accept_gun_offer);
 
 	ClassDB::bind_method(D_METHOD("should_start_chase"), &DopeWarsWorld::should_start_chase);
 	ClassDB::bind_method(D_METHOD("start_chase"), &DopeWarsWorld::start_chase);
@@ -91,11 +91,9 @@ void DopeWarsWorld::_bind_methods() {
 	ClassDB::bind_static_method(get_class_static(), D_METHOD("rules_default_start_coat_capacity"), &DopeWarsWorld::rules_default_start_coat_capacity);
 	ClassDB::bind_static_method(get_class_static(), D_METHOD("rules_default_start_location_index"), &DopeWarsWorld::rules_default_start_location_index);
 	ClassDB::bind_static_method(get_class_static(), D_METHOD("rules_gun_damage"), &DopeWarsWorld::rules_gun_damage);
-	ClassDB::bind_static_method(get_class_static(), D_METHOD("rules_gun_space"), &DopeWarsWorld::rules_gun_space);
 	ClassDB::bind_static_method(get_class_static(), D_METHOD("rules_player_armor"), &DopeWarsWorld::rules_player_armor);
 	ClassDB::bind_static_method(get_class_static(), D_METHOD("rules_debt_interest_bp"), &DopeWarsWorld::rules_debt_interest_bp);
 	ClassDB::bind_static_method(get_class_static(), D_METHOD("rules_bank_interest_bp"), &DopeWarsWorld::rules_bank_interest_bp);
-	ClassDB::bind_static_method(get_class_static(), D_METHOD("rules_bank_purchase_fee_bp"), &DopeWarsWorld::rules_bank_purchase_fee_bp);
 	ClassDB::bind_static_method(get_class_static(), D_METHOD("rules_cheap_divide"), &DopeWarsWorld::rules_cheap_divide);
 	ClassDB::bind_static_method(get_class_static(), D_METHOD("rules_expensive_multiply"), &DopeWarsWorld::rules_expensive_multiply);
 	ClassDB::bind_static_method(get_class_static(), D_METHOD("rules_locations_len"), &DopeWarsWorld::rules_locations_len);
@@ -132,6 +130,10 @@ void DopeWarsWorld::_bind_methods() {
 	BIND_CONSTANT(DW_ARRIVAL_MAMAS_BROWNIES);
 	BIND_CONSTANT(DW_ARRIVAL_FREE_WEED_DEATH);
 	BIND_CONSTANT(DW_ARRIVAL_FLAVOR);
+
+	BIND_CONSTANT(DW_DEALER_NONE);
+	BIND_CONSTANT(DW_DEALER_COAT);
+	BIND_CONSTANT(DW_DEALER_GUN);
 
 	BIND_CONSTANT(DW_PRICE_EVENT_CHEAP);
 	BIND_CONSTANT(DW_PRICE_EVENT_EXPENSIVE);
@@ -402,6 +404,20 @@ Dictionary DopeWarsWorld::roll_arrival_event() {
 	return out;
 }
 
+Dictionary DopeWarsWorld::roll_dealer_visit() {
+	Dictionary out;
+	if (!is_ready()) {
+		out["result"] = DW_ERR_INVALID_ARGUMENT;
+		out["kind"] = DW_DEALER_NONE;
+		return out;
+	}
+	dw_dealer_kind kind = DW_DEALER_NONE;
+	dw_result result = dw_roll_dealer_visit(world_, &kind);
+	out["result"] = result;
+	out["kind"] = kind;
+	return out;
+}
+
 Dictionary DopeWarsWorld::roll_coat_dealer_offer() {
 	Dictionary out;
 	if (!is_ready()) {
@@ -411,25 +427,24 @@ Dictionary DopeWarsWorld::roll_coat_dealer_offer() {
 	dw_coat_offer offer{};
 	dw_result result = dw_roll_coat_dealer_offer(world_, &offer);
 	out["result"] = result;
-	out["pockets"] = offer.pockets;
 	out["price"] = offer.price;
+	out["offered"] = offer.offered;
 	return out;
 }
 
-Dictionary DopeWarsWorld::accept_coat_offer(int pockets, int price) {
+Dictionary DopeWarsWorld::accept_coat_offer(int price) {
 	Dictionary out;
 	if (!is_ready()) {
 		out["result"] = DW_ERR_INVALID_ARGUMENT;
 		return out;
 	}
 	dw_coat_offer offer{};
-	offer.pockets = static_cast<uint32_t>(pockets);
 	offer.price = static_cast<int32_t>(price);
-	dw_purchase_result purchase{};
-	dw_result result = dw_accept_coat_offer(world_, &offer, &purchase);
+	offer.offered = 1;
+	uint32_t pockets = 0;
+	dw_result result = dw_accept_coat_offer(world_, &offer, &pockets);
 	out["result"] = result;
-	out["used_bank"] = purchase.used_bank;
-	out["fee"] = purchase.fee;
+	out["pockets"] = pockets;
 	return out;
 }
 
@@ -443,12 +458,12 @@ Dictionary DopeWarsWorld::roll_gun_dealer_offer() {
 	dw_result result = dw_roll_gun_dealer_offer(world_, &offer);
 	out["result"] = result;
 	out["price"] = offer.price;
-	out["damage"] = offer.damage;
-	out["space"] = offer.space;
+	out["name_index"] = offer.name_index;
+	out["offered"] = offer.offered;
 	return out;
 }
 
-Dictionary DopeWarsWorld::accept_gun_offer(int price, int damage, int space) {
+Dictionary DopeWarsWorld::accept_gun_offer(int price, int name_index) {
 	Dictionary out;
 	if (!is_ready()) {
 		out["result"] = DW_ERR_INVALID_ARGUMENT;
@@ -456,30 +471,10 @@ Dictionary DopeWarsWorld::accept_gun_offer(int price, int damage, int space) {
 	}
 	dw_gun_offer offer{};
 	offer.price = static_cast<int32_t>(price);
-	offer.damage = static_cast<uint32_t>(damage);
-	offer.space = static_cast<uint32_t>(space);
-	dw_purchase_result purchase{};
-	dw_result result = dw_accept_gun_offer(world_, &offer, &purchase);
+	offer.name_index = static_cast<uint32_t>(name_index);
+	offer.offered = 1;
+	dw_result result = dw_accept_gun_offer(world_, &offer);
 	out["result"] = result;
-	out["used_bank"] = purchase.used_bank;
-	out["fee"] = purchase.fee;
-	return out;
-}
-
-Dictionary DopeWarsWorld::roll_dealer_visits() {
-	Dictionary out;
-	if (!is_ready()) {
-		out["result"] = DW_ERR_INVALID_ARGUMENT;
-		out["coat_visit"] = 0;
-		out["gun_visit"] = 0;
-		return out;
-	}
-	uint8_t coat_visit = 0;
-	uint8_t gun_visit = 0;
-	dw_result result = dw_roll_dealer_visits(world_, &coat_visit, &gun_visit);
-	out["result"] = result;
-	out["coat_visit"] = coat_visit;
-	out["gun_visit"] = gun_visit;
 	return out;
 }
 
@@ -756,9 +751,6 @@ int DopeWarsWorld::rules_gun_damage() {
 	return static_cast<int>(dw_rules_gun_damage());
 }
 
-int DopeWarsWorld::rules_gun_space() {
-	return static_cast<int>(dw_rules_gun_space());
-}
 
 int DopeWarsWorld::rules_player_armor() {
 	return static_cast<int>(dw_rules_player_armor());
@@ -772,9 +764,6 @@ int DopeWarsWorld::rules_bank_interest_bp() {
 	return static_cast<int>(dw_rules_bank_interest_bp());
 }
 
-int DopeWarsWorld::rules_bank_purchase_fee_bp() {
-	return static_cast<int>(dw_rules_bank_purchase_fee_bp());
-}
 
 int DopeWarsWorld::rules_cheap_divide() {
 	return static_cast<int>(dw_rules_cheap_divide());

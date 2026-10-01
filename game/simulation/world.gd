@@ -39,6 +39,10 @@ const ARRIVAL_MAMAS_BROWNIES := DopeWarsWorld.DW_ARRIVAL_MAMAS_BROWNIES
 const ARRIVAL_FREE_WEED_DEATH := DopeWarsWorld.DW_ARRIVAL_FREE_WEED_DEATH
 const ARRIVAL_FLAVOR := DopeWarsWorld.DW_ARRIVAL_FLAVOR
 
+const DEALER_NONE := DopeWarsWorld.DW_DEALER_NONE
+const DEALER_COAT := DopeWarsWorld.DW_DEALER_COAT
+const DEALER_GUN := DopeWarsWorld.DW_DEALER_GUN
+
 const PRICE_EVENT_CHEAP := DopeWarsWorld.DW_PRICE_EVENT_CHEAP
 const PRICE_EVENT_EXPENSIVE := DopeWarsWorld.DW_PRICE_EVENT_EXPENSIVE
 const PRICE_EVENT_BUST := DopeWarsWorld.DW_PRICE_EVENT_BUST
@@ -153,27 +157,27 @@ func roll_arrival_event() -> Dictionary:
 	return _world.roll_arrival_event()
 
 
-## One call, both rolls, coat first then gun, always drawn. Only call it when
-## should_start_chase came back false -- the prototype skips the dealers
-## entirely on a chase.
-func roll_dealer_visits() -> Dictionary:
-	return _world.roll_dealer_visits()
+## Returns {result, kind} with kind one of DEALER_NONE / DEALER_COAT /
+## DEALER_GUN. Only call it when should_start_chase came back false -- a
+## chase skips the dealers entirely.
+func roll_dealer_visit() -> Dictionary:
+	return _world.roll_dealer_visit()
 
 
 func roll_coat_dealer_offer() -> Dictionary:
 	return _world.roll_coat_dealer_offer()
 
 
-func accept_coat_offer(pockets: int, price: int) -> Dictionary:
-	return _world.accept_coat_offer(pockets, price)
+func accept_coat_offer(price: int) -> Dictionary:
+	return _world.accept_coat_offer(price)
 
 
 func roll_gun_dealer_offer() -> Dictionary:
 	return _world.roll_gun_dealer_offer()
 
 
-func accept_gun_offer(price: int, damage: int, space: int) -> Dictionary:
-	return _world.accept_gun_offer(price, damage, space)
+func accept_gun_offer(price: int, name_index: int) -> Dictionary:
+	return _world.accept_gun_offer(price, name_index)
 
 
 # --- chase / combat ---------------------------------------------------------
@@ -300,10 +304,6 @@ func rules_gun_damage() -> int:
 	return DopeWarsWorld.rules_gun_damage()
 
 
-func rules_gun_space() -> int:
-	return DopeWarsWorld.rules_gun_space()
-
-
 func rules_player_armor() -> int:
 	return DopeWarsWorld.rules_player_armor()
 
@@ -314,10 +314,6 @@ func rules_debt_interest_bp() -> int:
 
 func rules_bank_interest_bp() -> int:
 	return DopeWarsWorld.rules_bank_interest_bp()
-
-
-func rules_bank_purchase_fee_bp() -> int:
-	return DopeWarsWorld.rules_bank_purchase_fee_bp()
 
 
 func rules_cheap_divide() -> int:

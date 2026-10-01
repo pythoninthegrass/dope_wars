@@ -68,7 +68,7 @@ def test_new_game_honours_overrides() raises:
     assert_equal(broke.cash, 0.0)
 
 
-def test_coat_used_counts_inventory_and_guns() raises:
+def test_coat_used_counts_inventory_only() raises:
     var game = world.new_game(UInt32(7), 0, -1)
     assert_equal(game.coat_used(), 0)
 
@@ -76,9 +76,9 @@ def test_coat_used_counts_inventory_and_guns() raises:
     _ = game.add_to_inventory(11, 2)  # weed
     assert_equal(game.coat_used(), 5)
 
-    # Each gun occupies GUN_SPACE slots.
+    # A gun takes no coat space.
     game.guns = 2
-    assert_equal(game.coat_used(), 5 + 2 * rules.GUN_SPACE)
+    assert_equal(game.coat_used(), 5)
 
 
 def test_coat_used_ignores_emptied_slots() raises:

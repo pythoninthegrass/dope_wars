@@ -246,12 +246,11 @@ struct World:
 
     # ---- coat -------------------------------------------------------------
 
-    # coatUsed: every held unit plus GUN_SPACE slots per gun.
+    # coatUsed: every held unit; a gun takes no coat space.
     def coat_used(ref self) -> Int64:
         var used: Int64 = 0
         for i in range(self.inv_order_len):
             used += self.inv_qty[Int(self.inv_order[i])]
-        used += self.guns * rules.GUN_SPACE
         return used
 
 

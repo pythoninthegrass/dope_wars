@@ -180,36 +180,34 @@ def run_step(mut game: world.World, ref rec: record.Record) raises:
     elif call == "rollArrivalEvent":
         var produced = events.roll_arrival_event(game)
         harness.assert_arrival_event_matches(produced, rec.ret)
+    elif call == "rollDealerVisit":
+        var kind = dealers.roll_dealer_visit(game)
+        var expected = rec.ret.string_at("kind")
+        if expected == "coat":
+            assert_equal(kind, dealers.DEALER_COAT)
+        elif expected == "gun":
+            assert_equal(kind, dealers.DEALER_GUN)
+        else:
+            assert_equal(kind, dealers.DEALER_NONE)
     elif call == "rollCoatDealerOffer":
         var offer = dealers.roll_coat_dealer_offer(game)
-        assert_equal(offer.pockets, rec.ret.int_at("pockets"))
         assert_equal(offer.price, rec.ret.int_at("price"))
+        assert_equal(offer.offered, rec.ret.bool_at("offered"))
     elif call == "rollGunDealerOffer":
         var offer = dealers.roll_gun_dealer_offer(game)
         assert_equal(offer.price, rec.ret.int_at("price"))
-        assert_equal(offer.damage, rec.ret.int_at("damage"))
-        assert_equal(offer.space, rec.ret.int_at("space"))
+        assert_equal(offer.offered, rec.ret.bool_at("offered"))
+        assert_equal(offer.name_index, rec.ret.int_at("nameIndex"))
     elif call == "acceptCoatOffer":
-        var offer = dealers.CoatOffer(
-            rec.args.int_at("offer.pockets"), rec.args.int_at("offer.price")
-        )
+        var offer = dealers.CoatOffer(rec.args.int_at("offer.price"), True)
         var outcome = dealers.accept_coat_offer(game, offer)
         harness.assert_purchase_matches(outcome, rec)
     elif call == "acceptGunOffer":
         var offer = dealers.GunOffer(
-            rec.args.int_at("offer.price"),
-            rec.args.int_at("offer.damage"),
-            rec.args.int_at("offer.space"),
+            rec.args.int_at("offer.price"), True, rec.args.int_at("offer.nameIndex")
         )
         var outcome = dealers.accept_gun_offer(game, offer)
         harness.assert_purchase_matches(outcome, rec)
-    elif call == "rollDealerVisits":
-        # The oracle helper is index.html:1387-1388, which has no engine export.
-        # The pair is the whole return value; the two draws it spends are proved
-        # by the state snapshot the caller compares afterwards.
-        var visits = dealers.roll_dealer_visits(game)
-        assert_equal(visits.coat, rec.ret.bool_at("coat"))
-        assert_equal(visits.gun, rec.ret.bool_at("gun"))
     elif call == "shouldStartChase":
         assert_equal(combat.should_start_chase(game), rec.ret.bool_at("value"))
     elif call == "startChase":

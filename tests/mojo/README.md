@@ -74,6 +74,7 @@ test asserts it, because the corpus has no step that reaches it.
 | `travel` | `travel.mojo` | fixture 03 |
 | `finances` | `finances.mojo` | fixture 11 |
 | `rollArrivalEvent` | `events.mojo` | fixture 04 |
+| `rollDealerVisit` | `dealers.mojo` | fixture 12 |
 | `rollCoatDealerOffer` | `dealers.mojo` | fixture 10 |
 | `acceptCoatOffer` | `dealers.mojo` | fixture 05 |
 | `rollGunDealerOffer` | `dealers.mojo` | fixture 10 |

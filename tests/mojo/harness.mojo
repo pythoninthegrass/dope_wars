@@ -191,17 +191,10 @@ def assert_purchase_matches(
     var expected_ok = rec.ret.bool_at("ok")
     assert_equal(outcome.code == result.OK, expected_ok)
     if not expected_ok:
-        # The oracle records a bare { ok: false } for both the bank and the
-        # space guard, so either code is acceptable.
-        assert_true(
-            outcome.code == result.ERR_INSUFFICIENT_BANK
-            or outcome.code == result.ERR_INSUFFICIENT_SPACE
-        )
+        assert_equal(outcome.code, result.ERR_INSUFFICIENT_CASH)
         return
-    if rec.ret.has("usedBank"):
-        assert_equal(outcome.used_bank, rec.ret.bool_at("usedBank"))
-    if rec.ret.has("fee"):
-        assert_equal(outcome.fee, rec.ret.int_at("fee"))
+    if rec.ret.has("pockets"):
+        assert_equal(outcome.pockets, rec.ret.int_at("pockets"))
 
 
 def assert_arrival_event_matches(

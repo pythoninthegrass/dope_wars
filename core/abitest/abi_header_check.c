@@ -32,7 +32,7 @@ belong in the Python harness. Run through task core:abi-header-check.
 /* The header must define its own dimensional contract, and the test-side
  * constants must agree with it. These are compile-time: a disagreement stops
  * the build rather than turning into a wrong-length buffer at runtime. */
-DW_STATIC_ASSERT(DW_ABI_VERSION == 5u, "DW_ABI_VERSION drifted from the v5 contract");
+DW_STATIC_ASSERT(DW_ABI_VERSION == 6u, "DW_ABI_VERSION drifted from the v6 contract");
 DW_STATIC_ASSERT(DW_NUM_LOCATIONS == 6u, "DW_NUM_LOCATIONS drifted");
 DW_STATIC_ASSERT(DW_NUM_DRUGS == 12u, "DW_NUM_DRUGS drifted");
 DW_STATIC_ASSERT(DW_MAX_HIGHSCORES == 10u, "DW_MAX_HIGHSCORES drifted");
@@ -50,6 +50,7 @@ DW_STATIC_ASSERT(DW_ERR_SERIALIZATION_FAILED == 13, "result code renumbered");
 DW_STATIC_ASSERT(sizeof(dw_arrival_event_kind) == 1, "arrival kind must stay uint8_t");
 DW_STATIC_ASSERT(sizeof(dw_price_event_kind) == 1, "price event kind must stay uint8_t");
 DW_STATIC_ASSERT(sizeof(dw_finances_action) == 1, "finances action must stay uint8_t");
+DW_STATIC_ASSERT(sizeof(dw_dealer_kind) == 1, "dealer kind must stay uint8_t");
 
 /* dw_world stays opaque: callers hold a pointer only. Assert the contract's
  * shape rather than its size, which must remain unknown here. */
@@ -110,11 +111,9 @@ static void *const dw_implemented_surface[] = {
     (void *) &dw_rules_default_start_coat_capacity,
     (void *) &dw_rules_default_start_location_index,
     (void *) &dw_rules_gun_damage,
-    (void *) &dw_rules_gun_space,
     (void *) &dw_rules_player_armor,
     (void *) &dw_rules_debt_interest_bp,
     (void *) &dw_rules_bank_interest_bp,
-    (void *) &dw_rules_bank_purchase_fee_bp,
     (void *) &dw_rules_cheap_divide,
     (void *) &dw_rules_expensive_multiply,
     (void *) &dw_rules_locations_len,
