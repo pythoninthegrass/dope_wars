@@ -38,3 +38,13 @@ tasks:
         {{end}}
     status:
       - test -x "{{.GHIDRA_HEADLESS}}"
+
+  test:
+    desc: "Run the Beermat extractor self-test (synthetic TPF0 and fixtures, no exe needed)"
+    cmds:
+      - uv run tools/re/test_extract_beermat.py
+
+  extract:
+    desc: "Extract forms from vendor/dopewars-1999/DopeWars.exe into the gitignored vendor/dopewars-1999/re/"
+    cmds:
+      - uv run tools/re/extract_beermat.py
