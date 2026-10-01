@@ -33,6 +33,8 @@ BTN_DECLINE,Decline
 BTN_RUN,Run
 BTN_STAY,Stay
 BTN_FIGHT,Fight
+BTN_YES,Yes
+BTN_NO,No
 BTN_SAVE_SCORE,Save score
 BTN_SKIP,Skip
 BTN_START_GAME,Start Game
@@ -48,6 +50,7 @@ DLG_RANDOM_EVENT,Random Event
 DLG_COAT_DEALER,Coat Dealer
 DLG_GUN_DEALER,Gun Dealer
 DLG_COP_CHASE,Cop Chase!
+DLG_DOCTOR,Confirm
 DLG_YOU_DIED,You Died
 DLG_GAME_OVER,Game Over
 DLG_HIGH_SCORES,High Scores
@@ -83,11 +86,16 @@ GUN_NAME_RUGER,Ruger
 GUN_NAME_SATURDAY_NIGHT_SPECIAL,Saturday Night Special
 MSG_CHASE_INTRO,Officer Hardass and {0} of his deputies are chasing you!
 MSG_CHASE_ESCAPED,You lost them in the alleys.
-MSG_CHASE_FIRED_ON,"They're firing on you, man! You've been hit!"
-MSG_CHASE_STAND_GROUND,You stand your ground and wait for them to close in.
-MSG_CHASE_WON,You took them all down! You got away!
-MSG_CHASE_HIT_DEPUTY,You hit a deputy! {0} left.
-MSG_CHASE_DAMAGE,You got hit for {0} damage!
+MSG_CHASE_RUN_MISSED,"You can't get away ! They're firing on you, man! They missed!"
+MSG_CHASE_RUN_HIT,"You can't get away ! They're firing on you, man! You've been hit!"
+MSG_CHASE_STAY_MISSED,"You stand there like an idiot. They're firing on you, man! They missed!"
+MSG_CHASE_STAY_HIT,"You stand there like an idiot. They're firing on you, man! You've been hit!"
+MSG_CHASE_SHOT_MISSED,You're firing on them! You missed them!
+MSG_CHASE_SHOT_KILLED,You're firing on them! You killed one!
+MSG_CHASE_COPS_MISSED,"They're firing on you, man! They missed!"
+MSG_CHASE_COPS_HIT,"They're firing on you, man! You've been hit!"
+MSG_CHASE_WON,You killed them all!
+MSG_DOCTOR_OFFER,"You find a gun and ${0} on Officer Hardass' carcass. Will you pay ${1} to have a doctor sew you up?"
 MSG_YOU_DIED,You have been killed. Game over.
 MSG_FINAL_SCORE,Final score: ${0}
 MSG_FINAL_SCORE_DEAD,{0} (dead)

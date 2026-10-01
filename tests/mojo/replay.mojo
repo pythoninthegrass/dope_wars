@@ -18,6 +18,7 @@ import fixtures
 import harness
 import prices
 import record
+import result
 import rules
 import score
 import serialize
@@ -168,6 +169,19 @@ def _apply_serialize_round_trip(mut game: world.World, ref rec: record.Record) r
     assert_equal(rec.ret.bool_at("equal"), True)
 
 
+def _assert_cop_fire(fire: combat.CopFire, ref rec: record.Record) raises:
+    assert_equal(fire.hit, rec.ret.bool_at(_hit_key(rec.call)))
+    assert_equal(fire.damage, rec.ret.int_at("damage"))
+    assert_equal(fire.dead, rec.ret.bool_at("dead"))
+
+
+# fight reports the cops' shot as copHit, because hit would read as the player's.
+def _hit_key(call: String) -> String:
+    if call == "fight":
+        return "copHit"
+    return "hit"
+
+
 def run_step(mut game: world.World, ref rec: record.Record) raises:
     # A step that carries a scripted RNG replaces the draw source for that call
     # only; the next step without one goes back to the seeded stream.
@@ -231,24 +245,26 @@ def run_step(mut game: world.World, ref rec: record.Record) raises:
         assert_equal(chase.deputies, rec.ret.int_at("deputies"))
         assert_equal(rec.ret.string_at("cop"), "Officer Hardass")
         assert_equal(rec.ret.bool_at("canFight"), game.guns > 0)
-    elif call == "getFightRatings":
-        var ratings = combat.get_fight_ratings(game)
-        assert_equal(ratings.attack, rec.ret.int_at("attack"))
-        assert_equal(ratings.defend, rec.ret.int_at("defend"))
     elif call == "applyDamage":
         var health = events.apply_damage(game, rec.args.int_at("amount"))
         assert_equal(health, rec.ret.int_at("value"))
     elif call == "runFromChase":
-        var chase = combat.Chase(rec.args.int_at("chase.deputies"))
-        var escaped = combat.run_from_chase(game, chase, rec.args.bool_at("isAggressor"))
-        assert_equal(escaped, rec.ret.bool_at("escaped"))
+        var outcome = combat.run_from_chase(game)
+        assert_equal(outcome.escaped, rec.ret.bool_at("escaped"))
+        _assert_cop_fire(outcome.fire, rec)
+    elif call == "stayInChase":
+        _assert_cop_fire(combat.stay_in_chase(game), rec)
     elif call == "fight":
         var chase = combat.Chase(rec.args.int_at("chase.deputies"))
         var outcome = combat.fight(game, chase)
-        assert_equal(outcome.hit, rec.ret.bool_at("hit"))
-        assert_equal(outcome.damage, rec.ret.int_at("damage"))
-        assert_equal(outcome.dead, rec.ret.bool_at("dead"))
+        assert_equal(outcome.killed, rec.ret.bool_at("killed"))
         assert_equal(outcome.won, rec.ret.bool_at("won"))
+        assert_equal(outcome.reward, rec.ret.int_at("reward"))
+        assert_equal(outcome.doctor.price, rec.ret.int_at("doctor.price"))
+        _assert_cop_fire(outcome.fire, rec)
+    elif call == "acceptDoctorOffer":
+        var code = combat.accept_doctor_offer(game, combat.DoctorOffer(rec.args.int_at("offer.price")))
+        assert_equal(code == result.OK, rec.ret.bool_at("ok"))
     elif call == "finish":
         var outcome = score.finish(game)
         assert_equal(outcome.score, rec.ret.float_at("score"))

@@ -123,31 +123,42 @@ struct GunOfferView(Copyable, Movable):
 
 @fieldwise_init
 struct ChaseView(Copyable, Movable):
-    var deputies: UInt32
+    var deputies: Int32
     var can_fight: UInt8
     var _pad0: Array[UInt8, 3]
 
 
 @fieldwise_init
-struct FightRatingsView(Copyable, Movable):
-    var attack: UInt32
-    var defend: UInt32
+struct RunResultView(Copyable, Movable):
+    var escaped: UInt8
+    var hit: UInt8
+    var dead: UInt8
+    var _pad0: UInt8
+    var damage_taken: Int32
 
 
 @fieldwise_init
-struct RunResultView(Copyable, Movable):
-    var escaped: UInt8
-    var _pad0: Array[UInt8, 3]
+struct StayResultView(Copyable, Movable):
+    var hit: UInt8
+    var dead: UInt8
+    var _pad0: Array[UInt8, 2]
     var damage_taken: Int32
+
+
+@fieldwise_init
+struct DoctorOfferView(Copyable, Movable):
+    var price: Int32
 
 
 @fieldwise_init
 struct FightResultView(Copyable, Movable):
-    var hit: UInt8
+    var killed: UInt8
+    var cop_hit: UInt8
     var dead: UInt8
     var won: UInt8
-    var _pad0: UInt8
     var damage_taken: Int32
+    var reward: Int32
+    var doctor: DoctorOfferView
 
 
 @fieldwise_init
@@ -206,7 +217,7 @@ def _world() -> Pointer[UInt8, origin=MutUntrackedOrigin]:
 
 
 def _config(seed: UInt32, num_days: UInt32 = 0, start_cash: Int32 = -1) -> Config:
-    return Config(UInt16(7), UInt16(0), seed, num_days, start_cash)
+    return Config(UInt16(8), UInt16(0), seed, num_days, start_cash)
 
 
 def _init(
@@ -327,9 +338,10 @@ def test_struct_sizes_match_header() raises:
     assert_equal(size_of[CoatOfferView](), 8)
     assert_equal(size_of[GunOfferView](), 12)
     assert_equal(size_of[ChaseView](), 8)
-    assert_equal(size_of[FightRatingsView](), 8)
     assert_equal(size_of[RunResultView](), 8)
-    assert_equal(size_of[FightResultView](), 8)
+    assert_equal(size_of[StayResultView](), 8)
+    assert_equal(size_of[DoctorOfferView](), 4)
+    assert_equal(size_of[FightResultView](), 16)
     assert_equal(size_of[FinishResultView](), 16)
     assert_equal(size_of[HighscoreEntryView](), 48)
 
@@ -663,8 +675,6 @@ def test_rules_accessors() raises:
     assert_equal(external_call["dw_rules_default_start_health", Int32](), Int32(100))
     assert_equal(external_call["dw_rules_default_start_coat_capacity", Int32](), Int32(100))
     assert_equal(external_call["dw_rules_default_start_location_index", Int32](), Int32(0))
-    assert_equal(external_call["dw_rules_gun_damage", UInt32](), UInt32(5))
-    assert_equal(external_call["dw_rules_player_armor", UInt32](), UInt32(100))
     assert_equal(external_call["dw_rules_debt_interest_bp", UInt32](), UInt32(1000))
     assert_equal(external_call["dw_rules_bank_interest_bp", UInt32](), UInt32(500))
     assert_equal(external_call["dw_rules_cheap_divide", UInt32](), UInt32(10))
@@ -795,6 +805,12 @@ def test_dealer_offers_and_purchases() raises:
     assert_equal(_state(ptr).coat_used, Int32(0))
 
 
+def _new_fight_result() -> FightResultView:
+    return FightResultView(
+        UInt8(0), UInt8(0), UInt8(0), UInt8(0), Int32(0), Int32(0), DoctorOfferView(Int32(0))
+    )
+
+
 def test_combat_flow() raises:
     var ptr = _world()
     assert_equal(_init(ptr, UInt32(7)), DW_OK)
@@ -802,25 +818,91 @@ def test_combat_flow() raises:
     assert_equal(external_call["dw_should_start_chase", Int32](ptr, Pointer(to=should)), DW_OK)
     assert_true(should == 0 or should == 1)
 
-    var chase = ChaseView(UInt32(0), UInt8(0), Array[UInt8, 3](fill=0))
+    var chase = ChaseView(Int32(0), UInt8(0), Array[UInt8, 3](fill=0))
     assert_equal(external_call["dw_start_chase", Int32](ptr, Pointer(to=chase)), DW_OK)
-    # beermat-verified (TASK-009): deputies is randInt(2, 11), no longer a
-    # deterministic function of day alone -- this is seed 7's actual draw
-    # after should_start_chase's one draw.
-    assert_equal(chase.deputies, UInt32(11))
+    # Seed 7's draw after should_start_chase's one draw; the count is Random(10) + 2.
+    assert_equal(chase.deputies, Int32(11))
     assert_equal(chase.can_fight, UInt8(0))
 
-    var ratings = FightRatingsView(UInt32(0), UInt32(0))
-    assert_equal(external_call["dw_get_fight_ratings", Int32](ptr, Pointer(to=ratings)), DW_OK)
-    assert_equal(ratings.attack, UInt32(80))
-    assert_equal(ratings.defend, UInt32(100))
+    # Fighting needs a gun, and the refusal draws nothing.
+    var before = _dump(ptr)
+    var fight = _new_fight_result()
+    assert_equal(
+        external_call["dw_fight", Int32](ptr, Pointer(to=chase), Pointer(to=fight)),
+        DW_ERR_INVALID_ARGUMENT,
+    )
+    var after = _dump(ptr)
+    for i in range(len(before)):
+        assert_equal(before[i], after[i])
 
-    var run = RunResultView(UInt8(0), Array[UInt8, 3](fill=0), Int32(0))
-    assert_equal(external_call["dw_run_from_chase", Int32](ptr, Pointer(to=chase), UInt8(0), Pointer(to=run)), DW_OK)
-    assert_true(run.escaped == 0 or run.escaped == 1)
+    # A failed run or a stay lets the cops fire: a hit costs 5 to 15, a miss nothing.
+    var run = RunResultView(UInt8(0), UInt8(0), UInt8(0), UInt8(0), Int32(0))
+    assert_equal(external_call["dw_run_from_chase", Int32](ptr, Pointer(to=run)), DW_OK)
+    var health = Int32(100) - run.damage_taken
+    if run.escaped == 1:
+        assert_equal(run.hit, UInt8(0))
+        assert_equal(run.damage_taken, Int32(0))
+    elif run.hit == 1:
+        assert_true(run.damage_taken >= 5 and run.damage_taken <= 15)
+    else:
+        assert_equal(run.damage_taken, Int32(0))
+    assert_equal(_state(ptr).health, health)
 
-    var fight = FightResultView(UInt8(0), UInt8(0), UInt8(0), UInt8(0), Int32(0))
-    assert_equal(external_call["dw_fight", Int32](ptr, Pointer(to=chase), Pointer(to=fight)), DW_OK)
+    for _ in range(3):
+        var stay = StayResultView(UInt8(0), UInt8(0), Array[UInt8, 2](fill=0), Int32(0))
+        assert_equal(external_call["dw_stay_in_chase", Int32](ptr, Pointer(to=stay)), DW_OK)
+        if stay.hit == 1:
+            assert_true(stay.damage_taken >= 5 and stay.damage_taken <= 15)
+        else:
+            assert_equal(stay.damage_taken, Int32(0))
+        health -= stay.damage_taken
+        assert_equal(_state(ptr).health, health)
+
+
+def test_chase_win_pays_gun_cash_and_doctor() raises:
+    var wins = 0
+    for seed in range(1, 40):
+        var ptr = _world()
+        assert_equal(_init(ptr, UInt32(seed)), DW_OK)
+        var gun = GunOfferView(Int32(0), UInt32(0), UInt8(1), Array[UInt8, 3](fill=0))
+        assert_equal(external_call["dw_accept_gun_offer", Int32](ptr, Pointer(to=gun)), DW_OK)
+        var chase = ChaseView(Int32(0), UInt8(0), Array[UInt8, 3](fill=0))
+        assert_equal(external_call["dw_start_chase", Int32](ptr, Pointer(to=chase)), DW_OK)
+        assert_true(chase.deputies >= 2 and chase.deputies <= 11)
+        var done = False
+        for _ in range(200):
+            if done:
+                break
+            var fight = _new_fight_result()
+            assert_equal(external_call["dw_fight", Int32](ptr, Pointer(to=chase), Pointer(to=fight)), DW_OK)
+            if fight.dead == 1:
+                assert_equal(_state(ptr).health, Int32(0))
+                done = True
+            elif fight.won == 1:
+                wins += 1
+                done = True
+                assert_equal(chase.deputies, Int32(-1))
+                assert_equal(fight.cop_hit, UInt8(0))
+                assert_true(fight.reward >= 1000 and fight.reward <= 3499)
+                assert_true(fight.doctor.price >= 1000 and fight.doctor.price <= 1999)
+                assert_true(fight.doctor.price <= fight.reward)
+                var won = _state(ptr)
+                assert_equal(won.guns, UInt32(2))
+                assert_equal(won.cash, Int32(2000) + fight.reward)
+                # The doctor is refused when the price exceeds cash, with no state change.
+                var dear = DoctorOfferView(Int32(99999))
+                assert_equal(
+                    external_call["dw_accept_doctor_offer", Int32](ptr, Pointer(to=dear)),
+                    DW_ERR_INSUFFICIENT_CASH,
+                )
+                assert_equal(_state(ptr).cash, won.cash)
+                assert_equal(external_call["dw_accept_doctor_offer", Int32](ptr, Pointer(to=fight.doctor)), DW_OK)
+                var healed = _state(ptr)
+                assert_equal(healed.health, Int32(100))
+                assert_equal(healed.cash, won.cash - fight.doctor.price)
+            else:
+                assert_true(chase.deputies >= 0)
+    assert_true(wins > 0)
 
 
 def test_finish_and_highscore() raises:

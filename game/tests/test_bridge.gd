@@ -40,6 +40,7 @@ const EXPECTED_ASSERTIONS := {
 	"rules_surface": 7,
 	"prev_prices": 6,
 	"dealer_visits": 14,
+	"chase_resolution": 7,
 }
 
 ## Coarse backstop for the harness itself: if every case reports but the total
@@ -76,6 +77,8 @@ func _initialize() -> void:
 	_test_prev_prices()
 	_case("dealer_visits")
 	_test_dealer_visits()
+	_case("chase_resolution")
+	_test_chase_resolution()
 	_finish()
 
 
@@ -415,3 +418,60 @@ func _test_dealer_visits() -> void:
 	var refused: Dictionary = broke.accept_coat_offer(300)
 	_assert(int(refused["result"]) == SimWorld.ERR_INSUFFICIENT_CASH, "a coat purchase should not draw on the bank")
 	_assert(int(broke.accept_gun_offer(400, 0)["result"]) == SimWorld.ERR_INSUFFICIENT_CASH, "a gun purchase should not draw on the bank")
+
+
+## Run, Stay and Fight through the shim: fighting needs a gun, a failed run or a
+## stay lets the cops fire for 5-15, and a win pays a gun, cash and a doctor
+## offer that restores health for its price. The win loop tallies violations
+## and asserts once, so the assertion count does not depend on the seeds.
+func _test_chase_resolution() -> void:
+	var world := _new_world(7)
+	var chase := world.start_chase()
+	var deputies := int(chase["deputies"])
+	_assert(deputies >= 2 and deputies <= 11, "a chase should start with 2-11 deputies, got %d" % deputies)
+	_assert(int(world.fight(deputies)["result"]) == SimWorld.ERR_INVALID_ARGUMENT, "fighting without a gun should be refused")
+
+	var run := world.run_from_chase()
+	var run_damage := int(run["damage_taken"])
+	_assert(
+		(bool(run["escaped"]) and not bool(run["hit"]) and run_damage == 0)
+		or (not bool(run["escaped"]) and bool(run["hit"]) == (run_damage >= 5 and run_damage <= 15)),
+		"a run should escape or let the cops fire for 5-15 on a hit",
+	)
+	var stay := world.stay_in_chase()
+	_assert(
+		int(world.state_get()["health"]) == 100 - run_damage - int(stay["damage_taken"])
+		and bool(stay["hit"]) == (int(stay["damage_taken"]) > 0),
+		"staying should let the cops fire and cost exactly the damage reported",
+	)
+
+	var wins := 0
+	var violations := 0
+	for seed in range(1, 40):
+		var w := SimWorld.new()
+		w.init(seed)
+		w.accept_gun_offer(0, 0)
+		var live_deputies := int(w.start_chase()["deputies"])
+		for _round in range(200):
+			var fight := w.fight(live_deputies)
+			live_deputies = int(fight["deputies"])
+			if bool(fight["dead"]):
+				break
+			if not bool(fight["won"]):
+				continue
+			wins += 1
+			var reward := int(fight["reward"])
+			var price := int(fight["doctor_price"])
+			var won := w.state_get()
+			if live_deputies != -1 or reward < 1000 or reward > 3499 or price < 1000 or price > 1999 or price > reward \
+					or int(won["guns"]) != 2 or int(won["cash"]) != 2000 + reward:
+				violations += 1
+			if int(w.accept_doctor_offer(99999)["result"]) != SimWorld.ERR_INSUFFICIENT_CASH:
+				violations += 1
+			w.accept_doctor_offer(price)
+			var healed := w.state_get()
+			if int(healed["health"]) != 100 or int(healed["cash"]) != int(won["cash"]) - price:
+				violations += 1
+			break
+	_assert(wins > 0, "some seed in the range should win a chase")
+	_assert(violations == 0, "%d chase wins broke the reward or doctor rules" % violations)

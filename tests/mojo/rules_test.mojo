@@ -22,8 +22,6 @@ def test_scalar_rules_match_js() raises:
     assert_equal(rules.DEBT_INTEREST, 0.10)
     assert_equal(rules.BANK_INTEREST, 0.05)
     assert_equal(rules.START_LOCATION, "bronx")
-    assert_equal(rules.GUN_DAMAGE, 5)
-    assert_equal(rules.PLAYER_ARMOR, 100)
     assert_equal(rules.CHEAP_DIVIDE, 10)
     assert_equal(rules.EXPENSIVE_MULTIPLY, 5)
     assert_equal(rules.DEALER_ODDS, 14)

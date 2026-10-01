@@ -42,8 +42,6 @@ PINNED: dict[str, int] = {
     "dw_rules_default_start_health": 100,
     "dw_rules_default_start_coat_capacity": 100,
     "dw_rules_default_start_location_index": 0,
-    "dw_rules_gun_damage": 5,
-    "dw_rules_player_armor": 100,
     "dw_rules_debt_interest_bp": 1000,
     "dw_rules_bank_interest_bp": 500,
     "dw_rules_cheap_divide": 10,
@@ -85,8 +83,8 @@ NOT_FORWARDED: dict[str, str] = {}
 # Written out rather than derived by a prefix rule, for two reasons. First, the
 # rule is not uniform in the way a derived name pretends: the shim drops `dw_`
 # from dw_abi_version and dw_world_* but keeps `rules_` on the rulebook
-# accessors, because a GDScript reader wants `world.rules_gun_damage()`, not
-# `world.gun_damage()` — the prefix says where the number comes from once it is
+# accessors, because a GDScript reader wants `world.rules_cheap_divide()`, not
+# `world.cheap_divide()` — the prefix says where the number comes from once it is
 # sitting next to methods from other subsystems. A single strip rule would encode
 # the opposite choice.
 #
@@ -102,8 +100,6 @@ GD_NAMES: dict[str, str] = {
     "dw_rules_default_start_health": "rules_default_start_health",
     "dw_rules_default_start_coat_capacity": "rules_default_start_coat_capacity",
     "dw_rules_default_start_location_index": "rules_default_start_location_index",
-    "dw_rules_gun_damage": "rules_gun_damage",
-    "dw_rules_player_armor": "rules_player_armor",
     "dw_rules_debt_interest_bp": "rules_debt_interest_bp",
     "dw_rules_bank_interest_bp": "rules_bank_interest_bp",
     "dw_rules_cheap_divide": "rules_cheap_divide",

@@ -188,19 +188,23 @@ func start_chase() -> Dictionary:
 	return _world.start_chase()
 
 
-func get_fight_ratings() -> Dictionary:
-	return _world.get_fight_ratings()
+func run_from_chase() -> Dictionary:
+	return _world.run_from_chase()
+
+
+func stay_in_chase() -> Dictionary:
+	return _world.stay_in_chase()
 
 
 ## `deputies` is the live count from the chase; the core does not track the
-## chase, so the caller carries it between calls.
-func run_from_chase(deputies: int, is_aggressor: bool) -> Dictionary:
-	return _world.run_from_chase(deputies, is_aggressor)
-
-
-## Returns the remaining deputy count, so the caller can keep passing it back.
+## chase, so the caller carries it between calls. Returns the new count, which
+## is below 0 once the chase is won.
 func fight(deputies: int) -> Dictionary:
 	return _world.fight(deputies)
+
+
+func accept_doctor_offer(price: int) -> Dictionary:
+	return _world.accept_doctor_offer(price)
 
 
 func apply_damage(amount: int) -> Dictionary:
@@ -295,14 +299,6 @@ func rules_default_start_coat_capacity() -> int:
 
 func rules_default_start_location_index() -> int:
 	return DopeWarsWorld.rules_default_start_location_index()
-
-
-func rules_gun_damage() -> int:
-	return DopeWarsWorld.rules_gun_damage()
-
-
-func rules_player_armor() -> int:
-	return DopeWarsWorld.rules_player_armor()
 
 
 func rules_debt_interest_bp() -> int:

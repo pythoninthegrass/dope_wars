@@ -147,7 +147,7 @@ func _check_class_surface(world: Object) -> void:
 #
 # This is also why SimWorld re-exports the dw_rules_* accessors as instance
 # methods even though DopeWarsWorld binds them statically: a GDScript
-# `static func` never shows up in get_method_list(), so 18 of the ABI's methods
+# `static func` never shows up in get_method_list(), so 14 of the ABI's methods
 # would be permanently invisible to this check.
 func _forwarded_method_names(world: Object) -> Array[String]:
 	var inherited := {}

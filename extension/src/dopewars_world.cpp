@@ -70,9 +70,10 @@ void DopeWarsWorld::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("should_start_chase"), &DopeWarsWorld::should_start_chase);
 	ClassDB::bind_method(D_METHOD("start_chase"), &DopeWarsWorld::start_chase);
-	ClassDB::bind_method(D_METHOD("get_fight_ratings"), &DopeWarsWorld::get_fight_ratings);
-	ClassDB::bind_method(D_METHOD("run_from_chase", "deputies", "is_aggressor"), &DopeWarsWorld::run_from_chase);
+	ClassDB::bind_method(D_METHOD("run_from_chase"), &DopeWarsWorld::run_from_chase);
+	ClassDB::bind_method(D_METHOD("stay_in_chase"), &DopeWarsWorld::stay_in_chase);
 	ClassDB::bind_method(D_METHOD("fight", "deputies"), &DopeWarsWorld::fight);
+	ClassDB::bind_method(D_METHOD("accept_doctor_offer", "price"), &DopeWarsWorld::accept_doctor_offer);
 	ClassDB::bind_method(D_METHOD("apply_damage", "amount"), &DopeWarsWorld::apply_damage);
 
 	ClassDB::bind_method(D_METHOD("finish"), &DopeWarsWorld::finish);
@@ -90,8 +91,6 @@ void DopeWarsWorld::_bind_methods() {
 	ClassDB::bind_static_method(get_class_static(), D_METHOD("rules_default_start_health"), &DopeWarsWorld::rules_default_start_health);
 	ClassDB::bind_static_method(get_class_static(), D_METHOD("rules_default_start_coat_capacity"), &DopeWarsWorld::rules_default_start_coat_capacity);
 	ClassDB::bind_static_method(get_class_static(), D_METHOD("rules_default_start_location_index"), &DopeWarsWorld::rules_default_start_location_index);
-	ClassDB::bind_static_method(get_class_static(), D_METHOD("rules_gun_damage"), &DopeWarsWorld::rules_gun_damage);
-	ClassDB::bind_static_method(get_class_static(), D_METHOD("rules_player_armor"), &DopeWarsWorld::rules_player_armor);
 	ClassDB::bind_static_method(get_class_static(), D_METHOD("rules_debt_interest_bp"), &DopeWarsWorld::rules_debt_interest_bp);
 	ClassDB::bind_static_method(get_class_static(), D_METHOD("rules_bank_interest_bp"), &DopeWarsWorld::rules_bank_interest_bp);
 	ClassDB::bind_static_method(get_class_static(), D_METHOD("rules_cheap_divide"), &DopeWarsWorld::rules_cheap_divide);
@@ -506,33 +505,34 @@ Dictionary DopeWarsWorld::start_chase() {
 	return out;
 }
 
-Dictionary DopeWarsWorld::get_fight_ratings() {
+Dictionary DopeWarsWorld::run_from_chase() {
 	Dictionary out;
 	if (!is_ready()) {
 		out["result"] = DW_ERR_INVALID_ARGUMENT;
 		return out;
 	}
-	dw_fight_ratings ratings{};
-	dw_result result = dw_get_fight_ratings(world_, &ratings);
+	dw_run_result run{};
+	dw_result result = dw_run_from_chase(world_, &run);
 	out["result"] = result;
-	out["attack"] = ratings.attack;
-	out["defend"] = ratings.defend;
+	out["escaped"] = run.escaped;
+	out["hit"] = run.hit;
+	out["dead"] = run.dead;
+	out["damage_taken"] = run.damage_taken;
 	return out;
 }
 
-Dictionary DopeWarsWorld::run_from_chase(int deputies, bool is_aggressor) {
+Dictionary DopeWarsWorld::stay_in_chase() {
 	Dictionary out;
 	if (!is_ready()) {
 		out["result"] = DW_ERR_INVALID_ARGUMENT;
 		return out;
 	}
-	dw_chase chase{};
-	chase.deputies = static_cast<uint32_t>(deputies);
-	dw_run_result run{};
-	dw_result result = dw_run_from_chase(world_, &chase, is_aggressor ? 1 : 0, &run);
+	dw_stay_result stay{};
+	dw_result result = dw_stay_in_chase(world_, &stay);
 	out["result"] = result;
-	out["escaped"] = run.escaped;
-	out["damage_taken"] = run.damage_taken;
+	out["hit"] = stay.hit;
+	out["dead"] = stay.dead;
+	out["damage_taken"] = stay.damage_taken;
 	return out;
 }
 
@@ -543,15 +543,31 @@ Dictionary DopeWarsWorld::fight(int deputies) {
 		return out;
 	}
 	dw_chase chase{};
-	chase.deputies = static_cast<uint32_t>(deputies);
+	chase.deputies = static_cast<int32_t>(deputies);
 	dw_fight_result fight_result{};
 	dw_result result = dw_fight(world_, &chase, &fight_result);
 	out["result"] = result;
-	out["hit"] = fight_result.hit;
+	out["killed"] = fight_result.killed;
+	out["cop_hit"] = fight_result.cop_hit;
 	out["dead"] = fight_result.dead;
 	out["won"] = fight_result.won;
 	out["damage_taken"] = fight_result.damage_taken;
+	out["reward"] = fight_result.reward;
+	out["doctor_price"] = fight_result.doctor.price;
 	out["deputies"] = chase.deputies;
+	return out;
+}
+
+Dictionary DopeWarsWorld::accept_doctor_offer(int price) {
+	Dictionary out;
+	if (!is_ready()) {
+		out["result"] = DW_ERR_INVALID_ARGUMENT;
+		return out;
+	}
+	dw_doctor_offer offer{};
+	offer.price = static_cast<int32_t>(price);
+	dw_result result = dw_accept_doctor_offer(world_, &offer);
+	out["result"] = result;
 	return out;
 }
 
@@ -742,15 +758,6 @@ int DopeWarsWorld::rules_default_start_coat_capacity() {
 
 int DopeWarsWorld::rules_default_start_location_index() {
 	return dw_rules_default_start_location_index();
-}
-
-int DopeWarsWorld::rules_gun_damage() {
-	return static_cast<int>(dw_rules_gun_damage());
-}
-
-
-int DopeWarsWorld::rules_player_armor() {
-	return static_cast<int>(dw_rules_player_armor());
 }
 
 int DopeWarsWorld::rules_debt_interest_bp() {

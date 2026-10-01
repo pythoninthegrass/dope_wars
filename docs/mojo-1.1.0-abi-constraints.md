@@ -10,7 +10,7 @@ way it is; read this before trying to "just add a pointer parameter".
 "net consequence" (pointer-shaped exports impossible on 1.1.0) was wrong: the
 probe never tried `OptionalPointer` with an explicitly bound *untracked* origin,
 nor the lowercase `size_of[T]()` / `align_of[T]()` intrinsics (it probed only
-`sizeof`/`alignof`). `core/src/abi.mojo` now exports all 54 declarations of
+`sizeof`/`alignof`). `core/src/abi.mojo` now exports all 53 declarations of
 `include/dopewars.h` on the pinned toolchain. The spelling that works is in
 "The spelling that works" below; everything above it documents the dead ends,
 which are real dead ends.
@@ -142,7 +142,7 @@ writes it into the caller's buffer, and `World` is plain data (fixed
 `Array` + length fields, no heap) so the whole lifecycle crosses the seam
 without a Mojo-side allocation the caller cannot free.
 
-Evidence this is not a paper claim: `check_abi_exports.py` reports 56/56
+Evidence this is not a paper claim: `check_abi_exports.py` reports 53/53
 declarations exported from `core/build-output/lib/libdopewars.a` with 0 leaked,
 `core/abitest/` drives the pointer-shaped functions through ctypes and through
 `std.ffi.external_call`, and both bridge tests cross them under Godot — all on

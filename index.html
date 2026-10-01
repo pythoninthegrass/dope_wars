@@ -647,8 +647,6 @@
       debtInterest: 0.10,
       bankInterest: 0.05, // beermat-verified (TASK-009): 5%/turn, matches docs/gameplay.md's C-source figure, not the Keymash-only 2%
       startLocation: 'bronx',
-      gunDamage: 5,
-      playerArmor: 100,
       locations: [
         { id: 'bronx', name: 'Bronx' },
         { id: 'ghetto', name: 'Ghetto' },
@@ -976,38 +974,46 @@
       };
     }
 
-    function getFightRatings(state) {
-      let attack = 80 + state.guns * RULES.gunDamage;
-      let defend = 100;
-      attack = Math.max(10, attack);
-      defend = Math.max(10, defend);
-      return { attack, defend };
+    // One volley from the cops (docs/beermat-re.md, M-07): Random(2), 1 hits for Random(11) + 5.
+    function copsFire(state, rng) {
+      if (randInt(rng, 0, 1) !== 1) return { hit: false, damage: 0, dead: state.dead };
+      const damage = randInt(rng, 5, 15);
+      applyDamage(state, damage);
+      return { hit: true, damage, dead: state.dead };
     }
 
-    function runFromChase(state, chase, isAggressor, rng) {
-      const chance = isAggressor ? 0.30 : 0.60;
-      const escaped = rng() < chance;
-      if (!escaped) {
-        const dmg = randInt(rng, 3, 12);
-        applyDamage(state, dmg);
-      }
-      return { escaped };
+    // Run escapes on Random(6) < 3, whatever the player carries; otherwise the cops fire.
+    function runFromChase(state, chase, rng) {
+      if (randInt(rng, 0, 5) < 3) return { escaped: true, hit: false, damage: 0, dead: state.dead };
+      return { escaped: false, ...copsFire(state, rng) };
     }
 
+    function stayInChase(state, rng) {
+      return copsFire(state, rng);
+    }
+
+    // The player's shot kills a deputy on Random(2) == 1; the chase is won once the count is below 0 (docs/beermat-re.md, M-08).
     function fight(state, chase, rng) {
-      const ratings = getFightRatings(state);
-      const attackRoll = randInt(rng, 0, ratings.attack);
-      const defendRoll = randInt(rng, 0, ratings.defend);
-      const hit = attackRoll > defendRoll;
-      let damage = 0;
-      if (hit) {
-        chase.deputies = Math.max(0, chase.deputies - 1);
-      } else {
-        const raw = randInt(rng, 0, RULES.gunDamage);
-        damage = Math.max(1, Math.round(raw * (100 / RULES.playerArmor)));
-        applyDamage(state, damage);
+      if (state.guns <= 0) return { ok: false };
+      const killed = randInt(rng, 0, 1) === 1;
+      if (killed) chase.deputies -= 1;
+      if (chase.deputies < 0) {
+        const doctorPrice = randInt(rng, 1000, 1999);
+        const reward = doctorPrice + randInt(rng, 0, 1499);
+        state.cash += reward;
+        state.guns += 1;
+        return { ok: true, killed, copHit: false, damage: 0, dead: false, won: true, reward, doctor: { price: doctorPrice } };
       }
-      return { hit, damage, dead: state.dead, won: chase.deputies <= 0 };
+      const fire = copsFire(state, rng);
+      return { ok: true, killed, copHit: fire.hit, damage: fire.damage, dead: fire.dead, won: false, reward: 0, doctor: { price: 0 } };
+    }
+
+    // The doctor is always offered after a win; accepting pays the price from cash and restores full health (M-09).
+    function acceptDoctorOffer(state, offer) {
+      if (offer.price > state.cash) return { ok: false };
+      state.cash -= offer.price;
+      state.health = RULES.startHealth;
+      return { ok: true };
     }
 
     function finish(state) {
@@ -1057,9 +1063,10 @@
       acceptGunOffer,
       shouldStartChase,
       startChase,
-      getFightRatings,
       runFromChase,
+      stayInChase,
       fight,
+      acceptDoctorOffer,
       applyDamage,
       finish,
       insertHighScore,
@@ -1456,10 +1463,10 @@
 
     function runCopChase(queue) {
       const chase = E.startChase(state, state.rng);
-      renderChaseDialog(chase, queue, false);
+      renderChaseDialog(chase, queue);
     }
 
-    function renderChaseDialog(chase, queue, wasAggressor) {
+    function renderChaseDialog(chase, queue) {
       openDialog(`
         <div class="titlebar"><span class="titlebar-title">Cop Chase!</span></div>
         <div class="dialog-body">
@@ -1480,32 +1487,58 @@
           </div>
         </div>
       `);
+      const again = () => renderChaseDialog(chase, queue);
+      const copsLine = (fire) => (fire.hit ? "They're firing on you, man! You've been hit!" : "They're firing on you, man! They missed!");
       document.getElementById('chaseRun').addEventListener('click', () => {
-        const res = E.runFromChase(state, chase, wasAggressor, state.rng);
+        const res = E.runFromChase(state, chase, state.rng);
         if (state.dead) { handleDeath(); return; }
         if (res.escaped) {
           showAlert('Cop Chase', 'You lost them in the alleys.', '\u{1F3C3}');
           document.getElementById('alertOk').addEventListener('click', () => { render(); processQueue(queue); }, { once: true });
         } else {
-          showAlert('Cop Chase', "They're firing on you, man! You've been hit!", '\u{1F4A5}');
-          document.getElementById('alertOk').addEventListener('click', () => renderChaseDialog(chase, queue, wasAggressor), { once: true });
+          showAlert('Cop Chase', `You can't get away ! ${copsLine(res)}`, '\u{1F4A5}');
+          document.getElementById('alertOk').addEventListener('click', again, { once: true });
         }
       });
       document.getElementById('chaseStay').addEventListener('click', () => {
-        showAlert('Cop Chase', 'You stand your ground and wait for them to close in.', '⏳');
-        document.getElementById('alertOk').addEventListener('click', () => renderChaseDialog(chase, queue, wasAggressor), { once: true });
+        const res = E.stayInChase(state, state.rng);
+        if (state.dead) { handleDeath(); return; }
+        showAlert('Cop Chase', `You stand there like an idiot. ${copsLine(res)}`, '\u{1F4A5}');
+        document.getElementById('alertOk').addEventListener('click', again, { once: true });
       });
       document.getElementById('chaseFight').addEventListener('click', () => {
         const res = E.fight(state, chase, state.rng);
+        if (!res.ok) { again(); return; }
         if (state.dead) { handleDeath(); return; }
         if (res.won) {
-          showAlert('Cop Chase', 'You took them all down! You got away!', '\u{1F3C3}');
-          document.getElementById('alertOk').addEventListener('click', () => { render(); processQueue(queue); }, { once: true });
+          showAlert('Cop Chase', 'You killed them all!', '\u{1F3C3}');
+          document.getElementById('alertOk').addEventListener('click', () => offerDoctor(res, queue), { once: true });
           return;
         }
-        const msg = res.hit ? `You hit a deputy! ${chase.deputies} left.` : `You got hit for ${res.damage} damage!`;
-        showAlert('Cop Chase', msg, res.hit ? '\u{1F4A8}' : '\u{1F4A5}');
-        document.getElementById('alertOk').addEventListener('click', () => renderChaseDialog(chase, queue, wasAggressor), { once: true });
+        const shot = res.killed ? "You're firing on them! You killed one!" : "You're firing on them! You missed them!";
+        showAlert('Cop Chase', `${shot} ${copsLine({ hit: res.copHit })}`, res.killed ? '\u{1F4A8}' : '\u{1F4A5}');
+        document.getElementById('alertOk').addEventListener('click', again, { once: true });
+      });
+    }
+
+    // Beermat always offers the doctor after a win (docs/beermat-re.md, M-09); the reward is already in cash.
+    function offerDoctor(win, queue) {
+      openDialog(`
+        <div class="titlebar"><span class="titlebar-title">Confirm</span></div>
+        <div class="dialog-body">
+          <div>You find a gun and $${win.reward} on Officer Hardass' carcass. Will you pay $${win.doctor.price} to have a doctor sew you up?</div>
+          <div class="dialog-buttons">
+            <button type="button" id="doctorBuy">Yes</button>
+            <button type="button" id="doctorDecline">No</button>
+          </div>
+        </div>
+      `);
+      document.getElementById('doctorBuy').addEventListener('click', () => {
+        E.acceptDoctorOffer(state, win.doctor);
+        closeDialog(); render(); processQueue(queue);
+      });
+      document.getElementById('doctorDecline').addEventListener('click', () => {
+        closeDialog(); render(); processQueue(queue);
       });
     }
 

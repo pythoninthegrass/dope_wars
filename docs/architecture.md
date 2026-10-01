@@ -32,7 +32,7 @@ versioning).
   `dw_world_size()` bytes and calls `dw_world_init`), `dw_result` return
   codes, `uint8_t`-typedef'd kind enums, `DW_STATIC_ASSERT` on every struct
   sizeof, two-call length-then-fill for every variable-length buffer.
-  `DW_ABI_VERSION` (currently 7 — see "ABI version history" below) bumps on
+  `DW_ABI_VERSION` (currently 8 — see "ABI version history" below) bumps on
   breaking changes only; additive changes don't bump it.
 - **`extension/` — C++ GDExtension shim.** 1:1 forwarding from ABI functions
   to a Godot class (`DopeWarsWorld`, registered in
@@ -134,6 +134,14 @@ direction.
   order; `DW_ARRIVAL_MAMAS_BROWNIES`, `DW_ARRIVAL_FREE_WEED_DEATH` and
   `DW_ARRIVAL_FLAVOR` are removed and `dw_arrival_event.damage` becomes
   `blocks` (24 bytes either way).
+- **v8** — TASK-010.02.07: Beermat's chase resolution. Run escapes on
+  `Random(6) < 3` and otherwise the cops fire (`Random(2)`, then
+  `Random(11) + 5` damage), changing RNG draw order. `dw_run_from_chase` loses
+  its `chase` and `is_aggressor` parameters, `dw_get_fight_ratings`,
+  `dw_fight_ratings`, `dw_rules_gun_damage` and `dw_rules_player_armor` are
+  removed, `dw_stay_in_chase` and `dw_accept_doctor_offer` are new,
+  `dw_chase.deputies` is signed (below 0 is a win), and `dw_fight_result`
+  grows from 8 to 16 bytes to carry the win reward and the doctor offer.
 
 ## Mojo LOC share
 

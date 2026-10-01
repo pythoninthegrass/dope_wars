@@ -81,9 +81,10 @@ test asserts it, because the corpus has no step that reaches it.
 | `acceptGunOffer` | `dealers.mojo` | fixture 05 |
 | `shouldStartChase` | `combat.mojo` | fixture 10 |
 | `startChase` | `combat.mojo` | fixture 06 |
-| `getFightRatings` | `combat.mojo` | fixture 10 |
 | `runFromChase` | `combat.mojo` | fixture 06 |
+| `stayInChase` | `combat.mojo` | fixture 06 |
 | `fight` | `combat.mojo` | fixture 06 |
+| `acceptDoctorOffer` | `combat.mojo` | fixture 06 |
 | `applyDamage` | `events.mojo` | fixture 10 |
 | `finish` | `score.mojo` | fixture 07 |
 | `insertHighScore` | `score.mojo` | fixture 07 |

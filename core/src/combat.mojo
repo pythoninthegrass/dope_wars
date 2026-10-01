@@ -1,18 +1,17 @@
-# core/src/combat.mojo — the cop chase and the fight.
+# core/src/combat.mojo — the cop chase: start, run, stay, fight and the doctor.
 #
-# Ported from shouldStartChase / startChase / getFightRatings / runFromChase /
-# fight in index.html:971-1019.
+# Ported from shouldStartChase / startChase / runFromChase / stayInChase /
+# fight / acceptDoctorOffer in index.html (docs/beermat-re.md, M-04, M-07 to M-09).
 #
 # shouldStartChase is Beermat's Random(6) == 0: a flat 1 in 6 at every location.
-#
-# fight compares one attack roll against one defend roll. A hit removes a
-# deputy; a miss costs the player health, scaled by armour. The damage formula
-# is `max(1, round(raw * (100 / playerArmor)))`, and playerArmor is 100, so it
-# currently reduces to `max(1, raw)` -- but the armour term is kept because it
-# is part of the rule, not an accident of the current constant.
+# Run escapes on Random(6) < 3 whatever the player carries. Anything but an
+# escape (and Stay) lets the cops fire: Random(2), 1 hits for Random(11) + 5.
+# Fight is the player's shot (Random(2), 1 kills a deputy) and then, while the
+# deputy count is still 0 or more, the cops' return fire. Dropping below 0 wins:
+# +1 gun, (Random(1000) + 1000) + Random(1500) cash, and a doctor offer priced
+# at the first term.
 
 import events
-import jsmath
 import result
 import rules
 import rng as rng_mod
@@ -26,26 +25,53 @@ struct Chase(Copyable, Movable):
         self.deputies = deputies
 
 
-struct FightRatings(Copyable, Movable):
-    var attack: Int64
-    var defend: Int64
-
-    def __init__(out self, attack: Int64, defend: Int64):
-        self.attack = attack
-        self.defend = defend
-
-
-struct FightResult(Copyable, Movable):
+struct CopFire(Copyable, Movable):
     var hit: Bool
     var damage: Int64
     var dead: Bool
-    var won: Bool
 
-    def __init__(out self, hit: Bool, damage: Int64, dead: Bool, won: Bool):
+    def __init__(out self, hit: Bool, damage: Int64, dead: Bool):
         self.hit = hit
         self.damage = damage
         self.dead = dead
+
+
+struct RunResult(Copyable, Movable):
+    var escaped: Bool
+    var fire: CopFire
+
+    def __init__(out self, escaped: Bool, fire: CopFire):
+        self.escaped = escaped
+        self.fire = fire.copy()
+
+
+struct DoctorOffer(Copyable, Movable):
+    var price: Int64
+
+    def __init__(out self, price: Int64):
+        self.price = price
+
+
+struct FightResult(Copyable, Movable):
+    var killed: Bool
+    var fire: CopFire
+    var won: Bool
+    var reward: Int64
+    var doctor: DoctorOffer
+
+    def __init__(
+        out self,
+        killed: Bool,
+        fire: CopFire,
+        won: Bool,
+        reward: Int64,
+        doctor: DoctorOffer,
+    ):
+        self.killed = killed
+        self.fire = fire.copy()
         self.won = won
+        self.reward = reward
+        self.doctor = doctor.copy()
 
 
 def should_start_chase(mut game: world.World) raises -> Bool:
@@ -61,44 +87,43 @@ def start_chase(mut game: world.World) raises -> Chase:
     return Chase(deputies)
 
 
-def get_fight_ratings(ref game: world.World) -> FightRatings:
-    var attack = 80 + game.guns * rules.GUN_DAMAGE
-    var defend: Int64 = 100
-    if attack < 10:
-        attack = 10
-    if defend < 10:
-        defend = 10
-    return FightRatings(attack, defend)
+# One volley from the cops: Random(2), 1 hits for Random(11) + 5 damage.
+def _cops_fire(mut game: world.World) raises -> CopFire:
+    if rng_mod.rand_int(game.rng, 0, 1) != 1:
+        return CopFire(False, 0, game.dead)
+    var damage = rng_mod.rand_int(game.rng, 5, 15)
+    _ = events.apply_damage(game, damage)
+    return CopFire(True, damage, game.dead)
 
 
-def run_from_chase(
-    mut game: world.World, chase: Chase, is_aggressor: Bool
-) raises -> Bool:
-    # Fleeing is harder when you started it.
-    var chance = 0.60
-    if is_aggressor:
-        chance = 0.30
-    var escaped = game.rng.next() < chance
-    if not escaped:
-        var damage = rng_mod.rand_int(game.rng, 3, 12)
-        _ = events.apply_damage(game, damage)
-    return escaped
+def run_from_chase(mut game: world.World) raises -> RunResult:
+    if rng_mod.rand_int(game.rng, 0, 5) < 3:
+        return RunResult(True, CopFire(False, 0, game.dead))
+    return RunResult(False, _cops_fire(game))
 
 
+def stay_in_chase(mut game: world.World) raises -> CopFire:
+    return _cops_fire(game)
+
+
+# The caller has checked the player owns a gun. The count goes below 0 on the last kill.
 def fight(mut game: world.World, mut chase: Chase) raises -> FightResult:
-    var ratings = get_fight_ratings(game)
-    var attack_roll = rng_mod.rand_int(game.rng, 0, ratings.attack)
-    var defend_roll = rng_mod.rand_int(game.rng, 0, ratings.defend)
-    var hit = attack_roll > defend_roll
-    var damage: Int64 = 0
-    if hit:
+    var killed = rng_mod.rand_int(game.rng, 0, 1) == 1
+    if killed:
         chase.deputies -= 1
-        if chase.deputies < 0:
-            chase.deputies = 0
-    else:
-        var raw = rng_mod.rand_int(game.rng, 0, rules.GUN_DAMAGE)
-        damage = jsmath.js_round(Float64(raw) * (100.0 / Float64(rules.PLAYER_ARMOR)))
-        if damage < 1:
-            damage = 1
-        _ = events.apply_damage(game, damage)
-    return FightResult(hit, damage, game.dead, chase.deputies <= 0)
+    if chase.deputies < 0:
+        var doctor_price = rng_mod.rand_int(game.rng, 1000, 1999)
+        var reward = doctor_price + rng_mod.rand_int(game.rng, 0, 1499)
+        game.cash += Float64(reward)
+        game.guns += 1
+        return FightResult(killed, CopFire(False, 0, False), True, reward, DoctorOffer(doctor_price))
+    return FightResult(killed, _cops_fire(game), False, 0, DoctorOffer(0))
+
+
+# The doctor is always offered after a win; accepting pays the price from cash and restores full health.
+def accept_doctor_offer(mut game: world.World, offer: DoctorOffer) -> Int:
+    if Float64(offer.price) > game.cash:
+        return result.ERR_INSUFFICIENT_CASH
+    game.cash -= Float64(offer.price)
+    game.health = rules.START_HEALTH
+    return result.OK

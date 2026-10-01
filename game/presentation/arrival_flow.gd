@@ -147,47 +147,67 @@ func _present_chase() -> void:
 	_dialogs.open(dialog, func(key: String) -> void: _on_chase_action(key, dialog))
 
 
-## The prototype always passes was_aggressor = false -- nothing in its flow
-## ever set it true (index.html:1474 and every re-render through :1523) -- so
-## the run chance is always the 60% escape roll, not the 30% one.
-func _on_chase_action(key: String, dialog: ChaseDialog) -> void:
+func _on_chase_action(key: String, _dialog: ChaseDialog) -> void:
 	var deputies := int(_chase["deputies"])
 
 	match key:
 		"chaseRun":
-			var run := _world.run_from_chase(deputies, false)
-			if _is_dead():
+			var run := _world.run_from_chase()
+			if bool(run.get("dead", false)):
 				_on_died.call()
 				return
 			if bool(run.get("escaped", false)):
 				_chase = {}
 				_present_alert(Copy.DLG_COP_CHASE, tr(Copy.MSG_CHASE_ESCAPED), AlertDialog.ICON_FLAG)
 				return
-			# A miss is not terminal: the cops are still on you, so re-present.
-			_present_alert(Copy.DLG_COP_CHASE, tr(Copy.MSG_CHASE_FIRED_ON), AlertDialog.ICON_BULLET)
+			# A failed run is not terminal: the cops fired and are still on you, so re-present.
+			var run_message := Copy.MSG_CHASE_RUN_HIT if bool(run.get("hit", false)) else Copy.MSG_CHASE_RUN_MISSED
+			_present_alert(Copy.DLG_COP_CHASE, tr(run_message), AlertDialog.ICON_BULLET)
 			return
 		"chaseStay":
-			_present_alert(Copy.DLG_COP_CHASE, tr(Copy.MSG_CHASE_STAND_GROUND), AlertDialog.ICON_HOURGLASS)
+			var stay := _world.stay_in_chase()
+			if bool(stay.get("dead", false)):
+				_on_died.call()
+				return
+			var stay_message := Copy.MSG_CHASE_STAY_HIT if bool(stay.get("hit", false)) else Copy.MSG_CHASE_STAY_MISSED
+			_present_alert(Copy.DLG_COP_CHASE, tr(stay_message), AlertDialog.ICON_BULLET)
 			return
 		"chaseFight":
 			var fight := _world.fight(deputies)
-			if bool(fight.get("dead", false)) or _is_dead():
+			if int(fight.get("result", SimWorld.ERR_INVALID_ARGUMENT)) != SimWorld.OK:
+				_advance()
+				return
+			if bool(fight.get("dead", false)):
 				_on_died.call()
 				return
 			if bool(fight.get("won", false)):
 				_chase = {}
-				_present_alert(Copy.DLG_COP_CHASE, tr(Copy.MSG_CHASE_WON), AlertDialog.ICON_FLAG)
+				_present_win(int(fight.get("reward", 0)), int(fight.get("doctor_price", 0)))
 				return
 			_chase = _chase.duplicate()
 			_chase["deputies"] = int(fight.get("deputies", deputies))
+			var killed := bool(fight.get("killed", false))
 			_present_alert(
 				Copy.DLG_COP_CHASE,
-				Copy.fight_message(bool(fight.get("hit", false)), int(_chase["deputies"]), int(fight.get("damage_taken", 0))),
-				AlertDialog.ICON_DAGGER if bool(fight.get("hit", false)) else AlertDialog.ICON_BULLET
+				Copy.fight_message(killed, bool(fight.get("cop_hit", false))),
+				AlertDialog.ICON_DAGGER if killed else AlertDialog.ICON_BULLET
 			)
 			return
 
 	_advance()
+
+
+## The kill message, then the doctor offer the core priced in the same call.
+func _present_win(reward: int, doctor_price: int) -> void:
+	_dialogs.open(AlertDialog.new().present(Copy.DLG_COP_CHASE, tr(Copy.MSG_CHASE_WON), AlertDialog.ICON_FLAG), func(_key: String) -> void:
+		state_changed.emit()
+		var dialog := DoctorDialog.new().present(reward, doctor_price)
+		_dialogs.open(dialog, func(answer: String) -> void:
+			if answer == "doctorYes":
+				_world.accept_doctor_offer(dialog.price)
+			_advance()
+		)
+	)
 
 
 func _is_dead() -> bool:
