@@ -108,23 +108,17 @@ struct ArrivalEventView(Copyable, Movable):
 
 @fieldwise_init
 struct CoatOfferView(Copyable, Movable):
-    var pockets: UInt32
     var price: Int32
+    var offered: UInt8
+    var _pad0: Array[UInt8, 3]
 
 
 @fieldwise_init
 struct GunOfferView(Copyable, Movable):
     var price: Int32
-    var damage: UInt32
-    var space: UInt32
-    var _pad0: UInt32
-
-
-@fieldwise_init
-struct PurchaseResultView(Copyable, Movable):
-    var used_bank: UInt8
+    var name_index: UInt32
+    var offered: UInt8
     var _pad0: Array[UInt8, 3]
-    var fee: Int32
 
 
 @fieldwise_init
@@ -185,7 +179,6 @@ comptime DW_ERR_UNKNOWN_LOCATION = Int32(4)
 comptime DW_ERR_UNKNOWN_DRUG = Int32(5)
 comptime DW_ERR_NOT_TRADED_HERE = Int32(6)
 comptime DW_ERR_INSUFFICIENT_CASH = Int32(7)
-comptime DW_ERR_INSUFFICIENT_BANK = Int32(8)
 comptime DW_ERR_INSUFFICIENT_INVENTORY = Int32(9)
 comptime DW_ERR_INSUFFICIENT_SPACE = Int32(10)
 comptime DW_ERR_GAME_OVER = Int32(11)
@@ -213,7 +206,7 @@ def _world() -> Pointer[UInt8, origin=MutUntrackedOrigin]:
 
 
 def _config(seed: UInt32, num_days: UInt32 = 0, start_cash: Int32 = -1) -> Config:
-    return Config(UInt16(5), UInt16(0), seed, num_days, start_cash)
+    return Config(UInt16(6), UInt16(0), seed, num_days, start_cash)
 
 
 def _init(
@@ -332,8 +325,7 @@ def test_struct_sizes_match_header() raises:
     assert_equal(size_of[PriceEventView](), 8)
     assert_equal(size_of[ArrivalEventView](), 24)
     assert_equal(size_of[CoatOfferView](), 8)
-    assert_equal(size_of[GunOfferView](), 16)
-    assert_equal(size_of[PurchaseResultView](), 8)
+    assert_equal(size_of[GunOfferView](), 12)
     assert_equal(size_of[ChaseView](), 8)
     assert_equal(size_of[FightRatingsView](), 8)
     assert_equal(size_of[RunResultView](), 8)
@@ -449,10 +441,11 @@ def test_every_result_code_is_reachable() raises:
     var present = _drug_in_roster(broke)
     assert_equal(external_call["dw_buy", Int32](broke, UInt32(present), UInt32(1)), DW_ERR_INSUFFICIENT_CASH)
 
-    # DW_ERR_INSUFFICIENT_BANK: cash 0, bank 0, coat offer costs money
-    var offer = CoatOfferView(UInt32(10), Int32(100))
-    var purchase = PurchaseResultView(UInt8(0), Array[UInt8, 3](fill=0), Int32(0))
-    assert_equal(external_call["dw_accept_coat_offer", Int32](broke, Pointer(to=offer), Pointer(to=purchase)), DW_ERR_INSUFFICIENT_BANK)
+    # DW_ERR_INSUFFICIENT_CASH again, from a dealer: cash 0, the coat offer costs money
+    var offer = CoatOfferView(Int32(100), UInt8(1), Array[UInt8, 3](fill=0))
+    var pockets: UInt32 = 0
+    assert_equal(external_call["dw_accept_coat_offer", Int32](broke, Pointer(to=offer), Pointer(to=pockets)), DW_ERR_INSUFFICIENT_CASH)
+    assert_equal(pockets, UInt32(0))
 
     # DW_ERR_INSUFFICIENT_INVENTORY
     assert_equal(external_call["dw_sell", Int32](ptr, UInt32(present), UInt32(1)), DW_ERR_INSUFFICIENT_INVENTORY)
@@ -671,11 +664,9 @@ def test_rules_accessors() raises:
     assert_equal(external_call["dw_rules_default_start_coat_capacity", Int32](), Int32(100))
     assert_equal(external_call["dw_rules_default_start_location_index", Int32](), Int32(0))
     assert_equal(external_call["dw_rules_gun_damage", UInt32](), UInt32(5))
-    assert_equal(external_call["dw_rules_gun_space", UInt32](), UInt32(4))
     assert_equal(external_call["dw_rules_player_armor", UInt32](), UInt32(100))
     assert_equal(external_call["dw_rules_debt_interest_bp", UInt32](), UInt32(1000))
     assert_equal(external_call["dw_rules_bank_interest_bp", UInt32](), UInt32(500))
-    assert_equal(external_call["dw_rules_bank_purchase_fee_bp", UInt32](), UInt32(2500))
     assert_equal(external_call["dw_rules_cheap_divide", UInt32](), UInt32(10))
     assert_equal(external_call["dw_rules_expensive_multiply", UInt32](), UInt32(5))
 
@@ -777,25 +768,31 @@ def test_finances_moves_money() raises:
 def test_dealer_offers_and_purchases() raises:
     var ptr = _world()
     assert_equal(_init(ptr, UInt32(7)), DW_OK)
-    var coat = CoatOfferView(UInt32(0), Int32(0))
+    var kind: UInt8 = 9
+    assert_equal(external_call["dw_roll_dealer_visit", Int32](ptr, Pointer(to=kind)), DW_OK)
+    assert_true(kind <= 2)
+
+    # The start cash is above every price, so both offers are made.
+    var coat = CoatOfferView(Int32(0), UInt8(0), Array[UInt8, 3](fill=0))
     assert_equal(external_call["dw_roll_coat_dealer_offer", Int32](ptr, Pointer(to=coat)), DW_OK)
-    assert_true(coat.pockets >= 10 and coat.pockets <= 30)
-    assert_true(coat.price >= 200 and coat.price <= 500)
+    assert_true(coat.price >= 201 and coat.price <= 350)
+    assert_equal(coat.offered, UInt8(1))
 
-    var purchase = PurchaseResultView(UInt8(0), Array[UInt8, 3](fill=0), Int32(0))
-    assert_equal(external_call["dw_accept_coat_offer", Int32](ptr, Pointer(to=coat), Pointer(to=purchase)), DW_OK)
-    assert_equal(_state(ptr).coat_capacity, Int32(100) + Int32(coat.pockets))
+    var pockets: UInt32 = 0
+    assert_equal(external_call["dw_accept_coat_offer", Int32](ptr, Pointer(to=coat), Pointer(to=pockets)), DW_OK)
+    assert_true(pockets >= 11 and pockets <= 20)
+    assert_equal(_state(ptr).coat_capacity, Int32(100) + Int32(pockets))
+    assert_equal(_state(ptr).cash, Int32(2000) - coat.price)
 
-    var gun = GunOfferView(Int32(0), UInt32(0), UInt32(0), UInt32(0))
+    var gun = GunOfferView(Int32(0), UInt32(0), UInt8(0), Array[UInt8, 3](fill=0))
     assert_equal(external_call["dw_roll_gun_dealer_offer", Int32](ptr, Pointer(to=gun)), DW_OK)
-    assert_equal(gun.damage, UInt32(5))
-    assert_equal(gun.space, UInt32(4))
-    assert_equal(external_call["dw_accept_gun_offer", Int32](ptr, Pointer(to=gun), Pointer(to=purchase)), DW_OK)
+    assert_true(gun.price >= 301 and gun.price <= 550)
+    assert_true(gun.name_index <= 3)
+    assert_equal(gun.offered, UInt8(1))
+    assert_equal(external_call["dw_accept_gun_offer", Int32](ptr, Pointer(to=gun)), DW_OK)
     assert_equal(_state(ptr).guns, UInt32(1))
-    # One gun with zero drugs held is 4 used slots: the gun's space, not a
-    # defect. This is the state the trenchcoat indicator renders as 4/100
-    # (docs/gameplay.md "Inventory"; index.html:711-716).
-    assert_equal(_state(ptr).coat_used, Int32(4))
+    # A gun takes no coat space.
+    assert_equal(_state(ptr).coat_used, Int32(0))
 
 
 def test_combat_flow() raises:

@@ -39,7 +39,7 @@ const EXPECTED_ASSERTIONS := {
 	"determinism": 5,
 	"rules_surface": 7,
 	"prev_prices": 6,
-	"dealer_visits": 10,
+	"dealer_visits": 14,
 }
 
 ## Coarse backstop for the harness itself: if every case reports but the total
@@ -360,42 +360,58 @@ func _test_prev_prices() -> void:
 	_assert(carried_verbatim, "a previous price should equal the day-one price for the same drug")
 
 
-## dw_roll_dealer_visits is the one addition that consumes RNG, so the
-## properties worth pinning are that it is deterministic for a seed, that it
-## advances the stream by exactly two draws, and that a dead player gets no
-## dealer even though the draws still happen.
+## The dealer rolls consume RNG, so the properties worth pinning are that the
+## visit roll is deterministic for a seed and advances the stream, and that
+## the offers and acceptances follow the cash-only rules.
 func _test_dealer_visits() -> void:
 	var a := _new_world(11)
 	var b := _new_world(11)
-	var first: Dictionary = a.roll_dealer_visits()
-	var second: Dictionary = b.roll_dealer_visits()
-	_assert(first["result"] == SimWorld.OK, "roll_dealer_visits should succeed")
+	var first: Dictionary = a.roll_dealer_visit()
+	var second: Dictionary = b.roll_dealer_visit()
+	_assert(first["result"] == SimWorld.OK, "roll_dealer_visit should succeed")
+	_assert(first["kind"] == second["kind"], "the same seed should produce the same dealer visit")
 	_assert(
-		first["coat_visit"] == second["coat_visit"] and first["gun_visit"] == second["gun_visit"],
-		"the same seed should produce the same dealer visits",
+		[SimWorld.DEALER_NONE, SimWorld.DEALER_COAT, SimWorld.DEALER_GUN].has(int(first["kind"])),
+		"the visit kind should be one of the three dealer kinds",
 	)
 
-	# Each call consumes two draws, so a second call on the same world has to
-	# land on a different pair of RNG values.
-	var after: Dictionary = a.roll_dealer_visits()
-	_assert(after["result"] == SimWorld.OK, "a second roll_dealer_visits should succeed")
+	a.roll_dealer_visit()
 	_assert(
 		a.world_dump()["bytes"] != b.world_dump()["bytes"],
-		"rolling the dealer visits should advance the world's RNG stream",
+		"rolling the dealer visit should advance the world's RNG stream",
 	)
 
-	# A dead player is never visited, but the roll is still spent -- the JS
-	# evaluates state.rng() before the !state.dead guard.
-	var dead := _new_world(11)
-	dead.apply_damage(100)
-	var suppressed: Dictionary = dead.roll_dealer_visits()
+	# The start cash (2000) is above every price, so both offers are made.
+	var coat: Dictionary = a.roll_coat_dealer_offer()
+	var price := int(coat["price"])
+	_assert(price >= 201 and price <= 350 and bool(coat["offered"]), "a coat offer should be 201-350 and offered")
+	var before: Dictionary = a.state_get()
+	var bought: Dictionary = a.accept_coat_offer(price)
+	var after_coat: Dictionary = a.state_get()
+	var pockets := int(bought["pockets"])
+	_assert(pockets >= 11 and pockets <= 20, "a coat purchase should add 11-20 pockets")
 	_assert(
-		not bool(suppressed["coat_visit"]) and not bool(suppressed["gun_visit"]),
-		"a dead player should be visited by neither dealer",
+		int(after_coat["coat_capacity"]) == int(before["coat_capacity"]) + pockets
+		and int(after_coat["cash"]) == int(before["cash"]) - price,
+		"a coat purchase should add the pockets and take the price from cash",
 	)
-	var live_twin := _new_world(11)
-	live_twin.roll_dealer_visits()
+
+	var gun: Dictionary = a.roll_gun_dealer_offer()
+	var gun_price := int(gun["price"])
 	_assert(
-		dead.world_dump()["bytes"] != live_twin.world_dump()["bytes"],
-		"a dead player's dealer roll should still consume its draws",
+		gun_price >= 301 and gun_price <= 550 and int(gun["name_index"]) >= 0 and int(gun["name_index"]) <= 3 and bool(gun["offered"]),
+		"a gun offer should be 301-550, offered, with a name index 0-3",
 	)
+	var gun_bought: Dictionary = a.accept_gun_offer(gun_price, int(gun["name_index"]))
+	var after_gun: Dictionary = a.state_get()
+	_assert(
+		int(gun_bought["result"]) == SimWorld.OK and int(after_gun["guns"]) == 1 and int(after_gun["coat_used"]) == int(after_coat["coat_used"]),
+		"a gun purchase should add one gun and no coat space",
+	)
+
+	# Cash only: with no cash a purchase is refused, whatever the bank holds.
+	var broke := _new_world(11)
+	broke.finances(SimWorld.FINANCES_DEPOSIT, 2000)
+	var refused: Dictionary = broke.accept_coat_offer(300)
+	_assert(int(refused["result"]) == SimWorld.ERR_INSUFFICIENT_CASH, "a coat purchase should not draw on the bank")
+	_assert(int(broke.accept_gun_offer(400, 0)["result"]) == SimWorld.ERR_INSUFFICIENT_CASH, "a gun purchase should not draw on the bank")

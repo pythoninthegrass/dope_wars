@@ -48,9 +48,9 @@ const ALLOWED = [
   'prices.*', 'prevPrices.*', 'inventory.*.qty', 'inventory.*.avgPrice',
   'priceEvents.*.type', 'priceEvents.*.drug',
   // trade / travel / finances / dealer / combat results
-  'ok', 'reason', 'amount', 'usedBank', 'fee', 'pockets', 'escaped', 'hit',
+  'ok', 'reason', 'amount', 'pockets', 'escaped', 'hit',
   'damage', 'won', 'cop', 'deputies', 'canFight', 'score', 'dead', 'day',
-  'attack', 'defend', 'space',
+  'attack', 'defend',
   // a call that returns a bare scalar (shouldStartChase -> bool,
   // applyDamage -> health) has no field name, so it lands under `.value`.
   'value',
@@ -61,8 +61,8 @@ const ALLOWED = [
   '*.type', '*.drug', '*.qty',
   // runner-helper results
   'drug', 'price', 'equal', 'scores',
-  // rollDealerVisits helper return (the two reported dealer visits)
-  'coat', 'gun',
+  // dealer visit kind and offers
+  'kind', 'offered', 'nameIndex',
   // high-score entries, in ranked order (fixture 07 checks top-10 truncation)
   'scores.*.name', 'scores.*.score', 'scores.*.day', 'scores.*.dead',
   'scores.*.date',

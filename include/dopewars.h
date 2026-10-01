@@ -57,7 +57,7 @@ extern "C" {
  * changes. Additive changes (new functions, new appended anonymous-enum
  * constants, new `#define`s that don't invalidate existing struct sizes)
  * do NOT bump this. See `docs/abi-contract.md` for the full policy. */
-#define DW_ABI_VERSION 5u
+#define DW_ABI_VERSION 6u
 
 /* The value above, readable at runtime.
  *
@@ -123,16 +123,14 @@ enum {
      * current location's price list this turn. */
     DW_ERR_NOT_TRADED_HERE = 6,
     /* dw_buy / dw_finances(deposit) / dw_accept_*_offer: not enough cash
-     * on hand to complete the transaction. */
+     * on hand to complete the transaction. Dealers are paid from cash only. */
     DW_ERR_INSUFFICIENT_CASH = 7,
-    /* dw_finances(withdraw) / dw_accept_*_offer bank fallback: not enough
-     * in the bank to complete the transaction (including the bank
-     * purchase fee, where applicable). */
+    /* Reserved: no call returns it. Kept so the numbering of the codes
+     * below does not move. */
     DW_ERR_INSUFFICIENT_BANK = 8,
     /* dw_sell: fewer units held than the caller tried to sell. */
     DW_ERR_INSUFFICIENT_INVENTORY = 9,
-    /* dw_buy / dw_accept_gun_offer: not enough coat space to hold the
-     * new inventory or gun. */
+    /* dw_buy: not enough coat space to hold the new inventory. */
     DW_ERR_INSUFFICIENT_SPACE = 10,
     /* dw_travel / dw_generate_prices: the game has already reached
      * numDays and no further turns are allowed. */
@@ -163,6 +161,15 @@ enum {
     DW_ARRIVAL_MAMAS_BROWNIES = 5,
     DW_ARRIVAL_FREE_WEED_DEATH = 6,
     DW_ARRIVAL_FLAVOR = 7,
+};
+
+/* dw_roll_dealer_visit's *out_kind. At most one dealer visits per
+ * non-chase arrival. See docs/beermat-re.md (M-05). */
+typedef uint8_t dw_dealer_kind;
+enum {
+    DW_DEALER_NONE = 0,
+    DW_DEALER_COAT = 1,
+    DW_DEALER_GUN = 2,
 };
 
 /* dw_price_event.kind. CHEAP is a price crash (div 10), EXPENSIVE a spike
@@ -312,28 +319,19 @@ DW_STATIC_ASSERT(sizeof(dw_arrival_event) == 24, "dw_arrival_event layout change
 /* ---------------------------------------------------------------------- */
 
 typedef struct dw_coat_offer {
-    uint32_t pockets;    /* extra coat slots on acceptance */
-    int32_t  price;      /* dollars */
+    int32_t  price;      /* dollars; 201-350 */
+    uint8_t  offered;    /* 1 when price < cash, else the dealer says nothing */
+    uint8_t  _pad0[3];   /* specified-zero */
 } dw_coat_offer;
 DW_STATIC_ASSERT(sizeof(dw_coat_offer) == 8, "dw_coat_offer layout changed");
 
 typedef struct dw_gun_offer {
-    int32_t  price;      /* dollars */
-    uint32_t damage;     /* per-gun damage; see dw_get_fight_ratings */
-    uint32_t space;      /* coat slots consumed per gun */
-    uint32_t _pad0;      /* specified-zero */
+    int32_t  price;      /* dollars; 301-550 */
+    uint32_t name_index; /* cosmetic: 0 Baretta, 1 .38 Special, 2 Ruger, 3 Saturday Night Special; 0 when not offered */
+    uint8_t  offered;    /* 1 when price < cash, else the dealer says nothing */
+    uint8_t  _pad0[3];   /* specified-zero */
 } dw_gun_offer;
-DW_STATIC_ASSERT(sizeof(dw_gun_offer) == 16, "dw_gun_offer layout changed");
-
-/* Populated by dw_accept_coat_offer / dw_accept_gun_offer. `used_bank`
- * indicates the price was drawn from the bank (with the bank purchase
- * fee applied); `fee` is 0 when used_bank is 0. */
-typedef struct dw_purchase_result {
-    uint8_t  used_bank;   /* 0 or 1 */
-    uint8_t  _pad0[3];    /* specified-zero */
-    int32_t  fee;         /* dollars; 0 when used_bank == 0 */
-} dw_purchase_result;
-DW_STATIC_ASSERT(sizeof(dw_purchase_result) == 8, "dw_purchase_result layout changed");
+DW_STATIC_ASSERT(sizeof(dw_gun_offer) == 12, "dw_gun_offer layout changed");
 
 /* ---------------------------------------------------------------------- */
 /* Chase / combat                                                          */
@@ -409,14 +407,10 @@ int32_t  dw_rules_default_start_health(void);
 int32_t  dw_rules_default_start_coat_capacity(void);
 int32_t  dw_rules_default_start_location_index(void);
 uint32_t dw_rules_gun_damage(void);
-uint32_t dw_rules_gun_space(void);
 uint32_t dw_rules_player_armor(void);
 /* Fixed-point interest rates: numerator over 10000. debt = 1000 -> 10.00%. */
 uint32_t dw_rules_debt_interest_bp(void);
 uint32_t dw_rules_bank_interest_bp(void);
-/* Bank purchase fee applied when a dealer offer is paid from the bank.
- * bp = numerator over 10000; 2500 -> 25.00%. */
-uint32_t dw_rules_bank_purchase_fee_bp(void);
 /* Cheap/expensive event multipliers. */
 uint32_t dw_rules_cheap_divide(void);
 uint32_t dw_rules_expensive_multiply(void);
@@ -589,37 +583,30 @@ dw_result dw_finances(dw_world *world, dw_finances_action action, int64_t amount
  * death, flavor-food cash loss) are applied before this call returns. */
 dw_result dw_roll_arrival_event(dw_world *world, dw_arrival_event *out_event);
 
-/* Roll a coat dealer offer without applying it (`index.html:929-934`).
- * Every roll draws from the world's RNG stream, so calling this twice
- * yields two different offers. */
+/* Roll whether a dealer visits on this non-chase arrival: Random(14) == 0,
+ * then Random(4) picks the coat dealer (0, 2) or the gun dealer (1, 3).
+ * Draws one value on a miss and two on a visit. Not called by dw_travel;
+ * the caller decides arrival sequencing, since no dealer shows up when
+ * dw_should_start_chase fired first. */
+dw_result dw_roll_dealer_visit(dw_world *world, dw_dealer_kind *out_kind);
+
+/* Roll a coat dealer price (one draw). out_offer->offered is 1 only when the
+ * price is strictly below cash; the caller shows the prompt only then. */
 dw_result dw_roll_coat_dealer_offer(dw_world *world, dw_coat_offer *out_offer);
 
-/* Apply the given coat offer (`index.html:936-948`). Draws from cash
- * first, then from the bank with a bank_purchase_fee_bp surcharge if
- * cash is short. Returns DW_ERR_INSUFFICIENT_CASH /
- * DW_ERR_INSUFFICIENT_BANK if neither path can cover the price; on
- * failure, world state is unchanged. */
-dw_result dw_accept_coat_offer(dw_world *world, const dw_coat_offer *offer, dw_purchase_result *out_result);
+/* Pay the coat offer from cash and draw the pocket count (Random(10) + 11),
+ * written to *out_pockets. Returns DW_ERR_INSUFFICIENT_CASH, with no draw and
+ * no state change, when the price exceeds cash. Never touches the bank. */
+dw_result dw_accept_coat_offer(dw_world *world, const dw_coat_offer *offer, uint32_t *out_pockets);
 
-/* Roll a gun dealer offer without applying it (`index.html:950-954`). */
+/* Roll a gun dealer price (one draw), then the cosmetic name (a second draw)
+ * only when the offer is made. offered follows the coat rule. */
 dw_result dw_roll_gun_dealer_offer(dw_world *world, dw_gun_offer *out_offer);
 
-/* Apply the given gun offer (`index.html:956-969`). Same cash-then-bank
- * fallback as dw_accept_coat_offer. Additionally returns
- * DW_ERR_INSUFFICIENT_SPACE if the gun does not fit in the coat. */
-dw_result dw_accept_gun_offer(dw_world *world, const dw_gun_offer *offer, dw_purchase_result *out_result);
-
-/* Roll whether each dealer visits on arrival (`index.html:1387-1388`).
- * One call covers both, in the order the turn produces them: the coat
- * draw happens first and the gun draw second, unconditionally, so a caller
- * that reports both can never desynchronize the world's RNG stream by
- * skipping one. A dealer only actually shows up when the player is alive,
- * so each output is 0 when the player is dead -- but the draw is still
- * consumed, matching the JS `state.rng() < 0.15 && !state.dead` order of
- * evaluation. Not called by dw_travel; the caller decides arrival
- * sequencing, since whether the dealers show up at all depends on whether
- * dw_should_start_chase fired first. */
-dw_result dw_roll_dealer_visits(dw_world *world, uint8_t *out_coat_visit, uint8_t *out_gun_visit);
+/* Pay the gun offer from cash and add one gun. A gun takes no coat space.
+ * Returns DW_ERR_INSUFFICIENT_CASH, with no state change, when the price
+ * exceeds cash. */
+dw_result dw_accept_gun_offer(dw_world *world, const dw_gun_offer *offer);
 
 /* ---------------------------------------------------------------------- */
 /* Chase / combat                                                          */

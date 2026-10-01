@@ -33,7 +33,7 @@ from abi_symbols import (  # noqa: E402
     struct_sizes,
 )
 
-DW_ABI_VERSION = 5
+DW_ABI_VERSION = 6
 
 # Result codes (include/dopewars.h, anonymous enum). Frozen from ABI v1;
 # appended to, never renumbered.
@@ -68,11 +68,9 @@ EXPECTED_RULES = {
     "dw_rules_default_start_coat_capacity": (ctypes.c_int32, 100),
     "dw_rules_default_start_location_index": (ctypes.c_int32, 0),  # bronx
     "dw_rules_gun_damage": (ctypes.c_uint32, 5),
-    "dw_rules_gun_space": (ctypes.c_uint32, 4),
     "dw_rules_player_armor": (ctypes.c_uint32, 100),
     "dw_rules_debt_interest_bp": (ctypes.c_uint32, 1000),
     "dw_rules_bank_interest_bp": (ctypes.c_uint32, 500),
-    "dw_rules_bank_purchase_fee_bp": (ctypes.c_uint32, 2500),
     "dw_rules_cheap_divide": (ctypes.c_uint32, 10),
     "dw_rules_expensive_multiply": (ctypes.c_uint32, 5),
 }
@@ -309,7 +307,6 @@ def test_header_struct_sizes_are_sane(abi: Abi, report: Report) -> None:
         "dw_location_view",
         "dw_price_event",
         "dw_price_slot",
-        "dw_purchase_result",
         "dw_run_result",
         "dw_state_view",
     }

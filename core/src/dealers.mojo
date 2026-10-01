@@ -1,124 +1,83 @@
 # core/src/dealers.mojo — the coat and gun dealers.
 #
-# Ported from rollCoatDealerOffer / acceptCoatOffer / rollGunDealerOffer /
-# acceptGunOffer in index.html:929-969.
-#
-# Both dealers share one payment rule: pay from cash if there is enough,
-# otherwise draw the shortfall from the bank and add a 25% fee on the whole
-# price. The fee is `Math.ceil(price * 0.25)`, so it rounds up to a whole
-# dollar. If the bank cannot cover price + fee the purchase fails and nothing
-# moves.
-#
-# The gun dealer has one extra guard the coat dealer does not: a gun occupies
-# GUN_SPACE coat slots, so the purchase fails outright if it would not fit.
+# One combined visit chance per non-chase arrival, then an even coat/gun split.
+# Both dealers are paid from cash only, and only when the rolled price is
+# strictly below cash. See docs/beermat-re.md, "Arrival events and dealers".
 
-import jsmath
 import result
 import rules
 import rng as rng_mod
 import world
 
+comptime DEALER_NONE = 0
+comptime DEALER_COAT = 1
+comptime DEALER_GUN = 2
+
 
 struct CoatOffer(Copyable, Movable):
-    var pockets: Int64
     var price: Int64
+    var offered: Bool
 
-    def __init__(out self, pockets: Int64, price: Int64):
-        self.pockets = pockets
+    def __init__(out self, price: Int64, offered: Bool):
         self.price = price
+        self.offered = offered
 
 
 struct GunOffer(Copyable, Movable):
     var price: Int64
-    var damage: Int64
-    var space: Int64
+    var offered: Bool
+    var name_index: Int64
 
-    def __init__(out self, price: Int64, damage: Int64, space: Int64):
+    def __init__(out self, price: Int64, offered: Bool, name_index: Int64):
         self.price = price
-        self.damage = damage
-        self.space = space
+        self.offered = offered
+        self.name_index = name_index
 
 
 struct PurchaseResult(Copyable, Movable):
     var code: Int
-    var used_bank: Bool
-    var fee: Int64
+    var pockets: Int64
 
-    def __init__(out self, code: Int, used_bank: Bool = False, fee: Int64 = 0):
+    def __init__(out self, code: Int, pockets: Int64 = 0):
         self.code = code
-        self.used_bank = used_bank
-        self.fee = fee
+        self.pockets = pockets
 
 
-struct DealerVisits(Copyable, Movable):
-    var coat: Bool
-    var gun: Bool
-
-    def __init__(out self, coat: Bool = False, gun: Bool = False):
-        self.coat = coat
-        self.gun = gun
+# Random(14) == 0 is a visit; Random(4) of 0 or 2 is the coat dealer, 1 or 3 the gun dealer.
+def roll_dealer_visit(mut game: world.World) raises -> Int:
+    if rng_mod.rand_int(game.rng, 0, rules.DEALER_ODDS - 1) != 0:
+        return DEALER_NONE
+    if rng_mod.rand_int(game.rng, 0, 3) % 2 == 0:
+        return DEALER_COAT
+    return DEALER_GUN
 
 
 def roll_coat_dealer_offer(mut game: world.World) raises -> CoatOffer:
-    var pockets = rng_mod.rand_int(game.rng, rules.COAT_MIN_POCKETS, rules.COAT_MAX_POCKETS)
     var price = rng_mod.rand_int(game.rng, rules.COAT_MIN_PRICE, rules.COAT_MAX_PRICE)
-    return CoatOffer(pockets, price)
+    return CoatOffer(price, price < Int64(game.cash))
 
 
+# The cosmetic name is drawn only when the offer is actually made.
 def roll_gun_dealer_offer(mut game: world.World) raises -> GunOffer:
     var price = rng_mod.rand_int(game.rng, rules.GUN_MIN_PRICE, rules.GUN_MAX_PRICE)
-    return GunOffer(price, rules.GUN_DAMAGE, rules.GUN_SPACE)
+    if price < Int64(game.cash):
+        return GunOffer(price, True, rng_mod.rand_int(game.rng, 0, rules.GUN_NAME_COUNT - 1))
+    return GunOffer(price, False, 0)
 
 
-# Ported from the two `state.rng() < 0.15` draws in index.html:1387-1388.
-# Both draws always happen, coat first and gun second, even when the player
-# is dead: in JS the `!state.dead` guard is the right-hand operand, so
-# short-circuit evaluation has already consumed the draw by the time it is
-# tested. Skipping the draw on death would desync the RNG stream for the rest
-# of the run.
-def roll_dealer_visits(mut game: world.World) raises -> DealerVisits:
-    var coat = game.rng.next() < rules.DEALER_VISIT_CHANCE
-    var gun = game.rng.next() < rules.DEALER_VISIT_CHANCE
-    if game.dead:
-        return DealerVisits()
-    return DealerVisits(coat, gun)
-
-
-# Shared payment path. Returns the code plus whether the bank was used and the
-# fee charged, so the caller can apply its own side effect on success.
-def _pay(mut game: world.World, price: Int64) -> PurchaseResult:
-    if price > Int64(game.cash):
-        # Math.ceil, not round: the fee always rounds up to a whole dollar.
-        var fee = _ceil(Float64(price) * rules.BANK_PURCHASE_FEE)
-        var total = price + fee
-        if Int64(game.bank) < total:
-            return PurchaseResult(result.ERR_INSUFFICIENT_BANK)
-        game.bank -= Float64(total)
-        return PurchaseResult(result.OK, True, fee)
-    game.cash -= Float64(price)
-    return PurchaseResult(result.OK, False, 0)
-
-
-def _ceil(value: Float64) -> Int64:
-    var whole = Int64(value)
-    if Float64(whole) < value:
-        return whole + 1
-    return whole
-
-
-def accept_coat_offer(mut game: world.World, offer: CoatOffer) -> PurchaseResult:
-    var payment = _pay(game, offer.price)
-    if payment.code != result.OK:
-        return payment^
-    game.coat_capacity += offer.pockets
-    return payment^
+# The pocket count is drawn on acceptance, after the price, and not at all if the purchase fails.
+def accept_coat_offer(mut game: world.World, offer: CoatOffer) raises -> PurchaseResult:
+    if offer.price > Int64(game.cash):
+        return PurchaseResult(result.ERR_INSUFFICIENT_CASH)
+    var pockets = rng_mod.rand_int(game.rng, rules.COAT_MIN_POCKETS, rules.COAT_MAX_POCKETS)
+    game.cash -= Float64(offer.price)
+    game.coat_capacity += pockets
+    return PurchaseResult(result.OK, pockets)
 
 
 def accept_gun_offer(mut game: world.World, offer: GunOffer) -> PurchaseResult:
-    if game.coat_used() + offer.space > game.coat_capacity:
-        return PurchaseResult(result.ERR_INSUFFICIENT_SPACE)
-    var payment = _pay(game, offer.price)
-    if payment.code != result.OK:
-        return payment^
+    if offer.price > Int64(game.cash):
+        return PurchaseResult(result.ERR_INSUFFICIENT_CASH)
+    game.cash -= Float64(offer.price)
     game.guns += 1
-    return payment^
+    return PurchaseResult(result.OK)

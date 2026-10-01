@@ -33,7 +33,7 @@ import travel
 import world as world_mod
 
 
-comptime DW_ABI_VERSION = 5
+comptime DW_ABI_VERSION = 6
 
 # dw_result values (include/dopewars.h). Frozen from ABI v1 onward.
 comptime DW_OK = Int32(0)
@@ -141,23 +141,17 @@ struct ArrivalEventView(Copyable, Movable):
 
 @fieldwise_init
 struct CoatOfferView(Copyable, Movable):
-    var pockets: UInt32
     var price: Int32
+    var offered: UInt8
+    var _pad0: Array[UInt8, 3]
 
 
 @fieldwise_init
 struct GunOfferView(Copyable, Movable):
     var price: Int32
-    var damage: UInt32
-    var space: UInt32
-    var _pad0: UInt32
-
-
-@fieldwise_init
-struct PurchaseResultView(Copyable, Movable):
-    var used_bank: UInt8
+    var name_index: UInt32
+    var offered: UInt8
     var _pad0: Array[UInt8, 3]
-    var fee: Int32
 
 
 @fieldwise_init
@@ -218,8 +212,7 @@ def _assert_layouts():
     comptime assert size_of[PriceEventView]() == 8, "dw_price_event layout changed"
     comptime assert size_of[ArrivalEventView]() == 24, "dw_arrival_event layout changed"
     comptime assert size_of[CoatOfferView]() == 8, "dw_coat_offer layout changed"
-    comptime assert size_of[GunOfferView]() == 16, "dw_gun_offer layout changed"
-    comptime assert size_of[PurchaseResultView]() == 8, "dw_purchase_result layout changed"
+    comptime assert size_of[GunOfferView]() == 12, "dw_gun_offer layout changed"
     comptime assert size_of[ChaseView]() == 8, "dw_chase layout changed"
     comptime assert size_of[FightRatingsView]() == 8, "dw_fight_ratings layout changed"
     comptime assert size_of[RunResultView]() == 8, "dw_run_result layout changed"
@@ -279,10 +272,8 @@ def _map_trade_code(code: Int) -> Int32:
 def _map_purchase_code(code: Int) -> Int32:
     if code == result.OK:
         return DW_OK
-    if code == result.ERR_INSUFFICIENT_BANK:
-        return DW_ERR_INSUFFICIENT_BANK
-    if code == result.ERR_INSUFFICIENT_SPACE:
-        return DW_ERR_INSUFFICIENT_SPACE
+    if code == result.ERR_INSUFFICIENT_CASH:
+        return DW_ERR_INSUFFICIENT_CASH
     return DW_ERR_INVALID_ARGUMENT
 
 
@@ -380,11 +371,6 @@ def dw_rules_gun_damage() abi("C") -> UInt32:
     return UInt32(rules.GUN_DAMAGE)
 
 
-@export("dw_rules_gun_space")
-def dw_rules_gun_space() abi("C") -> UInt32:
-    return UInt32(rules.GUN_SPACE)
-
-
 @export("dw_rules_player_armor")
 def dw_rules_player_armor() abi("C") -> UInt32:
     return UInt32(rules.PLAYER_ARMOR)
@@ -398,11 +384,6 @@ def dw_rules_debt_interest_bp() abi("C") -> UInt32:
 @export("dw_rules_bank_interest_bp")
 def dw_rules_bank_interest_bp() abi("C") -> UInt32:
     return UInt32(jsmath.js_round(rules.BANK_INTEREST * 10000.0))
-
-
-@export("dw_rules_bank_purchase_fee_bp")
-def dw_rules_bank_purchase_fee_bp() abi("C") -> UInt32:
-    return UInt32(jsmath.js_round(rules.BANK_PURCHASE_FEE * 10000.0))
 
 
 @export("dw_rules_cheap_divide")
@@ -885,6 +866,20 @@ def dw_roll_arrival_event(
         return DW_ERR_INVALID_ARGUMENT
 
 
+@export("dw_roll_dealer_visit")
+def dw_roll_dealer_visit(
+    world: OptionalPointer[world_mod.World, origin=MutUntrackedOrigin],
+    out_kind: OptionalPointer[UInt8, origin=MutUntrackedOrigin],
+) abi("C") -> Int32:
+    if not world or not out_kind:
+        return DW_ERR_INVALID_ARGUMENT
+    try:
+        out_kind.value()[] = UInt8(dealers.roll_dealer_visit(world.value()[]))
+        return DW_OK
+    except:
+        return DW_ERR_INVALID_ARGUMENT
+
+
 @export("dw_roll_coat_dealer_offer")
 def dw_roll_coat_dealer_offer(
     world: OptionalPointer[world_mod.World, origin=MutUntrackedOrigin],
@@ -894,7 +889,13 @@ def dw_roll_coat_dealer_offer(
         return DW_ERR_INVALID_ARGUMENT
     try:
         var offer = dealers.roll_coat_dealer_offer(world.value()[])
-        out_offer.value().unsafe_write(CoatOfferView(UInt32(offer.pockets), Int32(offer.price)))
+        out_offer.value().unsafe_write(
+            CoatOfferView(
+                Int32(offer.price),
+                UInt8(1) if offer.offered else UInt8(0),
+                Array[UInt8, 3](fill=0),
+            )
+        )
         return DW_OK
     except:
         return DW_ERR_INVALID_ARGUMENT
@@ -904,20 +905,17 @@ def dw_roll_coat_dealer_offer(
 def dw_accept_coat_offer(
     world: OptionalPointer[world_mod.World, origin=MutUntrackedOrigin],
     offer: OptionalPointer[CoatOfferView, origin=ImmUntrackedOrigin],
-    out_result: OptionalPointer[PurchaseResultView, origin=MutUntrackedOrigin],
+    out_pockets: OptionalPointer[UInt32, origin=MutUntrackedOrigin],
 ) abi("C") -> Int32:
-    if not world or not offer or not out_result:
+    if not world or not offer or not out_pockets:
         return DW_ERR_INVALID_ARGUMENT
-    var core_offer = dealers.CoatOffer(Int64(offer.value()[].pockets), Int64(offer.value()[].price))
-    var payment = dealers.accept_coat_offer(world.value()[], core_offer)
-    out_result.value().unsafe_write(
-        PurchaseResultView(
-            UInt8(1) if payment.used_bank else UInt8(0),
-            Array[UInt8, 3](fill=0),
-            Int32(payment.fee),
-        )
-    )
-    return _map_purchase_code(payment.code)
+    try:
+        var core_offer = dealers.CoatOffer(Int64(offer.value()[].price), offer.value()[].offered != 0)
+        var payment = dealers.accept_coat_offer(world.value()[], core_offer)
+        out_pockets.value()[] = UInt32(payment.pockets)
+        return _map_purchase_code(payment.code)
+    except:
+        return DW_ERR_INVALID_ARGUMENT
 
 
 @export("dw_roll_gun_dealer_offer")
@@ -930,7 +928,12 @@ def dw_roll_gun_dealer_offer(
     try:
         var offer = dealers.roll_gun_dealer_offer(world.value()[])
         out_offer.value().unsafe_write(
-            GunOfferView(Int32(offer.price), UInt32(offer.damage), UInt32(offer.space), UInt32(0))
+            GunOfferView(
+                Int32(offer.price),
+                UInt32(offer.name_index),
+                UInt8(1) if offer.offered else UInt8(0),
+                Array[UInt8, 3](fill=0),
+            )
         )
         return DW_OK
     except:
@@ -941,41 +944,16 @@ def dw_roll_gun_dealer_offer(
 def dw_accept_gun_offer(
     world: OptionalPointer[world_mod.World, origin=MutUntrackedOrigin],
     offer: OptionalPointer[GunOfferView, origin=ImmUntrackedOrigin],
-    out_result: OptionalPointer[PurchaseResultView, origin=MutUntrackedOrigin],
 ) abi("C") -> Int32:
-    if not world or not offer or not out_result:
+    if not world or not offer:
         return DW_ERR_INVALID_ARGUMENT
     var core_offer = dealers.GunOffer(
         Int64(offer.value()[].price),
-        Int64(offer.value()[].damage),
-        Int64(offer.value()[].space),
+        offer.value()[].offered != 0,
+        Int64(offer.value()[].name_index),
     )
     var payment = dealers.accept_gun_offer(world.value()[], core_offer)
-    out_result.value().unsafe_write(
-        PurchaseResultView(
-            UInt8(1) if payment.used_bank else UInt8(0),
-            Array[UInt8, 3](fill=0),
-            Int32(payment.fee),
-        )
-    )
     return _map_purchase_code(payment.code)
-
-
-@export("dw_roll_dealer_visits")
-def dw_roll_dealer_visits(
-    world: OptionalPointer[world_mod.World, origin=MutUntrackedOrigin],
-    out_coat_visit: OptionalPointer[UInt8, origin=MutUntrackedOrigin],
-    out_gun_visit: OptionalPointer[UInt8, origin=MutUntrackedOrigin],
-) abi("C") -> Int32:
-    if not world or not out_coat_visit or not out_gun_visit:
-        return DW_ERR_INVALID_ARGUMENT
-    try:
-        var visits = dealers.roll_dealer_visits(world.value()[])
-        out_coat_visit.value()[] = UInt8(1) if visits.coat else UInt8(0)
-        out_gun_visit.value()[] = UInt8(1) if visits.gun else UInt8(0)
-        return DW_OK
-    except:
-        return DW_ERR_INVALID_ARGUMENT
 
 
 # ---------------------------------------------------------------------------

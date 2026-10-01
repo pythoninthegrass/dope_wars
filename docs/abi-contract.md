@@ -94,16 +94,16 @@ Every ABI struct:
   order.
 - The `dw_world` handle owns its own RNG stream, seeded from `dw_config`.
   Turn-driving functions (`dw_generate_prices`, `dw_travel`,
-  `dw_roll_arrival_event`, `dw_roll_dealer_visits`, chase/combat rolls,
+  `dw_roll_arrival_event`, `dw_roll_dealer_visit`, chase/combat rolls,
   dealer offers) draw from that stream; callers do not pass an RNG.
 - The RNG state is included in the canonical dump so a saved game replays
   bit-for-bit on load.
 
 ### Why the draw-owning rules live in the core
 
-`index.html:1387-1388` reads `state.rng() < 0.15` twice to decide whether the
-coat and gun dealers show up on arrival. In the prototype those two draws sit
-in the *UI* layer but consume the *world's* RNG, because the JS engine injects
+The prototype's arrival sequence (`runArrivalSequence` in `index.html`) rolls
+whether a dealer shows up on arrival. In the prototype that draw sits in the
+*UI* layer but consumes the *world's* RNG, because the JS engine injects
 one `rng` closure through the whole call graph. The Mojo world owns its stream
 instead, so a presentation layer cannot reach it at all: there is no exported
 draw, and `dw_config.rng_seed` is write-only, so a caller cannot even reseed a
@@ -111,13 +111,9 @@ private generator into agreement.
 
 That makes the choice binary. Either the roll is a core rule — the only option
 consistent with `docs/layer-boundaries.md`, which forbids GDScript from
-computing event outcomes — or the two dealer dialogs are unreachable. It is
-therefore `dw_roll_dealer_visits`, which draws the coat roll and then the gun
-roll in a single call, in that order, unconditionally. The unconditional part
-matters: in JS the `&& !state.dead` guard is the *right-hand* operand, so
-short-circuit evaluation has already consumed the draw by the time it is
-tested. A core that skipped the draw on death would desync every subsequent
-draw for the rest of the run.
+computing event outcomes — or the dealer dialogs are unreachable. It is
+therefore `dw_roll_dealer_visit`, which draws `Random(14)` and, on a visit,
+`Random(4)` to pick the coat or gun dealer, in a single call.
 
 The same reasoning applies, more weakly, to `dw_prev_prices_copy`. The JS UI
 keeps `state.prevPrices` (`index.html:719`) purely to draw the market table's
@@ -170,6 +166,7 @@ float64, so save/load stays bit-exact.
   new kind for the cops-bust spike text. `MAX_PRICE_EVENTS` grew from 3 to 8,
   so the dump grew from 766 to 846 bytes.
 - **v4 (TASK-010.02.03)**: `dw_generate_prices` rolls each drug's availability (1 in 8 absent, at every location) in place of the per-location shuffled subset, changing RNG draw order. `dw_location_view` lost `min_drugs`, `max_drugs` and `_pad0`, so it shrank from 80 to 68 bytes; `dw_rules_locations_copy` now reports only `id`, `name` and `police`. The dump length is unchanged.
+- **v6 (TASK-010.02.05)**: one combined dealer visit, `dw_roll_dealer_visit` (`Random(14) == 0`, then `Random(4)` for coat or gun), replaces `dw_roll_dealer_visits`. `dw_coat_offer` is now `{price, offered}` (8 bytes) and `dw_gun_offer` is `{price, name_index, offered}` (16 -> 12 bytes); `offered` is 1 only when the price is strictly below cash. `dw_accept_coat_offer` draws the pocket count and returns it through `out_pockets`, `dw_accept_gun_offer` takes no result struct, and `dw_purchase_result`, `dw_rules_gun_space` and `dw_rules_bank_purchase_fee_bp` are removed. Dealers are paid from cash only, so `DW_ERR_INSUFFICIENT_BANK` is reserved and never returned, and a gun takes no coat space. `DW_DEALER_NONE`, `DW_DEALER_COAT` and `DW_DEALER_GUN` are new. The dump length is unchanged.
 - **v5 (TASK-010.02.04)**: `dw_should_start_chase` is Beermat's `Random(6) == 0`, a flat 1 in 6 at every location, still one RNG draw. `dw_location_view` lost `police`, so it shrank from 68 to 64 bytes and `dw_rules_locations_copy` now reports only `id` and `name`. The dump length is unchanged.
 
 ## Serialization

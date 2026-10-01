@@ -22,24 +22,23 @@ comptime DEBT_INTEREST = 0.10
 comptime BANK_INTEREST = 0.05  # beermat-verified (TASK-009): was 0.02
 comptime START_LOCATION = "bronx"
 comptime GUN_DAMAGE = 5
-comptime GUN_SPACE = 4
 comptime PLAYER_ARMOR = 100
 comptime CHEAP_DIVIDE = 10
 comptime EXPENSIVE_MULTIPLY = 5
 comptime ABSENT_ODDS = 8
 comptime EVENT_ODDS = 20
-comptime BANK_PURCHASE_FEE = 0.25
 
-comptime COAT_MIN_POCKETS = 10
-comptime COAT_MAX_POCKETS = 30
-comptime COAT_MIN_PRICE = 200
-comptime COAT_MAX_PRICE = 500
-comptime GUN_MIN_PRICE = 250
-comptime GUN_MAX_PRICE = 600
+comptime COAT_MIN_POCKETS = 11
+comptime COAT_MAX_POCKETS = 20
+comptime COAT_MIN_PRICE = 201
+comptime COAT_MAX_PRICE = 350
+comptime GUN_MIN_PRICE = 301
+comptime GUN_MAX_PRICE = 550
+# Cosmetic gun names (Baretta, .38 Special, Ruger, Saturday Night Special); the core only picks the index.
+comptime GUN_NAME_COUNT = 4
 
-# Per-dealer chance of showing up on arrival when no chase started
-# (`index.html:1387-1388`).
-comptime DEALER_VISIT_CHANCE = 0.15
+# One combined dealer visit per non-chase arrival happens on Random(DEALER_ODDS) == 0.
+comptime DEALER_ODDS = 14
 
 comptime NUM_LOCATIONS = 6
 comptime NUM_DRUGS = 12

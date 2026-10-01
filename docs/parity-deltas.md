@@ -64,15 +64,14 @@ second, independently-maintained serialization.
 
 ## 4. Chase escape RNG draw order — not a delta, called out because it looks like one
 
-`core/src/dealers.mojo:roll_dealer_visits` and the JS
-`state.rng() < 0.15` pair in `index.html:1387-1388` both draw twice
-unconditionally, then suppress the *reported* result when the player is dead
-— the `!state.dead` guard is evaluated after the draw, by JS's own
-short-circuit order, and the Mojo port preserves that draw-then-suppress
-sequencing exactly (pinned by `tests/fixtures/12-dealer-visits.jsonl`, added
-in TASK-001.09). Listed here only because it is the kind of thing that looks
-like a plausible optimization ("skip the draw when dead") that would in fact
-desync the RNG stream for the rest of the run; it is not an approved
+`core/src/dealers.mojo:roll_dealer_visit` and the JS `rollDealerVisit` draw
+one value on a miss and two on a visit, and only on a non-chase arrival.
+The offer price is drawn when the dealer is presented, the cosmetic gun name
+only when the offer is made, and the coat pocket count only when the player
+accepts (pinned by `tests/fixtures/12-dealer-visits.jsonl` and
+`05-dealers.jsonl`). Listed here only because it is the kind of thing that
+looks like a plausible optimization (draw everything up front) that would in
+fact desync the RNG stream for the rest of the run; it is not an approved
 deviation, it is a documented non-deviation.
 
 ## Not a delta: the TASK-009 constant corrections

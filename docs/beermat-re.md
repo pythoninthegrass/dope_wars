@@ -97,9 +97,9 @@ Names are the strings at `0x0045c518`-`0x0045c5c8`.
 
 | Stage | Beermat | Engine | Class |
 | --- | --- | --- | --- |
-| Dealer visit chance | `Random(14) == 0`, then `Random(4)`: 0 or 2 coat dealer, 1 or 3 gun dealer. One combined 1/14 chance, coat and gun equally likely | two independent 15% draws, coat and gun | **mismatch M-05** |
-| Coat dealer | price `Random(150) + 201` (201-350), adds `Random(10) + 11` pockets (11-20); offered only if `price < cash`; paid from cash only. Prompt "Would you like to buy a trenchcoat with more pockets for $X?" | pockets 10-30, price 200-500, may be paid from the bank with a 25% fee | **mismatch M-05** |
-| Gun dealer | price `Random(250) + 301` (301-550); offered only if `price < cash`; gun name drawn from Baretta, .38 Special, Ruger, Saturday Night Special (cosmetic); accepting adds one gun, uses no coat space; paid from cash only | price 250-600, a gun takes 4 coat space, may be paid from the bank with a 25% fee | **mismatch M-05** |
+| Dealer visit chance | `Random(14) == 0`, then `Random(4)`: 0 or 2 coat dealer, 1 or 3 gun dealer. One combined 1/14 chance, coat and gun equally likely | `Random(14) == 0` then `Random(4)`, even `% 2` picks the coat dealer, otherwise the gun dealer; one draw on a miss, two on a visit; skipped on a chase | match |
+| Coat dealer | price `Random(150) + 201` (201-350), adds `Random(10) + 11` pockets (11-20); offered only if `price < cash`; paid from cash only. Prompt "Would you like to buy a trenchcoat with more pockets for $X?" | price `randInt(201, 350)`, pockets `randInt(11, 20)` drawn only when the player accepts, offered only if `price < cash`, paid from cash only; no bank path | match |
+| Gun dealer | price `Random(250) + 301` (301-550); offered only if `price < cash`; gun name drawn from Baretta, .38 Special, Ruger, Saturday Night Special (cosmetic); accepting adds one gun, uses no coat space; paid from cash only | price `randInt(301, 550)`, then the name index `randInt(0, 3)` only when `price < cash`; accepting adds one gun, takes no coat space and is paid from cash only | match |
 | Event chance | if `cash + bank >= 99,999,999` the event always fires and is forced to the mugging outcome; otherwise `Random(14) == 0` | one percentile roll over the whole arrival, event table below | **mismatch M-06** |
 | Outcome 0 (1 in 4) | "You find N units of `<drug>` on a dead dude in the `<location>`"; drug is a random available one, `N = min(Random(7) + 2, free coat space)`; skipped when the coat is full. The average cost is diluted: `avg = held * avg div (held + N)` | "You found N units on a dead dude in the subway", 3-7 units, requires a roll in the 30-50% band | **mismatch M-06** |
 | Outcome 1 (1 in 4) | plays `DWMugged`, "You were mugged on the `<location>`", cash `-= cash div (Random(2) + 3)` (one third or one quarter) | 10% band, keeps 80-95% of cash; if cash is zero, loses 5% health | **mismatch M-06** |
@@ -184,7 +184,7 @@ Checked on the live oracle (see `CLAUDE.local.md` for how to reach it; none of t
 | M-02 | Price spike and crash events (fixed, match) | Drug table | TASK-010.02.02 |
 | M-03 | Drug availability (1/8 absent, location independent; fixed, match) | Drug table | TASK-010.02.03 |
 | M-04 | Chase start chance (1 in 6, flat; fixed, match) | Travel | TASK-010.02.04 |
-| M-05 | Dealer visits, coat and gun prices, payment | Arrival events | TASK-010.02.05 |
+| M-05 | Dealer visits, coat and gun prices, payment (fixed, match) | Arrival events | TASK-010.02.05 |
 | M-06 | Arrival event table | Arrival events | TASK-010.02.06 |
 | M-07 | Run, stay and cop damage | Chase | TASK-010.02.07 |
 | M-08 | Fight resolution and win condition | Chase | TASK-010.02.07 |

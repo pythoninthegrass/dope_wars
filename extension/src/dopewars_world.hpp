@@ -67,11 +67,11 @@ public:
 
 	// Arrival / dealer events
 	Dictionary roll_arrival_event();
+	Dictionary roll_dealer_visit();
 	Dictionary roll_coat_dealer_offer();
-	Dictionary accept_coat_offer(int pockets, int price);
+	Dictionary accept_coat_offer(int price);
 	Dictionary roll_gun_dealer_offer();
-	Dictionary accept_gun_offer(int price, int damage, int space);
-	Dictionary roll_dealer_visits();
+	Dictionary accept_gun_offer(int price, int name_index);
 
 	// Chase / combat
 	Dictionary should_start_chase();
@@ -100,11 +100,9 @@ public:
 	static int rules_default_start_coat_capacity();
 	static int rules_default_start_location_index();
 	static int rules_gun_damage();
-	static int rules_gun_space();
 	static int rules_player_armor();
 	static int rules_debt_interest_bp();
 	static int rules_bank_interest_bp();
-	static int rules_bank_purchase_fee_bp();
 	static int rules_cheap_divide();
 	static int rules_expensive_multiply();
 	static int64_t rules_locations_len();

@@ -10,7 +10,7 @@ way it is; read this before trying to "just add a pointer parameter".
 "net consequence" (pointer-shaped exports impossible on 1.1.0) was wrong: the
 probe never tried `OptionalPointer` with an explicitly bound *untracked* origin,
 nor the lowercase `size_of[T]()` / `align_of[T]()` intrinsics (it probed only
-`sizeof`/`alignof`). `core/src/abi.mojo` now exports all 56 declarations of
+`sizeof`/`alignof`). `core/src/abi.mojo` now exports all 54 declarations of
 `include/dopewars.h` on the pinned toolchain. The spelling that works is in
 "The spelling that works" below; everything above it documents the dead ends,
 which are real dead ends.
