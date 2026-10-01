@@ -659,21 +659,22 @@
         { id: 'brooklyn', name: 'Brooklyn', police: 70, minDrugs: 4, maxDrugs: 11 },
       ],
       drugs: [
-        { id: 'acid', name: 'Acid', min: 1000, max: 4500, cheap: true, expensive: false },
+        { id: 'acid', name: 'Acid', min: 1000, max: 4500, cheap: true, expensive: false, crashMessage: 'The market has been flooded with cheap home-made acid!' },
         { id: 'cocaine', name: 'Cocaine', min: 15000, max: 30000, cheap: false, expensive: true },
         { id: 'crack', name: 'Crack', min: 1000, max: 3500, cheap: false, expensive: false },
-        { id: 'ecstasy', name: 'Ecstasy', min: 10, max: 60, cheap: true, expensive: false },
-        { id: 'hashish', name: 'Hashish', min: 450, max: 1350, cheap: true, expensive: false },
+        { id: 'ecstasy', name: 'Ecstasy', min: 10, max: 60, cheap: true, expensive: false, crashMessage: 'Rival dealers raided a pharmacy and are selling cheap ecstasy!' },
+        { id: 'hashish', name: 'Hashish', min: 450, max: 1350, cheap: true, expensive: false, crashMessage: 'The Marrakesh Express has arrived!' },
         { id: 'heroin', name: 'Heroin', min: 5000, max: 14000, cheap: false, expensive: true },
         { id: 'opium', name: 'Opium', min: 500, max: 1300, cheap: false, expensive: true },
         { id: 'peyote', name: 'Peyote', min: 200, max: 700, cheap: false, expensive: false },
         { id: 'shrooms', name: 'Shrooms', min: 600, max: 1350, cheap: false, expensive: false },
         { id: 'smack', name: 'Smack', min: 1500, max: 4500, cheap: false, expensive: false },
         { id: 'speed', name: 'Speed', min: 70, max: 250, cheap: false, expensive: true },
-        { id: 'weed', name: 'Weed', min: 300, max: 900, cheap: true, expensive: false },
+        { id: 'weed', name: 'Weed', min: 300, max: 900, cheap: true, expensive: false, crashMessage: 'Columbian freighter dusted the Coast Guard!  Weed prices have bottomed out!' },
       ],
-      cheapDivide: 4,
-      expensiveMultiply: 4,
+      eventOdds: 20,
+      cheapDivide: 10,
+      expensiveMultiply: 5,
       coatDealer: { minPockets: 10, maxPockets: 30, minPrice: 200, maxPrice: 500 },
       gunDealer: { minPrice: 250, maxPrice: 600 },
       // Fee charged when drawing from bank to cover a coat/gun purchase (split: ATM + dealer's time)
@@ -719,41 +720,28 @@
       state.prevPrices = state.prices || {};
       const loc = findLocation(state.location);
       const rng = state.rng;
-      const eventDrugs = new Set();
-      if (rng() < 0.70) {
-        const pool = RULES.drugs.slice();
-        eventDrugs.add(pool[randInt(rng, 0, pool.length - 1)].id);
-        if (rng() < 0.40) {
-          eventDrugs.add(pool[randInt(rng, 0, pool.length - 1)].id);
-          if (rng() < 0.05) {
-            eventDrugs.add(pool[randInt(rng, 0, pool.length - 1)].id);
-          }
-        }
-      }
+      const targetCount = randInt(rng, loc.minDrugs, loc.maxDrugs);
+      const available = RULES.drugs.slice();
+      shuffle(available, rng);
+      const traded = new Set(available.slice(0, targetCount).map((d) => d.id));
 
       const prices = {};
       const events = [];
-      for (const drugId of eventDrugs) {
-        const drug = findDrug(drugId);
-        const base = randInt(rng, drug.min, drug.max);
-        let goExpensive = drug.expensive && (!drug.cheap || rng() < 0.5);
-        if (goExpensive) {
-          prices[drugId] = base * RULES.expensiveMultiply;
-          events.push({ type: 'expensive', drug: drugId, message: `Addicts are buying ${drug.name} at outrageous prices!` });
-        } else if (drug.cheap) {
-          prices[drugId] = Math.max(1, Math.floor(base / RULES.cheapDivide));
-          events.push({ type: 'cheap', drug: drugId, message: `The market is flooded with cheap ${drug.name}!` });
-        } else {
-          prices[drugId] = base;
+      for (const drug of RULES.drugs) {
+        if (!traded.has(drug.id)) continue;
+        let price = randInt(rng, drug.min, drug.max);
+        if (drug.expensive && randInt(rng, 0, RULES.eventOdds - 1) === 0) {
+          price *= RULES.expensiveMultiply;
+          const bust = randInt(rng, 0, 1) === 0;
+          events.push(bust
+            ? { type: 'bust', drug: drug.id, message: `Cops made a big ${drug.name} bust!  Prices are outrageous!` }
+            : { type: 'expensive', drug: drug.id, message: `Addicts are buying ${drug.name} at outrageous prices!` });
         }
-      }
-
-      const targetCount = randInt(rng, loc.minDrugs, loc.maxDrugs);
-      const remaining = RULES.drugs.filter((d) => !(d.id in prices));
-      shuffle(remaining, rng);
-      for (const drug of remaining) {
-        if (Object.keys(prices).length >= targetCount) break;
-        prices[drug.id] = randInt(rng, drug.min, drug.max);
+        if (drug.cheap && randInt(rng, 0, RULES.eventOdds - 1) === 0) {
+          price = Math.floor(price / RULES.cheapDivide);
+          events.push({ type: 'cheap', drug: drug.id, message: drug.crashMessage });
+        }
+        prices[drug.id] = price;
       }
 
       state.prices = prices;

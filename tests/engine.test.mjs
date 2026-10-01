@@ -127,17 +127,118 @@ describe('generatePrices', () => {
     }
   })
 
-  test('every listed price is within the drug base range, or scaled x4/÷4 for an event', () => {
+  test('every listed price is within the drug base range, or scaled x5 / div 10 for an event', () => {
     const state = Engine.newGame({ seed: 99 })
     for (let i = 0; i < 50; i++) {
       Engine.generatePrices(state)
       for (const [drugId, price] of Object.entries(state.prices)) {
         const drug = Engine.RULES.drugs.find((d) => d.id === drugId)
-        const cheapFloor = Math.floor(drug.min / 4)
-        const expensiveCeil = drug.max * 4
+        const cheapFloor = Math.floor(drug.min / 10)
+        const expensiveCeil = drug.max * 5
         assert.ok(price >= cheapFloor && price <= expensiveCeil, `${drugId} price ${price} outside plausible [${cheapFloor},${expensiveCeil}]`)
       }
     }
+  })
+
+  test('when every 1-in-20 roll hits, each available spike drug costs min x5 and each crash drug min div 10', () => {
+    const state = Engine.newGame({ seed: 5 })
+    state.rng = () => 0
+    Engine.generatePrices(state)
+    assert.equal(Engine.RULES.expensiveMultiply, 5)
+    assert.equal(Engine.RULES.cheapDivide, 10)
+    let spikes = 0
+    let crashes = 0
+    for (const drug of Engine.RULES.drugs) {
+      if (!(drug.id in state.prices)) continue
+      if (drug.expensive) {
+        spikes++
+        assert.equal(state.prices[drug.id], drug.min * 5, drug.id)
+      } else if (drug.cheap) {
+        crashes++
+        assert.equal(state.prices[drug.id], Math.floor(drug.min / 10), drug.id)
+      } else {
+        assert.equal(state.prices[drug.id], drug.min, drug.id)
+      }
+    }
+    assert.ok(spikes > 0 && crashes > 0)
+    assert.equal(state.priceEvents.length, spikes + crashes)
+  })
+
+  test('when no 1-in-20 roll hits, there are no price events and prices stay in the base range', () => {
+    const state = Engine.newGame({ seed: 5 })
+    state.rng = () => 0.999
+    Engine.generatePrices(state)
+    assert.deepEqual([...state.priceEvents], [])
+    for (const [drugId, price] of Object.entries(state.prices)) {
+      const drug = Engine.RULES.drugs.find((d) => d.id === drugId)
+      assert.ok(price >= drug.min && price <= drug.max, drugId)
+    }
+  })
+
+  test('a spike message is one of the two Beermat texts, drawn about 50/50', () => {
+    const forced = Engine.newGame({ seed: 5 })
+    forced.rng = () => 0
+    Engine.generatePrices(forced)
+    const forcedSpikes = forced.priceEvents.filter((e) => e.type === 'bust' || e.type === 'expensive')
+    assert.ok(forcedSpikes.length > 0)
+    for (const ev of forcedSpikes) {
+      const name = Engine.RULES.drugs.find((d) => d.id === ev.drug).name
+      assert.equal(ev.type, 'bust')
+      assert.equal(ev.message, `Cops made a big ${name} bust!  Prices are outrageous!`)
+    }
+
+    const state = Engine.newGame({ seed: 77 })
+    let busts = 0
+    let addicts = 0
+    for (let i = 0; i < 4000; i++) {
+      Engine.generatePrices(state)
+      for (const ev of state.priceEvents) {
+        const name = Engine.RULES.drugs.find((d) => d.id === ev.drug).name
+        if (ev.type === 'bust') {
+          busts++
+          assert.equal(ev.message, `Cops made a big ${name} bust!  Prices are outrageous!`)
+        } else if (ev.type === 'expensive') {
+          addicts++
+          assert.equal(ev.message, `Addicts are buying ${name} at outrageous prices!`)
+        }
+      }
+    }
+    const share = busts / (busts + addicts)
+    assert.ok(share > 0.4 && share < 0.6, `bust share ${share}`)
+  })
+
+  test('each crash drug has its own fixed message', () => {
+    const expected = {
+      acid: 'The market has been flooded with cheap home-made acid!',
+      hashish: 'The Marrakesh Express has arrived!',
+      ecstasy: 'Rival dealers raided a pharmacy and are selling cheap ecstasy!',
+      weed: 'Columbian freighter dusted the Coast Guard!  Weed prices have bottomed out!',
+    }
+    const state = Engine.newGame({ seed: 31 })
+    const seen = new Set()
+    for (let i = 0; i < 4000; i++) {
+      Engine.generatePrices(state)
+      for (const ev of state.priceEvents.filter((e) => e.type === 'cheap')) {
+        assert.equal(ev.message, expected[ev.drug], ev.drug)
+        seen.add(ev.drug)
+      }
+    }
+    assert.deepEqual([...seen].sort(), Object.keys(expected).sort())
+  })
+
+  test('each flagged, available drug spikes or crashes about 1 time in 20', () => {
+    const state = Engine.newGame({ seed: 2024 })
+    let opportunities = 0
+    let hits = 0
+    for (let i = 0; i < 4000; i++) {
+      Engine.generatePrices(state)
+      for (const drug of Engine.RULES.drugs) {
+        if (drug.id in state.prices && (drug.cheap || drug.expensive)) opportunities++
+      }
+      hits += state.priceEvents.length
+    }
+    const rate = hits / opportunities
+    assert.ok(rate > 0.04 && rate < 0.06, `event rate ${rate}`)
   })
 
   test('a drug not selected this stop is absent from prices (not tradeable)', () => {
