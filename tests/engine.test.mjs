@@ -672,83 +672,150 @@ describe('finish', () => {
   })
 })
 
-describe('bank-purchase fee (coat and gun dealers)', () => {
-  // Coat dealer
-  test('acceptCoatOffer pays from cash when sufficient', () => {
+describe('dealers (Beermat: one 1-in-14 visit, coat or gun, cash only)', () => {
+  const scripted = (...floats) => {
+    let i = 0
+    const rng = () => floats[i++]
+    rng.drawn = () => i
+    return rng
+  }
+
+  test('rollDealerVisit draws one value and reports none unless Random(14) is 0', () => {
+    const state = Engine.newGame({ seed: 1 })
+    const rng = scripted(0.5)
+    assert.equal(Engine.rollDealerVisit(state, rng).kind, 'none')
+    assert.equal(rng.drawn(), 1)
+  })
+
+  test('rollDealerVisit hits at the first fourteenth and not past it', () => {
+    const state = Engine.newGame({ seed: 1 })
+    assert.equal(Engine.rollDealerVisit(state, scripted(0.0714, 0)).kind, 'coat')
+    assert.equal(Engine.rollDealerVisit(state, scripted(0.0715)).kind, 'none')
+  })
+
+  test('rollDealerVisit splits Random(4): 0 and 2 coat, 1 and 3 gun', () => {
+    const state = Engine.newGame({ seed: 1 })
+    const kinds = [0, 0.25, 0.5, 0.75].map((r) => Engine.rollDealerVisit(state, scripted(0, r)).kind)
+    assert.deepEqual([...kinds], ['coat', 'gun', 'coat', 'gun'])
+  })
+
+  test('rollDealerVisit draws two values on a visit', () => {
+    const state = Engine.newGame({ seed: 1 })
+    const rng = scripted(0, 0.3)
+    Engine.rollDealerVisit(state, rng)
+    assert.equal(rng.drawn(), 2)
+  })
+
+  test('rollCoatDealerOffer prices 201-350 with one draw', () => {
+    const state = Engine.newGame({ seed: 1 })
+    state.cash = 10000
+    const low = scripted(0)
+    assert.equal(Engine.rollCoatDealerOffer(state, low).price, 201)
+    assert.equal(low.drawn(), 1)
+    assert.equal(Engine.rollCoatDealerOffer(state, scripted(0.999999)).price, 350)
+  })
+
+  test('rollCoatDealerOffer is offered only when price is strictly below cash', () => {
+    const state = Engine.newGame({ seed: 1 })
+    state.cash = 201
+    assert.equal(Engine.rollCoatDealerOffer(state, scripted(0)).offered, false)
+    state.cash = 202
+    assert.equal(Engine.rollCoatDealerOffer(state, scripted(0)).offered, true)
+  })
+
+  test('acceptCoatOffer pays cash and adds Random(10)+11 pockets', () => {
     const state = Engine.newGame({ seed: 1 })
     state.cash = 500
-    const offer = { pockets: 10, price: 300 }
-    const res = Engine.acceptCoatOffer(state, offer)
+    const rng = scripted(0.5)
+    const res = Engine.acceptCoatOffer(state, { price: 300 }, rng)
     assert.equal(res.ok, true)
-    assert.equal(res.usedBank, false)
+    assert.equal(res.pockets, 16)
     assert.equal(state.cash, 200)
-    assert.equal(state.coatCapacity, 110)
+    assert.equal(state.coatCapacity, 116)
+    assert.equal(rng.drawn(), 1)
   })
 
-  test('acceptCoatOffer uses bank with 25% fee when cash is short but bank is sufficient', () => {
-    const state = Engine.newGame({ seed: 1 })
-    state.cash = 0
-    state.bank = 1000
-    const offer = { pockets: 10, price: 400 }
-    const totalExpected = Math.ceil(400 * 1.25) // 500
-    const res = Engine.acceptCoatOffer(state, offer)
-    assert.equal(res.ok, true)
-    assert.equal(res.usedBank, true)
-    assert.equal(res.fee, Math.ceil(400 * Engine.RULES.bankPurchaseFee))
-    assert.equal(state.bank, 1000 - totalExpected)
-    assert.equal(state.cash, 0) // cash untouched
-    assert.equal(state.coatCapacity, 110)
+  test('acceptCoatOffer pocket range is 11-20', () => {
+    const lo = Engine.newGame({ seed: 1 })
+    lo.cash = 500
+    Engine.acceptCoatOffer(lo, { price: 300 }, scripted(0))
+    assert.equal(lo.coatCapacity, 111)
+    const hi = Engine.newGame({ seed: 1 })
+    hi.cash = 500
+    Engine.acceptCoatOffer(hi, { price: 300 }, scripted(0.999999))
+    assert.equal(hi.coatCapacity, 120)
   })
 
-  test('acceptCoatOffer fails when both cash and bank are insufficient', () => {
+  test('acceptCoatOffer never touches the bank and draws nothing when cash is short', () => {
     const state = Engine.newGame({ seed: 1 })
     state.cash = 0
-    state.bank = 100
-    const offer = { pockets: 10, price: 400 }
-    const res = Engine.acceptCoatOffer(state, offer)
+    state.bank = 100000
+    const rng = scripted()
+    const res = Engine.acceptCoatOffer(state, { price: 300 }, rng)
     assert.equal(res.ok, false)
+    assert.equal(state.bank, 100000)
     assert.equal(state.coatCapacity, 100)
+    assert.equal(rng.drawn(), 0)
   })
 
-  // Gun dealer
-  test('acceptGunOffer pays from cash when sufficient', () => {
+  test('rollGunDealerOffer prices 301-550', () => {
+    const state = Engine.newGame({ seed: 1 })
+    state.cash = 10000
+    assert.equal(Engine.rollGunDealerOffer(state, scripted(0, 0)).price, 301)
+    assert.equal(Engine.rollGunDealerOffer(state, scripted(0.999999, 0)).price, 550)
+  })
+
+  test('rollGunDealerOffer draws the name only when the offer is made', () => {
+    const state = Engine.newGame({ seed: 1 })
+    state.cash = 301
+    const unaffordable = scripted(0)
+    const none = Engine.rollGunDealerOffer(state, unaffordable)
+    assert.equal(none.offered, false)
+    assert.equal(unaffordable.drawn(), 1)
+    state.cash = 302
+    const affordable = scripted(0, 0.99)
+    const made = Engine.rollGunDealerOffer(state, affordable)
+    assert.equal(made.offered, true)
+    assert.equal(made.nameIndex, 3)
+    assert.equal(affordable.drawn(), 2)
+  })
+
+  test('gun names are the four Beermat names in order', () => {
+    assert.deepEqual([...Engine.RULES.gunNames], ['Baretta', '.38 Special', 'Ruger', 'Saturday Night Special'])
+  })
+
+  test('acceptGunOffer pays cash, adds a gun and uses no coat space', () => {
     const state = Engine.newGame({ seed: 1 })
     state.cash = 500
-    const offer = { price: 300, damage: 5, space: 4 }
-    const res = Engine.acceptGunOffer(state, offer)
+    const usedBefore = Engine.coatUsed(state)
+    const res = Engine.acceptGunOffer(state, { price: 300, nameIndex: 0 })
     assert.equal(res.ok, true)
-    assert.equal(res.usedBank, false)
     assert.equal(state.cash, 200)
     assert.equal(state.guns, 1)
+    assert.equal(Engine.coatUsed(state), usedBefore)
   })
 
-  test('acceptGunOffer uses bank with 25% fee when cash is short but bank is sufficient', () => {
+  test('acceptGunOffer succeeds with a full coat', () => {
     const state = Engine.newGame({ seed: 1 })
-    state.cash = 0
-    state.bank = 1000
-    const offer = { price: 400, damage: 5, space: 4 }
-    const totalExpected = Math.ceil(400 * 1.25) // 500
-    const res = Engine.acceptGunOffer(state, offer)
-    assert.equal(res.ok, true)
-    assert.equal(res.usedBank, true)
-    assert.equal(res.fee, Math.ceil(400 * Engine.RULES.bankPurchaseFee))
-    assert.equal(state.bank, 1000 - totalExpected)
-    assert.equal(state.cash, 0)
+    state.cash = 500
+    state.inventory.weed = { qty: state.coatCapacity, avgPrice: 0 }
+    assert.equal(Engine.acceptGunOffer(state, { price: 300, nameIndex: 0 }).ok, true)
     assert.equal(state.guns, 1)
   })
 
-  test('acceptGunOffer fails when both cash and bank are insufficient', () => {
+  test('acceptGunOffer never touches the bank', () => {
     const state = Engine.newGame({ seed: 1 })
     state.cash = 0
-    state.bank = 100
-    const offer = { price: 400, damage: 5, space: 4 }
-    const res = Engine.acceptGunOffer(state, offer)
+    state.bank = 100000
+    const res = Engine.acceptGunOffer(state, { price: 300, nameIndex: 0 })
     assert.equal(res.ok, false)
+    assert.equal(state.bank, 100000)
     assert.equal(state.guns, 0)
   })
 
-  test('bankPurchaseFee is 0.25 in RULES', () => {
-    assert.equal(Engine.RULES.bankPurchaseFee, 0.25)
+  test('the bank purchase fee and gun space rules are gone', () => {
+    assert.equal(Engine.RULES.bankPurchaseFee, undefined)
+    assert.equal(Engine.RULES.gunSpace, undefined)
   })
 })
 

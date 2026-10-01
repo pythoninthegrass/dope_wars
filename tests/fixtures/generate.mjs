@@ -116,27 +116,27 @@ const FIXTURES = [
   },
   {
     name: '05-dealers',
-    meta: { seed: 1, description: 'coat + gun dealer paths', mechanic: 'cash / bank+25% fee / insufficient' },
+    meta: { seed: 1, description: 'coat + gun dealer acceptance', mechanic: 'cash only, pockets drawn on acceptance, no bank fallback, a gun uses no coat space' },
     steps: [
       { call: 'newGame', args: { seed: 1 } },
-      // coat cash path
+      // coat cash path; the pocket draw is Random(10) + 11
       { call: 'setField', args: { cash: 500, bank: 0 } },
-      { call: 'acceptCoatOffer', args: { offer: { pockets: 10, price: 300 } } },
-      // coat bank+fee path
-      { call: 'setField', args: { cash: 0, bank: 1000, coatCapacity: 100 } },
-      { call: 'acceptCoatOffer', args: { offer: { pockets: 10, price: 400 } } },
-      // coat insufficient
-      { call: 'setField', args: { cash: 0, bank: 100, coatCapacity: 100 } },
-      { call: 'acceptCoatOffer', args: { offer: { pockets: 10, price: 400 } } },
+      { call: 'acceptCoatOffer', args: { offer: { price: 300 } }, rng: [0.0] },
+      { call: 'setField', args: { cash: 500, bank: 0, coatCapacity: 100 } },
+      { call: 'acceptCoatOffer', args: { offer: { price: 300 } }, rng: [0.999] },
+      // coat is not paid from the bank, and nothing is drawn on failure
+      { call: 'setField', args: { cash: 0, bank: 100000, coatCapacity: 100 } },
+      { call: 'acceptCoatOffer', args: { offer: { price: 300 } }, rng: [] },
       // gun cash path
       { call: 'setField', args: { cash: 500, bank: 0, guns: 0 } },
-      { call: 'acceptGunOffer', args: { offer: { price: 300, damage: 5, space: 4 } } },
-      // gun bank+fee path
-      { call: 'setField', args: { cash: 0, bank: 1000, guns: 0 } },
-      { call: 'acceptGunOffer', args: { offer: { price: 400, damage: 5, space: 4 } } },
-      // gun insufficient
-      { call: 'setField', args: { cash: 0, bank: 100, guns: 0 } },
-      { call: 'acceptGunOffer', args: { offer: { price: 400, damage: 5, space: 4 } } },
+      { call: 'acceptGunOffer', args: { offer: { price: 300, nameIndex: 0 } } },
+      // a gun fits in a full coat
+      { call: 'setField', args: { cash: 500, guns: 0 } },
+      { call: 'setInventory', args: { weed: 100 } },
+      { call: 'acceptGunOffer', args: { offer: { price: 300, nameIndex: 1 } } },
+      // gun is not paid from the bank
+      { call: 'setField', args: { cash: 0, bank: 100000, guns: 0 } },
+      { call: 'acceptGunOffer', args: { offer: { price: 400, nameIndex: 2 } } },
     ],
   },
   {
@@ -212,7 +212,7 @@ const FIXTURES = [
   },
   {
     name: '10-rolls-and-helpers',
-    meta: { seed: 1, description: 'RNG-driven rolls and pure helpers', mechanic: 'shouldStartChase flat 1 in 6, coat/gun dealer offer ranges, getFightRatings, applyDamage' },
+    meta: { seed: 1, description: 'RNG-driven rolls and pure helpers', mechanic: 'shouldStartChase flat 1 in 6, coat/gun dealer offers, getFightRatings, applyDamage' },
     steps: [
       { call: 'newGame', args: { seed: 1 } },
       // shouldStartChase: Random(6) == 0, so only the first sixth of [0,1) starts a chase.
@@ -224,12 +224,22 @@ const FIXTURES = [
       { call: 'travel', args: { dest: 'manhattan' } },
       { call: 'shouldStartChase', rng: [0.0] },
       { call: 'shouldStartChase', rng: [0.999] },
-      // rollCoatDealerOffer: pockets = randInt(10,30), price = randInt(200,500).
-      { call: 'rollCoatDealerOffer', rng: [0.0, 0.0] },
-      { call: 'rollCoatDealerOffer', rng: [0.999, 0.999] },
-      // rollGunDealerOffer: price = randInt(250,600), damage/space from RULES.
+      // rollCoatDealerOffer: price = randInt(201, 350), offered only when price < cash.
+      { call: 'setField', args: { cash: 10000 } },
+      { call: 'rollCoatDealerOffer', rng: [0.0] },
+      { call: 'rollCoatDealerOffer', rng: [0.999999] },
+      { call: 'setField', args: { cash: 201 } },
+      { call: 'rollCoatDealerOffer', rng: [0.0] },
+      { call: 'setField', args: { cash: 202 } },
+      { call: 'rollCoatDealerOffer', rng: [0.0] },
+      // rollGunDealerOffer: price = randInt(301, 550), then the name draw only when offered.
+      { call: 'setField', args: { cash: 10000 } },
+      { call: 'rollGunDealerOffer', rng: [0.0, 0.0] },
+      { call: 'rollGunDealerOffer', rng: [0.999999, 0.999] },
+      { call: 'setField', args: { cash: 301 } },
       { call: 'rollGunDealerOffer', rng: [0.0] },
-      { call: 'rollGunDealerOffer', rng: [0.999] },
+      { call: 'setField', args: { cash: 302 } },
+      { call: 'rollGunDealerOffer', rng: [0.0, 0.5] },
       // getFightRatings: attack = 80 + guns*5, defend = 100.
       { call: 'setField', args: { guns: 0 } },
       { call: 'getFightRatings' },
@@ -263,57 +273,31 @@ const FIXTURES = [
   },
   {
     name: '12-dealer-visits',
-    meta: { seed: 13, description: 'coat/gun dealer visit draws', mechanic: 'rollDealerVisits seeded stream, four scripted combinations, dead-player draw consumption, chase skip' },
+    meta: { seed: 4, description: 'combined dealer visit draw', mechanic: 'rollDealerVisit seeded stream, 1 in 14 boundary, Random(4) coat/gun split, chase skip' },
     steps: [
-      // A) Seeded stream: eight back-to-back calls. Seed 13 is chosen so the
-      //    first eight pairs are varied (coat-only, both, and five plain
-      //    misses) rather than eight identical false/false lines. Every line
-      //    pins the pair *and* rngState, so the draw count and the coat-then-gun
-      //    order are oracle facts: a core that drew once per call, or skipped a
-      //    draw when the pair came out false/false, would desync rngState from
-      //    this line onward, not just on the line it got wrong.
-      { call: 'newGame', args: { seed: 13 } },
-      ...Array.from({ length: 8 }, () => ({ call: 'rollDealerVisits' })),
-      // B) Scripted RNG: the four reported combinations, forced rather than
-      //    left to whichever way a seed falls. A script is injected for one
-      //    call and is not drawn from state.rng, so each of these lines records
-      //    rngState unchanged from the seeded run — scripted mode is not an
-      //    extra draw. The last two pin the 0.15 boundary itself: just under it
-      //    visits, exactly it does not.
-      { call: 'rollDealerVisits', rng: [0.1, 0.5] }, // coat only
-      { call: 'rollDealerVisits', rng: [0.5, 0.1] }, // gun only
-      { call: 'rollDealerVisits', rng: [0.1, 0.1] }, // both
-      { call: 'rollDealerVisits', rng: [0.5, 0.5] }, // neither
-      { call: 'rollDealerVisits', rng: [0.1499999999, 0.1499999999] },
-      { call: 'rollDealerVisits', rng: [0.15, 0.15] },
-      // C) The dead player draws anyway. `dead` is true, so this call reports
-      //    false/false -- and its post-call rngState is required to equal the
-      //    live twin's two steps below, which made the same two scripted draws
-      //    with `dead` false. Asserting only the false/false pair would also
-      //    pass an implementation that tested `dead` before drawing; the
-      //    rngState equality is the part that rules that out. The live twin's
-      //    pair here (coat, gun both true) is what makes the next line's
-      //    false/false a suppression rather than two losing draws.
-      { call: 'setField', args: { dead: true, health: 0 } },
-      { call: 'rollDealerVisits', rng: [0.1, 0.1] },
-      { call: 'setField', args: { dead: false, health: 100 } },
-      { call: 'rollDealerVisits', rng: [0.1, 0.1] },
-      // D) Chase: index.html:1382-1383 pushes the chase and the two dealer
-      //    draws in the else branch are never reached. The skip is stated as a
-      //    draw budget rather than inferred from an absent step:
-      //    shouldStartChase spends exactly one draw at any location, so
-      //    repeating the identical roll must land on the same rngState. Had the
-      //    chase path also spent the two dealer draws, the second line would be
-      //    two draws further along.
+      // A) Seeded stream: back-to-back calls pin the kind and rngState, so the
+      //    draw count (one on a miss, two on a visit) is an oracle fact.
+      { call: 'newGame', args: { seed: 4 } },
+      ...Array.from({ length: 40 }, () => ({ call: 'rollDealerVisit' })),
+      // B) Scripted RNG: Random(4) of 0 and 2 is the coat dealer, 1 and 3 the gun dealer.
+      { call: 'rollDealerVisit', rng: [0.0, 0.0] },
+      { call: 'rollDealerVisit', rng: [0.0, 0.25] },
+      { call: 'rollDealerVisit', rng: [0.0, 0.5] },
+      { call: 'rollDealerVisit', rng: [0.0, 0.75] },
+      // C) The 1 in 14 boundary: the last value that visits, and the first that does not.
+      { call: 'rollDealerVisit', rng: [0.0714, 0.0] },
+      { call: 'rollDealerVisit', rng: [0.0715] },
+      { call: 'rollDealerVisit', rng: [0.999] },
+      // D) Chase: the arrival sequence skips the dealer when a chase starts.
+      //    shouldStartChase spends exactly one draw, so repeating the identical
+      //    roll must land on the same rngState; a chase path that also spent
+      //    the dealer draws would be further along.
       { call: 'setField', args: { location: 'manhattan' } },
-      // 0.0 scales to Random(6) == 0, so the chase fires.
       { call: 'shouldStartChase', rng: [0.0] },
       { call: 'shouldStartChase', rng: [0.0] },
-      // A live twin that *is* offered the dealers spends the two draws the chase
-      // path saved, so it lands two draws further along than the chase twin
-      // above.
+      // A live twin that is offered the dealer spends the draw the chase saved.
       { call: 'setField', args: { location: 'bronx' } },
-      { call: 'rollDealerVisits' },
+      { call: 'rollDealerVisit' },
     ],
   },
 ]

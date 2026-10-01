@@ -648,7 +648,6 @@
       bankInterest: 0.05, // beermat-verified (TASK-009): 5%/turn, matches docs/gameplay.md's C-source figure, not the Keymash-only 2%
       startLocation: 'bronx',
       gunDamage: 5,
-      gunSpace: 4,
       playerArmor: 100,
       locations: [
         { id: 'bronx', name: 'Bronx' },
@@ -676,10 +675,10 @@
       eventOdds: 20,
       cheapDivide: 10,
       expensiveMultiply: 5,
-      coatDealer: { minPockets: 10, maxPockets: 30, minPrice: 200, maxPrice: 500 },
-      gunDealer: { minPrice: 250, maxPrice: 600 },
-      // Fee charged when drawing from bank to cover a coat/gun purchase (split: ATM + dealer's time)
-      bankPurchaseFee: 0.25,
+      dealerOdds: 14,
+      coatDealer: { minPockets: 11, maxPockets: 20, minPrice: 201, maxPrice: 350 },
+      gunDealer: { minPrice: 301, maxPrice: 550 },
+      gunNames: ['Baretta', '.38 Special', 'Ruger', 'Saturday Night Special'],
     };
 
     function findDrug(id) { return RULES.drugs.find((d) => d.id === id); }
@@ -713,7 +712,6 @@
     function coatUsed(state) {
       let used = 0;
       for (const k in state.inventory) used += state.inventory[k].qty;
-      used += state.guns * RULES.gunSpace;
       return used;
     }
 
@@ -902,46 +900,38 @@
       return { type: 'none' };
     }
 
+    // One combined dealer chance per non-chase arrival, then an even coat/gun split (docs/beermat-re.md, M-05).
+    function rollDealerVisit(state, rng) {
+      if (randInt(rng, 0, RULES.dealerOdds - 1) !== 0) return { kind: 'none' };
+      return { kind: randInt(rng, 0, 3) % 2 === 0 ? 'coat' : 'gun' };
+    }
+
     function rollCoatDealerOffer(state, rng) {
-      const cfg = RULES.coatDealer;
-      const pockets = randInt(rng, cfg.minPockets, cfg.maxPockets);
-      const price = randInt(rng, cfg.minPrice, cfg.maxPrice);
-      return { pockets, price };
+      const price = randInt(rng, RULES.coatDealer.minPrice, RULES.coatDealer.maxPrice);
+      return { price, offered: price < state.cash };
     }
 
-    function acceptCoatOffer(state, offer) {
-      if (offer.price > state.cash) {
-        const fee = Math.ceil(offer.price * RULES.bankPurchaseFee);
-        const total = offer.price + fee;
-        if (state.bank < total) return { ok: false };
-        state.bank -= total;
-        state.coatCapacity += offer.pockets;
-        return { ok: true, usedBank: true, fee };
-      }
+    // The pocket count is drawn on acceptance, after the price.
+    function acceptCoatOffer(state, offer, rng) {
+      if (offer.price > state.cash) return { ok: false };
+      const pockets = randInt(rng, RULES.coatDealer.minPockets, RULES.coatDealer.maxPockets);
       state.cash -= offer.price;
-      state.coatCapacity += offer.pockets;
-      return { ok: true, usedBank: false };
+      state.coatCapacity += pockets;
+      return { ok: true, pockets };
     }
 
+    // The cosmetic gun name is drawn only when the offer is actually made.
     function rollGunDealerOffer(state, rng) {
-      const cfg = RULES.gunDealer;
-      const price = randInt(rng, cfg.minPrice, cfg.maxPrice);
-      return { price, damage: RULES.gunDamage, space: RULES.gunSpace };
+      const price = randInt(rng, RULES.gunDealer.minPrice, RULES.gunDealer.maxPrice);
+      if (!(price < state.cash)) return { price, offered: false, nameIndex: 0 };
+      return { price, offered: true, nameIndex: randInt(rng, 0, RULES.gunNames.length - 1) };
     }
 
     function acceptGunOffer(state, offer) {
-      if (coatUsed(state) + offer.space > state.coatCapacity) return { ok: false };
-      if (offer.price > state.cash) {
-        const fee = Math.ceil(offer.price * RULES.bankPurchaseFee);
-        const total = offer.price + fee;
-        if (state.bank < total) return { ok: false };
-        state.bank -= total;
-        state.guns += 1;
-        return { ok: true, usedBank: true, fee };
-      }
+      if (offer.price > state.cash) return { ok: false };
       state.cash -= offer.price;
       state.guns += 1;
-      return { ok: true, usedBank: false };
+      return { ok: true };
     }
 
     // Beermat starts a chase on Random(6) == 0, the same at every location (docs/beermat-re.md, M-04).
@@ -1036,6 +1026,7 @@
       travel,
       finances,
       rollArrivalEvent,
+      rollDealerVisit,
       rollCoatDealerOffer,
       acceptCoatOffer,
       rollGunDealerOffer,
@@ -1360,10 +1351,11 @@
       if (E.shouldStartChase(state, state.rng)) {
         queue.push({ kind: 'chase' });
       } else {
-        const arrivalEvent = E.rollArrivalEvent(state, state.rng);
-        if (arrivalEvent.type !== 'none') queue.push({ kind: 'event', event: arrivalEvent });
-        if (state.rng() < 0.15 && !state.dead) queue.push({ kind: 'coatDealer' });
-        if (state.rng() < 0.15 && !state.dead) queue.push({ kind: 'gunDealer' });
+        // The dealer comes first and the arrival event is rolled after it is dealt with (docs/beermat-re.md, M-05).
+        const visit = E.rollDealerVisit(state, state.rng);
+        if (visit.kind === 'coat') queue.push({ kind: 'coatDealer' });
+        if (visit.kind === 'gun') queue.push({ kind: 'gunDealer' });
+        queue.push({ kind: 'eventRoll' });
       }
 
       processQueue(queue);
@@ -1377,6 +1369,12 @@
         document.getElementById('alertOk').addEventListener('click', () => processQueue(queue), { once: true });
         return;
       }
+      if (item.kind === 'eventRoll') {
+        const arrivalEvent = E.rollArrivalEvent(state, state.rng);
+        if (arrivalEvent.type !== 'none') queue.unshift({ kind: 'event', event: arrivalEvent });
+        processQueue(queue);
+        return;
+      }
       if (item.kind === 'event') {
         showAlert('Random Event', item.event.message, item.event.type === 'freeWeedDeath' ? '☠️' : '⚠️');
         document.getElementById('alertOk').addEventListener('click', () => {
@@ -1388,47 +1386,33 @@
       }
       if (item.kind === 'coatDealer') {
         const offer = E.rollCoatDealerOffer(state, state.rng);
-        const needsBank = offer.price > state.cash;
-        const fee = Math.ceil(offer.price * E.RULES.bankPurchaseFee);
-        const totalWithFee = offer.price + fee;
-        const canAffordFromBank = needsBank && state.bank >= totalWithFee;
-        const canBuy = !needsBank || canAffordFromBank;
-        const priceNote = needsBank
-          ? `<div style="color:#800000;margin-top:4px">Not enough cash — ATM + dealer fee: $${fmt(fee)} (total $${fmt(totalWithFee)} from bank)</div>`
-          : '';
+        if (!offer.offered) { processQueue(queue); return; }
         openDialog(`
           <div class="titlebar"><span class="titlebar-title">Coat Dealer</span></div>
           <div class="dialog-body">
-            <div>Would you like to buy a trenchcoat with ${offer.pockets} more pockets for $${fmt(offer.price)}?${priceNote}</div>
+            <div>Would you like to buy a trenchcoat with more pockets for $${fmt(offer.price)}?</div>
             <div class="dialog-buttons">
-              <button type="button" id="coatBuy"${canBuy ? '' : ' disabled'}>Buy</button>
+              <button type="button" id="coatBuy">Buy</button>
               <button type="button" id="coatDecline">Decline</button>
             </div>
           </div>
         `);
         document.getElementById('coatDecline').addEventListener('click', () => { closeDialog(); render(); processQueue(queue); });
         document.getElementById('coatBuy').addEventListener('click', () => {
-          E.acceptCoatOffer(state, offer);
+          E.acceptCoatOffer(state, offer, state.rng);
           closeDialog(); render(); processQueue(queue);
         });
         return;
       }
       if (item.kind === 'gunDealer') {
         const offer = E.rollGunDealerOffer(state, state.rng);
-        const needsBank = offer.price > state.cash;
-        const fee = Math.ceil(offer.price * E.RULES.bankPurchaseFee);
-        const totalWithFee = offer.price + fee;
-        const canAffordFromBank = needsBank && state.bank >= totalWithFee;
-        const canBuy = !needsBank || canAffordFromBank;
-        const priceNote = needsBank
-          ? `<div style="color:#800000;margin-top:4px">Not enough cash — ATM + dealer fee: $${fmt(fee)} (total $${fmt(totalWithFee)} from bank)</div>`
-          : '';
+        if (!offer.offered) { processQueue(queue); return; }
         openDialog(`
           <div class="titlebar"><span class="titlebar-title">Gun Dealer</span></div>
           <div class="dialog-body">
-            <div>Need protection? I got a gun for $${fmt(offer.price)}.${priceNote}</div>
+            <div>Would you like to buy a ${E.RULES.gunNames[offer.nameIndex]} for $${fmt(offer.price)}?</div>
             <div class="dialog-buttons">
-              <button type="button" id="gunBuy"${canBuy ? '' : ' disabled'}>Buy</button>
+              <button type="button" id="gunBuy">Buy</button>
               <button type="button" id="gunDecline">Decline</button>
             </div>
           </div>

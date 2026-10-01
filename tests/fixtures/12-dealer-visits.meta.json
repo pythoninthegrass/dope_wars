@@ -1,5 +1,5 @@
 {
-  "seed": 13,
-  "description": "coat/gun dealer visit draws",
-  "mechanic": "rollDealerVisits seeded stream, four scripted combinations, dead-player draw consumption, chase skip"
+  "seed": 4,
+  "description": "combined dealer visit draw",
+  "mechanic": "rollDealerVisit seeded stream, 1 in 14 boundary, Random(4) coat/gun split, chase skip"
 }
