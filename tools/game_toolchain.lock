@@ -1,0 +1,11 @@
+# Single source of truth for Godot export-template pins (TASK-012.02).
+# Parsed by tools/fetch_export_templates.py. Environment variables of the
+# same name override any entry.
+
+# Godot itself is installed via mise (aqua backend; see .tool-versions,
+# currently godot 4.7.2-stable). Export templates are never distributed by
+# mise on any platform, so they are always a checksum-verified download,
+# version-matched to the mise-pinned Godot release.
+GODOT_TEMPLATE_VERSION="4.7.2.stable"
+GODOT_TEMPLATES_URL="https://github.com/godotengine/godot-builds/releases/download/4.7.2-stable/Godot_v4.7.2-stable_export_templates.tpz"
+GODOT_TEMPLATES_SHA256="f298490b8d44d934be425a5a65a51bf15f422428b229a06a6e11d9ffea248011"

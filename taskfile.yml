@@ -13,6 +13,7 @@ env:
 
 includes:
   core: taskfiles/core.yml
+  export: taskfiles/export.yml
   extension: taskfiles/extension.yml
   game: taskfiles/game.yml
   re: taskfiles/re.yml

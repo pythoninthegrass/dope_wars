@@ -215,6 +215,44 @@ which should show `RPATH: [$ORIGIN]` and `NEEDED: [libKGENCompilerRTShared.so]`.
   hit that failure directly, `rm -rf game/.godot && task game:import` forces
   a clean reimport.
 
+## Tier 7 — Linux export (TASK-012.02)
+
+```sh
+task export:templates   # one-time: checksum-verified export-template download
+task export:linux       # produces game/build/linux/dopewars.x86_64 + .pck + .so files
+```
+
+`export:templates` downloads the Godot export templates pinned in
+`tools/game_toolchain.lock` (version-matched to `.tool-versions`' `godot`
+entry), checksum-verifies them, and extracts them to
+`.tools/game/xdg-data/godot/export_templates/<version>/` — gitignored and
+never under the user's real `~/.local/share/godot`. `export:linux` points
+Godot at that directory via `XDG_DATA_HOME` and runs `godot --headless
+--export-release Linux` against the `Linux` preset in
+`game/export_presets.cfg`. `game/bin/dopewars.gdextension`'s
+`[dependencies]` section lists the three vendored Mojo/KGEN runtime `.so`
+files (`libAsyncRTRuntimeGlobals.so`, `libKGENCompilerRTShared.so`,
+`libMSupportGlobals.so`) for `linux.debug.x86_64` and `linux.release.x86_64`,
+so Godot copies them into `game/build/linux/` alongside the exported binary
+and `.pck` — without that section the export would ship
+`libdopewars.linux.*.so` alone, and it would fail to `dlopen` its runtime
+dependencies outside the dev tree.
+
+**glibc floor** (measured on `mf`, AlmaLinux 10.2, glibc 2.39 — see
+`CLAUDE.local.md` for connection details): `objdump -T` against
+`game/bin/libdopewars.linux.template_release.x86_64.so` shows a floor of
+`GLIBC_2.38`, higher than any of the three vendored Mojo/KGEN runtime `.so`
+files (highest: `GLIBC_2.35`) and higher than Godot's own
+`linux_release.x86_64` export template (`GLIBC_2.28`) — so the GDExtension
+itself sets the overall floor. `mf`'s glibc 2.39 meets that floor, so no
+container build (e.g. an Ubuntu 22.04 image, as `~/git/neo_snake`'s
+`docker/linux/Dockerfile` does for its Zig core) is needed for distribution
+from this host. Re-measure if the Mojo toolchain version changes.
+
+Verified by copying `game/build/linux/`'s contents to a directory outside
+the repo and running `./dopewars.x86_64 --headless --quit-after 2`: no
+missing-library errors, exit code 0.
+
 ## Live inspection with gda
 
 `gda` and the `godot` MCP server need `GDA_GODOT` (path to the Godot binary)

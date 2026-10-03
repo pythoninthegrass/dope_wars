@@ -1,0 +1,42 @@
+# yaml-language-server: $schema=https://taskfile.dev/schema.json
+
+version: "3.0"
+
+vars:
+  GAME_TOOLS: "{{.ROOT_DIR}}/.tools/game"
+  LINUX_BUILD_DIR: "{{.ROOT_DIR}}/game/build/linux"
+
+tasks:
+  templates:
+    desc: "Download and checksum-verify the pinned Godot export templates (TASK-012.02 AC#3)"
+    cmds:
+      - python3 tools/fetch_export_templates.py
+    sources:
+      - tools/game_toolchain.lock
+      - tools/fetch_export_templates.py
+    status:
+      - test -f {{.GAME_TOOLS}}/xdg-data/godot/export_templates/4.7.2.stable/version.txt
+
+  linux:
+    desc: "Headless-export a Linux release build (TASK-012.02 AC#4)"
+    summary: |
+      task export:linux
+
+      Runs godot --headless --export-release Linux with no explicit output
+      path, so Godot writes to the "Linux" preset's own export_path
+      (game/export_presets.cfg): game/build/linux/dopewars.x86_64 plus its
+      .pck and the referenced release GDExtension .so (and the three
+      vendored Mojo/KGEN runtime .so files, now declared in
+      game/bin/dopewars.gdextension's [dependencies] section so Godot copies
+      them alongside the exported binary).
+
+      XDG_DATA_HOME is pointed at a repo-local directory so Godot discovers
+      the export templates task export:templates just installed there,
+      without ever touching the user's real ~/.local/share/godot.
+    platforms: [linux]
+    deps: [":export:templates", ":game:import", ":extension:build-linux"]
+    cmds:
+      - mkdir -p {{.LINUX_BUILD_DIR}}
+      - >-
+        env XDG_DATA_HOME="{{.GAME_TOOLS}}/xdg-data"
+        godot --headless --path game --export-release Linux

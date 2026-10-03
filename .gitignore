@@ -311,4 +311,8 @@ game/assets/sound/*
 # TASK-002 vendored Mojo runtime (copied into game/bin by the extension build)
 libKGENCompilerRTShared.*
 libMSupportGlobals.*
+
+# TASK-012.02 checksum-verified export-template download and fake XDG_DATA_HOME,
+# so `task export:templates` never touches the user's real ~/.local/share/godot
+.tools/
 libAsyncRTRuntimeGlobals.*
