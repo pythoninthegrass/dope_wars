@@ -12,6 +12,7 @@ env:
   PATH: "{{.MISE_SHIMS}}:{{.PATH}}"
 
 includes:
+  capture: taskfiles/capture.yml
   core: taskfiles/core.yml
   export: taskfiles/export.yml
   extension: taskfiles/extension.yml

@@ -316,3 +316,6 @@ libMSupportGlobals.*
 # so `task export:templates` never touches the user's real ~/.local/share/godot
 .tools/
 libAsyncRTRuntimeGlobals.*
+
+# Screenshots from task capture:linux
+artifacts/

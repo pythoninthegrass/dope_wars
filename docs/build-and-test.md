@@ -272,6 +272,20 @@ The vendored `libKGENCompilerRTShared.so` (Modular's prebuilt runtime) still con
 
 Godot falls back to X11 on its own when Wayland is unavailable (checked by pointing `WAYLAND_DISPLAY` at a nonexistent socket: it logs "falling back to x11" and starts at 704x620), so pure-X11 desktops still work. `task game:ui-test` asserts the setting; the window size itself cannot be asserted headless because headless has no screen scale, so it is checked by hand on a HiDPI Wayland machine. Release templates ignore `--path` and `--script`, so to measure the exported build, export a `.pck` with temporary `print` instrumentation (`godot --headless --path game --export-pack Linux <out>.pck`) and swap it next to an exported binary.
 
+## Tier 8 — Linux parity screenshots (TASK-012.03)
+
+```sh
+task capture:linux -- --seed=42
+```
+
+Exports the Linux build, then `tools/capture_parity.sh` starts a headless sway compositor, runs the exported build at each state, loads `index.html?seed=42` in Firefox under the same compositor, and saves one PNG per side and state with `grim` to `artifacts/parity/` (gitignored): `godot-<state>.png` and `oracle-<state>.png`. It is for a human to compare by eye and asserts nothing about the pixels; it needs `sway`, `swaymsg`, `wtype`, `grim`, `firefox` and `jq` on the host and is Linux-only, so it is not part of `task check`.
+
+The Godot side is driven by `--capture-state=<boot|buy|travel|finances>` (`Main.drive_capture_state`, covered by the `capture_states` case in `task game:ui-test`), which calls the same entry points as the keyboard and buttons and starts from the seed instead of a saved game. The hook exists because wtype keystrokes under headless sway reach a Godot window without changing game state. The prototype side takes real `wtype` keystrokes (`f` for finances, `6` for Brooklyn).
+
+The oracle has no buy screenshot: the prototype selects a drug only by clicking a table row, and a headless sway seat has no pointer device (`swaymsg get_seats` reports no pointer capability, and `swaymsg seat cursor` events, `wlrctl` and `ydotool` all need a persistent virtual pointer or a libinput backend that would also grab the host's physical input devices). The buy state is therefore Godot-only.
+
+Things that bit while building it, so they are not rediscovered: Godot's default Vulkan renderer cannot get a surface under headless sway, so the script forces `--rendering-driver opengl3 --rendering-method gl_compatibility`; a lone per-invocation `wtype` loses a race with its own virtual keyboard, so one `wtype -s` is held open for the whole run; the game's `print` output is block-buffered into a log file, so the script runs it under `stdbuf -oL`; and each run gets a throwaway `XDG_DATA_HOME` so it never touches the player's real save. Verified for seed 42: the day-1 market, the day-2 market after travelling to Brooklyn (prices and trend arrows) and the finances figures are identical on both sides.
+
 ## Live inspection with gda
 
 `gda` and the `godot` MCP server need `GDA_GODOT` (path to the Godot binary)

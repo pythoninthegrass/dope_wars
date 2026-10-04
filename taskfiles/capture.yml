@@ -1,0 +1,20 @@
+# yaml-language-server: $schema=https://taskfile.dev/schema.json
+
+version: "3.0"
+
+tasks:
+  linux:
+    desc: "Screenshot the Linux build and index.html at matching states under headless sway (TASK-012.03)"
+    summary: |
+      task capture:linux -- --seed=42
+
+      Exports the Linux build, then tools/capture_parity.sh starts a headless
+      sway session, drives the build to each state with its --capture-state=
+      hook, drives index.html?seed=<n> in Firefox with real wtype input, and
+      saves one PNG per side and state to artifacts/parity (gitignored) with
+      grim. Needs sway, wtype, grim and firefox on the host. For a human to
+      compare by eye; it asserts nothing about the pixels.
+    platforms: [linux]
+    deps: [":export:linux"]
+    cmds:
+      - bash tools/capture_parity.sh {{.CLI_ARGS}}
