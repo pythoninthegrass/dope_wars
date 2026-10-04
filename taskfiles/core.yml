@@ -39,9 +39,13 @@ tasks:
     desc: "Build core/build-output/lib/libdopewars.a from the Mojo sources"
     deps: [_install-venv]
     dir: core
+    vars:
+      # Mojo defaults to the host CPU, so a build host with AVX-512 emits code that traps (SIGILL) elsewhere. Linux x86-64 is the only distributed non-native target; macOS arm64 stays host-native.
+      MOJO_CPU_FLAGS:
+        sh: '[ "$(uname -s)-$(uname -m)" = "Linux-x86_64" ] && echo "--target-cpu x86-64-v3" || true'
     cmds:
       - mkdir -p build-output/lib
-      - .venv/bin/mojo build src/abi.mojo --emit object -o build-output/dopewars-raw.o
+      - .venv/bin/mojo build src/abi.mojo --emit object {{.MOJO_CPU_FLAGS}} -o build-output/dopewars-raw.o
       # On ELF, Mojo's `--emit object` output carries its runtime's symbols as
       # globals, so everything outside the dw_* set is demoted to local here.
       # The ABI contract (docs/abi-contract.md, "The two sets are equal") says
@@ -67,11 +71,14 @@ tasks:
       # AC#1 of TASK-001.05: the archive's global defined set must contain no
       # non-dw_* symbol. Runs on the archive, so it needs no compiler.
       - python3 ../tools/check_abi_exports.py build-output/lib/libdopewars.a
+      # TASK-012.05 AC#3: no AVX-512 beyond the x86-64-v3 baseline. Only meaningful where the baseline flag applies.
+      - test -z "{{.MOJO_CPU_FLAGS}}" || python3 ../tools/check_cpu_baseline.py build-output/lib/libdopewars.a
     sources:
       - "src/**/*.mojo"
       - "../include/dopewars.h"
       - "../tools/abi_symbols.py"
       - "../tools/check_abi_exports.py"
+      - "../tools/check_cpu_baseline.py"
     generates:
       - build-output/lib/libdopewars.a
 

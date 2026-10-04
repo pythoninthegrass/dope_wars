@@ -49,7 +49,7 @@ the fixtures whose filename contains `04` or `05`.
 task abi:check
 ```
 
-Three checks, none of which build or run anything:
+Four checks, none of which build or run anything:
 
 - `tools/validate_abi_exporter.py` — only `core/src/abi.mojo` declares
   `@export` symbols.
@@ -57,6 +57,7 @@ Three checks, none of which build or run anything:
   simulation only through `include/dopewars.h`, never a core import.
 - `tools/abi_symbols.py --check` — the header parses as C and its
   declarations are unique.
+- `tools/test_check_cpu_baseline.py` — self-check for the CPU-baseline gate that `core:build` runs on Linux x86-64 (see "CPU baseline" under Tier 7).
 
 ## Tier 3 — ABI conformance (Tier-C)
 
@@ -252,6 +253,18 @@ from this host. Re-measure if the Mojo toolchain version changes.
 Verified by copying `game/build/linux/`'s contents to a directory outside
 the repo and running `./dopewars.x86_64 --headless --quit-after 2`: no
 missing-library errors, exit code 0.
+
+### CPU baseline (TASK-012.05)
+
+On Linux x86-64, `core:build` passes `--target-cpu x86-64-v3` to `mojo build` (AVX2, FMA, BMI2; Intel Haswell and AMD Excavator/Zen onward, roughly 2013 and later). Older CPUs are deliberately not supported. macOS arm64 and any other host stay host-native, because the flag is only added when `uname` reports `Linux-x86_64`.
+
+The reason is that `mojo build` defaults to the host CPU. The first Linux export was built on `mf` (Ryzen 7 7840HS, AVX-512) and its core library contained AVX-512 instructions (`%zmm` registers, `%k` masks); it died with SIGILL at startup on a Fedora 42 laptop with a Core Ultra 7 155H, which has AVX2 but no AVX-512. The kernel's `traps: ... trap invalid opcode ... in libdopewars.linux.template_release.x86_64.so` line (`journalctl -k`) is how that was pinned to our core library rather than the Mojo runtime.
+
+`tools/check_cpu_baseline.py` is the gate: `core:build` disassembles `libdopewars.a` after the ABI export check and fails if any instruction uses a `%zmm` register, a `%k0-%k7` mask register, or `%xmm16-31`/`%ymm16-31` (registers only EVEX can encode). `ymm` and VEX instructions are inside the baseline and allowed. `tools/test_check_cpu_baseline.py` (run by `task abi:check`) proves the scanner catches each marker. Run it by hand on an exported library with `python3 tools/check_cpu_baseline.py game/build/linux/libdopewars.linux.template_release.x86_64.so`.
+
+`task core:test` does not exercise the baseline codegen, since it runs through `mojo run`, which compiles for the host CPU. The bridge and ui tests do, because they load the rebuilt archive through the GDExtension.
+
+The vendored `libKGENCompilerRTShared.so` (Modular's prebuilt runtime) still contains AVX-512 code, and that is safe on CPUs without it: a runtime feature probe (`cpuid` leaves 0, 1 and 7, then `xgetbv`) selects one row of a four-row function-pointer table (scalar, SSE2, AVX2, AVX-512) and copies it into globals, and the AVX-512 row is chosen only when AVX-512F is present and the OS has enabled all of the AVX-512 register state (`XCR0 & 0xe6`). The `%zmm` functions are reachable only through that table (no direct callers). The probe itself uses `vmovups %ymm0`, so the runtime needs AVX, which the v3 baseline already implies. Verified by disassembly and by running the export on the AVX2-only laptop above: `./dopewars.x86_64 --headless --quit-after 120 --seed=42` exits 0 with no invalid-opcode trap.
 
 ## Live inspection with gda
 

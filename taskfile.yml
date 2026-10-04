@@ -46,6 +46,8 @@ tasks:
       - python3 tools/validate_abi_test_purity.py
       # The header must parse, and its declarations must be unique.
       - python3 tools/abi_symbols.py --check
+      # The CPU-baseline gate must itself catch AVX-512 markers (TASK-012.05).
+      - uv run tools/test_check_cpu_baseline.py
 
   abi:conformance:
     desc: "Tier-C ABI conformance: ctypes suite, Mojo external_call suite, C header check"
