@@ -129,6 +129,8 @@ func _run() -> void:
 	await _test_new_game_dialog()
 	_case("win98_chrome")
 	_test_win98_chrome()
+	_case("linux_display_driver")
+	_test_linux_display_driver()
 	_case("window_pinned")
 	_test_window_pinned()
 	_case("tables_fit_twelve_drugs")
@@ -981,6 +983,14 @@ func _test_window_pinned() -> void:
 	_assert(
 		ProjectSettings.get_setting("display/window/stretch/aspect") == "keep_width",
 		"stretch/aspect should be keep_width so the fixed-width chrome never stretches"
+	)
+
+
+# Under XWayland Godot reports screen scale 1.0, so the HiDPI window fix in Main._constrain_window cannot apply; see TASK-012.06.
+func _test_linux_display_driver() -> void:
+	_assert(
+		ProjectSettings.get_setting("display/display_server/driver.linuxbsd", "") == "wayland",
+		"display_server/driver.linuxbsd should be wayland so a HiDPI Linux desktop does not fall into XWayland's scale-1.0 window"
 	)
 
 

@@ -266,6 +266,12 @@ The reason is that `mojo build` defaults to the host CPU. The first Linux export
 
 The vendored `libKGENCompilerRTShared.so` (Modular's prebuilt runtime) still contains AVX-512 code, and that is safe on CPUs without it: a runtime feature probe (`cpuid` leaves 0, 1 and 7, then `xgetbv`) selects one row of a four-row function-pointer table (scalar, SSE2, AVX2, AVX-512) and copies it into globals, and the AVX-512 row is chosen only when AVX-512F is present and the OS has enabled all of the AVX-512 register state (`XCR0 & 0xe6`). The `%zmm` functions are reachable only through that table (no direct callers). The probe itself uses `vmovups %ymm0`, so the runtime needs AVX, which the v3 baseline already implies. Verified by disassembly and by running the export on the AVX2-only laptop above: `./dopewars.x86_64 --headless --quit-after 120 --seed=42` exits 0 with no invalid-opcode trap.
 
+### Display driver and window scale on Linux (TASK-012.06)
+
+`game/project.godot` sets `display_server/driver.linuxbsd="wayland"`. Godot defaults to X11, and on a GNOME or KDE Wayland desktop a terminal session has `DISPLAY` set, so the game ran under XWayland, which reports screen scale 1.0 to the client. `Main._constrain_window` (see its comment) scales the 704x620 window by `screen_get_scale()`, so under XWayland it did nothing and the window opened tiny on a HiDPI panel. Measured on a 3072x1920 panel at 1.5x: X11 driver gave scale 1.0 and a 704x620 window, native Wayland gave scale 2.0 and a 1409x1241 window. Godot only reports integer scales, so a fractional compositor scale is rounded up to 2 and the compositor scales the result down.
+
+Godot falls back to X11 on its own when Wayland is unavailable (checked by pointing `WAYLAND_DISPLAY` at a nonexistent socket: it logs "falling back to x11" and starts at 704x620), so pure-X11 desktops still work. `task game:ui-test` asserts the setting; the window size itself cannot be asserted headless because headless has no screen scale, so it is checked by hand on a HiDPI Wayland machine. Release templates ignore `--path` and `--script`, so to measure the exported build, export a `.pck` with temporary `print` instrumentation (`godot --headless --path game --export-pack Linux <out>.pck`) and swap it next to an exported binary.
+
 ## Live inspection with gda
 
 `gda` and the `godot` MCP server need `GDA_GODOT` (path to the Godot binary)

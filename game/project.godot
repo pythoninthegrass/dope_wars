@@ -40,6 +40,9 @@ window/size/maximize_disabled=true
 window/stretch/mode="canvas_items"
 window/stretch/aspect="keep_width"
 
+; Prefer native Wayland on Linux: XWayland reports screen scale 1.0, so the HiDPI sizing in Main._constrain_window never applies and the window opens tiny (TASK-012.06). Godot falls back to X11 when Wayland is unavailable.
+display_server/driver.linuxbsd="wayland"
+
 [internationalization]
 
 ; Every display string is a tr() key; this is the compiled English table that
