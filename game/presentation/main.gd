@@ -38,6 +38,10 @@ var _finished := false
 ## so `godot --path game -- --seed=12345` replays that seed.
 const SEED_ARG := "--seed="
 
+## `--capture-state=<state>` takes one of CAPTURE_STATES; see drive_capture_state.
+const CAPTURE_STATE_ARG := "--capture-state="
+const CAPTURE_STATES: Array[String] = ["boot", "buy", "travel", "finances"]
+
 func _ready() -> void:
 	_constrain_window()
 	theme = Win98Theme.shared()
@@ -100,24 +104,73 @@ func _constrain_window() -> void:
 ## Load the save if there is a usable one, otherwise start fresh --
 ## index.html:1700-1706.
 func _boot() -> void:
-	if _saves.load_into(_world):
+	var capture: Variant = _arg_value(CAPTURE_STATE_ARG)
+	# A capture run starts from its seed, never from whatever save is on disk.
+	if capture == null and _saves.load_into(_world):
 		_hud.seed_last_day_warning(_world)
 		_hud.clear_selection()
 		_refresh()
 		return
 	start_new_game(_seed_from_args())
+	if capture != null:
+		drive_capture_state(capture)
 
 
 func _seed_from_args() -> int:
+	var value: Variant = _arg_value(SEED_ARG)
+	return -1 if value == null else int(value)
+
+
+## The text after `prefix` in the first matching argument, or null when absent.
+func _arg_value(prefix: String) -> Variant:
 	for arg in OS.get_cmdline_user_args():
-		if arg.begins_with(SEED_ARG):
-			return int(arg.substr(SEED_ARG.length()))
+		if arg.begins_with(prefix):
+			return arg.substr(prefix.length())
 	# A bare --seed=N is also accepted, since that is what a packaged build
 	# will hand the player rather than a Godot-style `--` user arg.
 	for arg in OS.get_cmdline_args():
-		if arg.begins_with(SEED_ARG):
-			return int(arg.substr(SEED_ARG.length()))
-	return -1
+		if arg.begins_with(prefix):
+			return arg.substr(prefix.length())
+	return null
+
+
+## Drives the booted game to a named screen for the parity screenshots
+## (TASK-012.03), through the same entry points the keyboard and buttons use.
+## Under headless sway, synthetic keyboard input reaches the window without
+## changing game state, so the screenshot task cannot press these keys itself.
+## False for an unknown state.
+func drive_capture_state(state: String) -> bool:
+	match state:
+		"boot":
+			pass
+		"buy":
+			var row := _cheapest_market_row()
+			# The oracle side clicks this row, and its position depends on the seed.
+			print("capture-state buy: market_row=%d" % row)
+			_hud.market_drug_pressed(int(_world.prices_copy()[row]["drug_index"]))
+			await get_tree().process_frame
+			_do_buy()
+			await get_tree().process_frame
+			_dialogs.confirm()
+		"travel":
+			_do_travel(SimWorld.NUM_LOCATIONS - 1)
+		"finances":
+			_do_finances()
+		_:
+			push_warning("unknown capture state '%s' (known: %s)" % [state, ", ".join(CAPTURE_STATES)])
+			return false
+	return true
+
+
+## The market row of the cheapest drug, so the purchase is affordable from the
+## starting cash; the first row can cost more than that.
+func _cheapest_market_row() -> int:
+	var slots: Array = _world.prices_copy()
+	var best := 0
+	for row in slots.size():
+		if int(slots[row]["price"]) < int(slots[best]["price"]):
+			best = row
+	return best
 
 
 # --- new game / persistence -------------------------------------------------

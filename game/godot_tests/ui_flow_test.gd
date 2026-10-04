@@ -66,6 +66,7 @@ const CASES := [
 	"win98_chrome",
 	"linux_display_driver",
 	"window_pinned",
+	"capture_states",
 	"tables_fit_twelve_drugs",
 	"chase_and_doctor",
 	"dealer_dialogs",
@@ -94,6 +95,7 @@ const CASE_FLOORS := {
 	"win98_chrome": 82,
 	"linux_display_driver": 1,
 	"window_pinned": 5,
+	"capture_states": 17,
 	"tables_fit_twelve_drugs": 4,
 	"chase_and_doctor": 12,
 	"dealer_dialogs": 30,
@@ -135,6 +137,8 @@ func _run() -> void:
 	_test_linux_display_driver()
 	_case("window_pinned")
 	_test_window_pinned()
+	_case("capture_states")
+	await _test_capture_states()
 	_case("tables_fit_twelve_drugs")
 	await _test_tables_fit_twelve_drugs()
 	_case("chase_and_doctor")
@@ -994,6 +998,43 @@ func _test_linux_display_driver() -> void:
 		ProjectSettings.get_setting("display/display_server/driver.linuxbsd", "") == "wayland",
 		"display_server/driver.linuxbsd should be wayland so a HiDPI Linux desktop does not fall into XWayland's scale-1.0 window"
 	)
+
+
+# --capture-state=<state> drives the running game to a named screen for the parity screenshots (TASK-012.03). Each state goes through the same entry points as the other cases.
+func _test_capture_states() -> void:
+	_assert(Main.CAPTURE_STATES == ["boot", "buy", "travel", "finances"], "the capture states should be boot, buy, travel, finances, got %s" % [Main.CAPTURE_STATES])
+	var hud := _main.hud()
+
+	var world := _fresh(SEED)
+	var start_cash := int(world.state_get()["cash"])
+	_assert(await _main.drive_capture_state("boot"), "boot should be a known capture state")
+	await _idle()
+	_assert(int(world.state_get()["day"]) == 1, "boot should stay on day 1")
+	_assert(not _main.dialogs().is_open(), "boot should leave no dialog open")
+	_assert(hud.market_table().row_count() > 0, "boot should show the day-1 market")
+	_assert(hud.coat_table().row_count() == 0, "boot should leave the coat empty")
+
+	world = _fresh(SEED)
+	var cheapest := _cheapest_traded(world)
+	_assert(await _main.drive_capture_state("buy"), "buy should be a known capture state")
+	await _idle()
+	_assert(not _main.dialogs().is_open(), "buy should confirm and close the quantity dialog")
+	_assert(hud.coat_table().row_count() == 1, "buy should leave exactly one drug in the coat")
+	_assert(int(hud.coat_table().quantity_text(cheapest)) > 0, "buy should buy the cheapest drug on the market")
+	_assert(int(world.state_get()["cash"]) < start_cash, "buy should spend cash")
+
+	world = _fresh(SEED)
+	_assert(await _main.drive_capture_state("travel"), "travel should be a known capture state")
+	await _idle()
+	_assert(int(world.state_get()["day"]) == 2, "travel should advance to day 2")
+	_assert(int(world.state_get()["location_index"]) == SimWorld.NUM_LOCATIONS - 1, "travel should go to the last borough")
+
+	world = _fresh(SEED)
+	_assert(await _main.drive_capture_state("finances"), "finances should be a known capture state")
+	await _idle()
+	_assert(_main.dialogs().current() is FinancesDialog, "finances should open the finances dialog")
+
+	_assert(not await _main.drive_capture_state("nope"), "an unknown capture state should be refused")
 
 
 # The reason the window needs no resizing: every borough can trade all
