@@ -1,10 +1,11 @@
 ---
 id: TASK-012.03
 title: Play-test the Linux build and capture screenshots against the prototype oracle
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-01 21:00'
-updated_date: '2026-10-01 21:01'
+updated_date: '2026-10-03 22:43'
 labels: []
 dependencies:
   - TASK-012.02
