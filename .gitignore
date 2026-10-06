@@ -284,10 +284,6 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
-# INCLUDE
-!**/.gitkeep
-!**/*.example
-
 # TASK-001.03 build outputs
 .task/
 core/.venv/
@@ -319,3 +315,8 @@ libAsyncRTRuntimeGlobals.*
 
 # Screenshots from task capture:linux
 artifacts/
+
+# INCLUDE
+!**/.gitkeep
+!**/*.example
+
