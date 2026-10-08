@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-01 21:00'
-updated_date: '2026-10-03 22:43'
+updated_date: '2026-10-04 01:41'
 labels: []
 dependencies:
   - TASK-012.02
@@ -25,11 +25,19 @@ Gameplay *correctness* (does the Mojo core produce the right values) is already 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 A command-line hook (e.g. `--capture-state=<state>`) exists in `game/presentation/main.gd` that drives the running game to a named state (at minimum: boot/day-1 prices, post-buy, post-travel, finances dialog) by calling the same entry points `game:ui-test` already exercises — no duplicated logic
-- [ ] #2 A new `game:ui-test` case asserts each capture-state hook actually reaches the state it claims to
-- [ ] #3 A `platforms: [linux]` task (e.g. `task capture:linux -- --seed=42`) starts a headless sway session, launches the exported Linux build with a given seed, and uses `grim` to save one screenshot per captured state to a gitignored output directory
+- [x] #1 A command-line hook (e.g. `--capture-state=<state>`) exists in `game/presentation/main.gd` that drives the running game to a named state (at minimum: boot/day-1 prices, post-buy, post-travel, finances dialog) by calling the same entry points `game:ui-test` already exercises — no duplicated logic
+- [x] #2 A new `game:ui-test` case asserts each capture-state hook actually reaches the state it claims to
+- [x] #3 A `platforms: [linux]` task (e.g. `task capture:linux -- --seed=42`) starts a headless sway session, launches the exported Linux build with a given seed, and uses `grim` to save one screenshot per captured state to a gitignored output directory
 - [ ] #4 The same seed is loaded in `index.html?seed=<n>` under the same headless sway session (browser driven with real `wtype` input) and screenshotted at matching states
-- [ ] #5 Screenshots from both sides show the same day-1 drug prices for the same seed, confirming the Mojo core and JS oracle agree visually, not just in fixture tests
+- [x] #5 Screenshots from both sides show the same day-1 drug prices for the same seed, confirming the Mojo core and JS oracle agree visually, not just in fixture tests
 - [ ] #6 The exported Linux build is launched windowed at least once on mf (e.g. via the existing noVNC/SSH access) and played through a few turns interactively, with any visual or input issues noted
 - [ ] #7 Beermat itself is not required to be screenshotted in this task — its RNG cannot be seeded, so side-by-side comparison with the real 1999 executable remains the existing manual TASK-008-style workflow and is out of scope here
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-04 progress. AC#1/#2: `--capture-state=<boot|buy|travel|finances>` in game/presentation/main.gd (Main.drive_capture_state), covered by the `capture_states` ui-test case (17 assertions, floor registered in CASES/CASE_FLOORS; suite 557 assertions); commit 77a1309. AC#3: `task capture:linux -- --seed=42` (taskfiles/capture.yml, tools/capture_parity.sh, platforms: [linux], gitignored artifacts/parity) runs clean on mf, exit 0, 7 PNGs. AC#5: for seed 42 the day-1 market (Acid 3,104 / Cocaine 25,046 / Crack 1,683 / Ecstasy 54 / Hashish 1,244 / Heroin 6,775 / Speed 103 / Weed 316, cash 2,000, debt 5,500, start Bronx), the day-2 market after travelling to Brooklyn (prices and trend arrows, debt 6,050) and the finances figures are identical in the Godot and prototype screenshots, compared by eye. Cosmetic differences seen, not judged: the prototype's dialog title bar is a blue gradient, Godot's is flat navy; Close sits on its own row in the prototype's finances dialog, inline in Godot's.
+
+AC#4 is only partly met: the oracle side is captured for boot, travel and finances with real wtype keystrokes, but NOT for buy. The prototype can only select a drug by clicking a row, and headless sway's seat has no pointer capability (get_seats capabilities 0 until a virtual keyboard exists; then 2 = keyboard only). Tried: swaymsg seat cursor (events dropped), wlrctl built from source (one-shot virtual pointer, no effect), ydotool (needs a libinput backend; WLR_BACKENDS=headless,libinput works but sway then grabs mf's real physical keyboard/power button/video bus, so rejected). Remaining option is a small persistent virtual-pointer helper (wlr-virtual-pointer protocol) -- awaiting Lance's decision. Also lone per-invocation wtype lost keystrokes until one `wtype -s` was held open (neo_snake decision-025).
+<!-- SECTION:NOTES:END -->
