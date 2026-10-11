@@ -3,6 +3,8 @@
 version: "3"
 
 vars:
+  EXE: '{{.EXE | default "vendor/dopewars-1999/DopeWars.exe"}}'
+  OUT: '{{.OUT | default "vendor/dopewars-1999/re"}}'
   GHIDRA_VERSION: "12.1.4"
   GHIDRA_BUILD: "20260921"
   GHIDRA_SHA256: "ddac49f903da9d5bac833e5cc79395098b9c33cfd3279be5f31bd00387d2d4db"
@@ -51,9 +53,9 @@ tasks:
       - uv run tools/re/unwise.py
 
   extract:
-    desc: "Extract forms from vendor/dopewars-1999/DopeWars.exe into the gitignored vendor/dopewars-1999/re/"
+    desc: "Extract forms from EXE (default vendor/dopewars-1999/DopeWars.exe) into the gitignored OUT (default vendor/dopewars-1999/re/), e.g. task re:extract EXE=vendor/dopewars-2001/game/DopeWars.exe OUT=vendor/dopewars-2001/re"
     cmds:
-      - uv run tools/re/extract_beermat.py
+      - uv run tools/re/extract_beermat.py --exe "{{.EXE}}" --out "{{.OUT}}"
 
   apply-labels-check:
     desc: "Import DopeWars.exe into a throwaway Ghidra project and apply the extracted labels"
@@ -62,21 +64,21 @@ tasks:
       - |
         proj="$(mktemp -d)"
         trap 'rm -rf "$proj"' EXIT
-        out="$(timeout 600 {{.GHIDRA_RUN}} {{.GHIDRA_HEADLESS}} "$proj" dw -import vendor/dopewars-1999/DopeWars.exe -scriptPath tools/re/ghidra -postScript ApplyLabels.java vendor/dopewars-1999/re/labels.csv -deleteProject </dev/null 2>&1)" || { echo "$out"; exit 1; }
+        out="$(timeout 600 {{.GHIDRA_RUN}} {{.GHIDRA_HEADLESS}} "$proj" dw -import {{.EXE}} -scriptPath tools/re/ghidra -postScript ApplyLabels.java {{.OUT}}/labels.csv -deleteProject </dev/null 2>&1)" || { echo "$out"; exit 1; }
         echo "$out" | rg "ApplyLabels:|ERROR"
         if echo "$out" | rg -q "ERROR"; then exit 1; fi
 
   decompile:
-    desc: "Decompile every function in DopeWars.exe into the gitignored vendor/dopewars-1999/re/decompiled/"
+    desc: "Decompile every function in DopeWars.exe into the gitignored {{.OUT}}/decompiled/"
     deps: [extract, _install-ghidra, _install-java]
     cmds:
       - |
         proj="$(mktemp -d)"
         trap 'rm -rf "$proj"' EXIT
-        rm -rf vendor/dopewars-1999/re/decompiled
-        out="$(timeout 1800 {{.GHIDRA_RUN}} {{.GHIDRA_HEADLESS}} "$proj" dw -import vendor/dopewars-1999/DopeWars.exe -scriptPath tools/re/ghidra -postScript ApplyLabels.java vendor/dopewars-1999/re/labels.csv -postScript DiscoverFunctions.java -postScript ExportDecompiled.java vendor/dopewars-1999/re/decompiled -deleteProject </dev/null 2>&1)" || { echo "$out"; exit 1; }
+        rm -rf {{.OUT}}/decompiled
+        out="$(timeout 1800 {{.GHIDRA_RUN}} {{.GHIDRA_HEADLESS}} "$proj" dw -import {{.EXE}} -scriptPath tools/re/ghidra -postScript ApplyLabels.java {{.OUT}}/labels.csv -postScript DiscoverFunctions.java -postScript ExportDecompiled.java {{.OUT}}/decompiled -deleteProject </dev/null 2>&1)" || { echo "$out"; exit 1; }
         echo "$out" | rg "ApplyLabels:|DiscoverFunctions:|ExportDecompiled:|ERROR"
-        uv run tools/re/check_decompiled.py
+        uv run tools/re/check_decompiled.py "{{.OUT}}"
 
   disasm:
     desc: "Print disassembly of functions by hex VA, e.g. task re:disasm -- 0045e3a4,0045e3d4"
@@ -85,6 +87,6 @@ tasks:
       - |
         proj="$(mktemp -d)"
         trap 'rm -rf "$proj"' EXIT
-        out="$(timeout 600 {{.GHIDRA_RUN}} {{.GHIDRA_HEADLESS}} "$proj" dw -import vendor/dopewars-1999/DopeWars.exe -scriptPath tools/re/ghidra -postScript ApplyLabels.java vendor/dopewars-1999/re/labels.csv -postScript DiscoverFunctions.java -postScript DumpListing.java {{.CLI_ARGS}} -deleteProject </dev/null 2>&1)" || { echo "$out"; exit 1; }
+        out="$(timeout 600 {{.GHIDRA_RUN}} {{.GHIDRA_HEADLESS}} "$proj" dw -import {{.EXE}} -scriptPath tools/re/ghidra -postScript ApplyLabels.java {{.OUT}}/labels.csv -postScript DiscoverFunctions.java -postScript DumpListing.java {{.CLI_ARGS}} -deleteProject </dev/null 2>&1)" || { echo "$out"; exit 1; }
         echo "$out" | rg "ERROR" && exit 1
         echo "$out" | rg "^INFO  DumpListing.java> LISTING" | sed -E 's/^INFO  DumpListing.java> LISTING //; s/ \(GhidraScript\) *$//'

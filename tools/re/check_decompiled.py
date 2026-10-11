@@ -2,19 +2,20 @@
 # /// script
 # requires-python = ">=3.11"
 # ///
-"""Fail unless the Ghidra decompile export under vendor/dopewars-1999/re/decompiled is populated and address-tagged."""
+"""Fail unless the Ghidra decompile export under <re dir>/decompiled (default vendor/dopewars-1999/re) is populated and address-tagged."""
 
 import re
 import sys
 from pathlib import Path
 
-OUT = Path("vendor/dopewars-1999/re/decompiled")
-LABELS = Path("vendor/dopewars-1999/re/labels.csv")
+RE_DIR = Path("vendor/dopewars-1999/re")
+OUT = RE_DIR / "decompiled"
+LABELS = RE_DIR / "labels.csv"
 MIN_FUNCTIONS = 200
 INDEX_ROW = re.compile(r"^[0-9a-f]{8}\t\S+\t\S+\.c$")
 
 
-def check(out: Path = OUT) -> list[str]:
+def check(out: Path = OUT, labels: Path = LABELS) -> list[str]:
     index = out / "index.tsv"
     if not index.is_file():
         return [f"missing {index}"]
@@ -32,7 +33,7 @@ def check(out: Path = OUT) -> list[str]:
             continue
         if f"0x{va}" not in src.read_text().splitlines()[0]:
             errors.append(f"{src} first line lacks address 0x{va}")
-    return errors + missing_labeled_functions(out, rows)
+    return errors + missing_labeled_functions(out, rows, labels)
 
 
 def missing_labeled_functions(out: Path, rows: list[str], labels: Path = LABELS) -> list[str]:
@@ -47,7 +48,8 @@ def missing_labeled_functions(out: Path, rows: list[str], labels: Path = LABELS)
 
 
 if __name__ == "__main__":
-    errs = check()
+    re_dir = Path(sys.argv[1]) if len(sys.argv) > 1 else RE_DIR
+    errs = check(re_dir / "decompiled", re_dir / "labels.csv")
     for e in errs[:20]:
         print(f"ERROR: {e}", file=sys.stderr)
     if errs:

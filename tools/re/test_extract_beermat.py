@@ -14,11 +14,15 @@ copyrighted exe being present.
 Usage: uv run tools/re/test_extract_beermat.py
 """
 
+import contextlib
+import io
+import shutil
 import struct
 import sys
 import tempfile
 import traceback
 from pathlib import Path
+from types import SimpleNamespace
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -399,6 +403,62 @@ def test_write_labels_csv() -> None:
         eb.write_labels(vmts, Path(tmp))
         text = (Path(tmp) / "labels.csv").read_text()
         assert text == "00401234,TFakeForm1_BuyBtnClick\n00450000,TFakeForm1_VMT\n"
+
+
+class FakePE:
+    """Stand-in for pefile.PE: one RT_RCDATA form resource and the given section names."""
+
+    def __init__(self, section_names: list[bytes], blob: bytes) -> None:
+        self.sections = [SimpleNamespace(Name=n.ljust(8, b"\0")) for n in section_names]
+        self.OPTIONAL_HEADER = SimpleNamespace(ImageBase=IMAGE_BASE)
+        self._blob = blob
+        leaf = SimpleNamespace(struct=SimpleNamespace(OffsetToData=0, Size=len(blob)))
+        lang = SimpleNamespace(data=leaf)
+        name = SimpleNamespace(directory=SimpleNamespace(entries=[lang]))
+        kind = SimpleNamespace(
+            id=eb.RT_RCDATA, directory=SimpleNamespace(entries=[name])
+        )
+        self.DIRECTORY_ENTRY_RESOURCE = SimpleNamespace(entries=[kind])
+
+    def get_data(self, offset: int, size: int) -> bytes:
+        return self._blob[offset : offset + size]
+
+    def get_rva_from_offset(self, offset: int) -> int:
+        return offset
+
+
+def run_main_on_fake_pe(section_names: list[bytes]) -> "tuple[int, str, Path, Path]":
+    tmp = Path(tempfile.mkdtemp())
+    exe = tmp / "fake.exe"
+    exe.write_bytes(b"MZ" + b"\x00" * 16 + b"some text here\x00")
+    out = tmp / "out"
+    real_pe = eb.pefile.PE
+    eb.pefile.PE = lambda _path: FakePE(section_names, synthetic_blob())
+    stdout = io.StringIO()
+    try:
+        with contextlib.redirect_stdout(stdout):
+            code = eb.main(["--exe", str(exe), "--out", str(out)])
+    finally:
+        eb.pefile.PE = real_pe
+    return code, stdout.getvalue(), out, tmp
+
+
+def test_is_pcguard_detects_pcgw32_sections() -> None:
+    assert eb.is_pcguard(FakePE([b".text", b".PCGW32"], b""))
+    assert not eb.is_pcguard(FakePE([b".text", b".data"], b""))
+
+
+def test_main_pcguard_exe_skips_code_recovery_and_exits_zero() -> None:
+    code, stdout, out, tmp = run_main_on_fake_pe([b".PCGW32", b".tls"])
+    try:
+        assert code == 0
+        assert "PC Guard" in stdout and "skipping" in stdout
+        assert (out / "forms" / "Form1.dfm").is_file()
+        assert (out / "strings.txt").is_file()
+        for name in ("sounds.tsv", "methods.tsv", "labels.csv"):
+            assert not (out / name).exists(), name
+    finally:
+        shutil.rmtree(tmp)
 
 
 def main() -> int:

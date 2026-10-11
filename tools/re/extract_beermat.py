@@ -32,6 +32,7 @@ DEFAULT_EXE = REPO_ROOT / "vendor" / "dopewars-1999" / "DopeWars.exe"
 DEFAULT_OUT = REPO_ROOT / "vendor" / "dopewars-1999" / "re"
 
 RT_RCDATA = 10
+PCGUARD_SECTION = b".PCGW32"
 TPF0_MAGIC = b"TPF0"
 FLAG_PREFIX_MASK = 0xF0
 FLAG_CHILD_POS = 0x02
@@ -351,9 +352,9 @@ def parse_sounds(strings: list[tuple[int, str]]) -> list[tuple[str, str, str]]:
     return [(event, *found[event]) for event in EXPECTED_SOUNDS]
 
 
-def write_string_outputs(
+def write_strings(
     data: bytes, offset_to_va: Callable[[int], int], out: Path
-) -> int:
+) -> list[tuple[int, str]]:
     out.mkdir(parents=True, exist_ok=True)
     strings = scan_strings(data)
     (out / "strings.txt").write_text(
@@ -361,6 +362,13 @@ def write_string_outputs(
         encoding="utf-8",
     )
     print(f"{len(strings)} strings written to {out / 'strings.txt'}")
+    return strings
+
+
+def write_string_outputs(
+    data: bytes, offset_to_va: Callable[[int], int], out: Path
+) -> int:
+    strings = write_strings(data, offset_to_va, out)
     try:
         rows = parse_sounds(strings)
     except ValueError as err:
@@ -523,6 +531,10 @@ def write_labels(vmts: list[Vmt], out: Path) -> None:
     )
 
 
+def is_pcguard(pe: pefile.PE) -> bool:
+    return any(s.Name.rstrip(b"\0") == PCGUARD_SECTION for s in pe.sections)
+
+
 def resolve_exe(arg: str | None) -> Path:
     if arg:
         return Path(arg)
@@ -562,6 +574,15 @@ def main(argv: list[str] | None = None) -> int:
     print(f"{len(forms)} forms written to {forms_dir}")
 
     data = exe.read_bytes()
+    if is_pcguard(pe):
+        write_strings(data, lambda off: off, out)
+        print(
+            f"PC Guard sections ({PCGUARD_SECTION.decode()}) detected: skipping the "
+            "sound table, VMT, methods and labels; run on a decrypted process dump "
+            "to recover them"
+        )
+        return 0 if forms else 1
+
     image_base = pe.OPTIONAL_HEADER.ImageBase
     strings_status = write_string_outputs(
         data, lambda off: image_base + pe.get_rva_from_offset(off), out
