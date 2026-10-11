@@ -4,14 +4,14 @@ What can and cannot be learned from Beermat Software's "Dope Wars for Windows" 2
 
 ## Installer layout
 
-`dw21.exe` is a Wise installer: a small PE32 stub followed by raw-deflate streams (no zip, 7z or NSIS container, so `7z l` rejects it). The streams were located by scanning for deflate data in memory; nothing was written to disk. The relevant contents:
+`dw21.exe` is a Wise installer: a small PE32 stub followed by raw-deflate streams (no zip, 7z or NSIS container, so `7z l` rejects it). Each stream is trailed by its little-endian CRC32, and one stream is the Wise script, whose install-file records give each file's path, stream extent and size. `task re:unwise` (`tools/re/unwise.py`) finds the streams, pairs them with the script's records and writes only the game files, leaving the Gator stub and the installer's helper executables in memory. The relevant contents:
 
 | Item | Notes |
 | --- | --- |
 | `DopeWars.exe` | The game, 1.48 MB, PE32, Delphi, protected by PC Guard (next section). It is the stream at file offset `0xe0acd`. |
 | `cities.txt` | 11 world cities, each with a country, 6 sub-locations, a transit name and an airport. The location model is not a fidelity target (`docs/parity-deltas.md` section 5), and airport flights are skipped for 2.1 as well. |
 | `oldlady.txt` | The Old Lady phrase list. |
-| `Sounds/*.wav` | 39 wavs, a larger set than the ten cues in 1.2 (weapon fire and hit per weapon, jail door, chainsaw, window, hospital, store, borrow, warnings, headlines and more). |
+| `Sounds/*.wav` | 38 wavs, a larger set than the ten cues in 1.2 (weapon fire and hit per weapon, jail door, chainsaw, window, hospital, store, borrow, warnings, headlines and more). |
 | Gator adware stub | `Trickler_PIC_Beermat_Dopewars.exe`. Never run it, and never extract it. |
 
 ## PC Guard
@@ -61,11 +61,11 @@ Not established. Only the start state is confirmed, and only by text: IntroDlg s
 | Win reward and doctor offer after a chase | Unverified, and likely replaced by the hospital. |
 | Score `cash + bank - debt` | Unverified, now with several loans. |
 | 31-day game | Replaced by 15, 30, 60 and 90 days. |
-| Sound cues | Replaced, 39 wavs instead of 10. |
+| Sound cues | Replaced, 38 wavs instead of 10. |
 
 ## Unpack approach
 
-1. Extract the inner `DopeWars.exe`, `cities.txt`, `oldlady.txt` and the wavs from the Wise payload into gitignored `vendor/dopewars-2001/game/` (TASK-013.01.01). The installer itself is not run.
+1. Run `task re:unwise` to extract the inner `DopeWars.exe`, `cities.txt`, `oldlady.txt` and the wavs from the Wise payload into gitignored `vendor/dopewars-2001/game/` (TASK-013.01.01). It is idempotent, and its self-test runs under `task re:test`. The installer itself is not run.
 2. Run the extracted game in a dedicated 32-bit CrossOver bottle, enter the license key, and check that the registered-only features unlock (TASK-013.01.03).
 3. Dump the running process once PC Guard has decrypted it, rebuild its import table, and point the existing Ghidra pipeline at the dump (TASK-013.01.03). The first fallback is a `winedbg` minidump, the second is the Windows oracle described in `CLAUDE.local.md`.
 4. Re-check every row of the table above and record the 2.1 virtual addresses and constants in this document (TASK-013.01.04).
