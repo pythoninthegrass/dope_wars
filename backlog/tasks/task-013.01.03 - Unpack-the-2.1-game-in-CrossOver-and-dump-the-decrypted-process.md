@@ -1,10 +1,10 @@
 ---
 id: TASK-013.01.03
 title: Unpack the 2.1 game in CrossOver and dump the decrypted process
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-10-11 04:02'
-updated_date: '2026-10-11 06:34'
+updated_date: '2026-10-11 16:24'
 labels:
   - beermat-2.1
   - reverse-engineering
@@ -52,4 +52,6 @@ The 2.1 exe holds no wav records, so `sounds.tsv` joins `appevents.tsv` (event t
 IntroDlg and NMShow are orphan form resources (no VMT in the image); the extractor warns instead of failing. Ghidra scripts changed: DiscoverFunctions falls back to the first executable block when there is no CODE block, ApplyLabels clears an instruction straddling a labeled entry. The 1.2 pipeline was re-run with 0 failures.
 
 Open for TASK-013.01.04: `TCityEditor_FormShow`-style functions are fine now, but the Binary Ninja MCP (added to .mcp.json) was not used here; the xref work was done on the decompiled C.
+
+TASK-013.01.03 complete. All 5 ACs satisfied: game runs registered in the CrossOver bottle (#1), pe-sieve32 dump at vendor/dopewars-2001/dump/ has decrypted code sections and Ghidra-imports (#2), re:decompile/re:disasm produce the 2.1 index.tsv + ~4280 C files (#3), the 38-event sound table and string table resolve to handlers (#4), and docs/beermat-2.1-re.md records the reproducible steps with no key/bottle/CLAUDE.local.md infra (#5). Deviation from plan: pe-sieve32 v0.4.1.1 (/imp 3 /dmode 3) used instead of Scylla x86; no fallback needed.
 <!-- SECTION:NOTES:END -->
