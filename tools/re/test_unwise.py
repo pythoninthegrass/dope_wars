@@ -58,7 +58,10 @@ def record(name: str, start: int, end: int, size: int, root: str = "MAINDIR") ->
 
 
 def build_installer(
-    files: list[tuple[str, bytes]], noise: bytes = b"", sys_files: tuple[str, ...] = ()
+    files: list[tuple[str, bytes]],
+    noise: bytes = b"",
+    sys_files: tuple[str, ...] = (),
+    script_extra: bytes = b"",
 ) -> bytes:
     streams = [raw_deflate(data) for _, data in files]
     records = b""
@@ -69,7 +72,7 @@ def build_installer(
         start += len(stream)
     # a trailing uninstall-style listing without usable record fields
     listing = b"\0" * 0x30 + b"%MAINDIR%\\" + files[0][0].encode() + b"\0"
-    script = b"%MAINDIR%\\INSTALL.LOG\0" + records + listing
+    script = b"%MAINDIR%\\INSTALL.LOG\0" + records + listing + script_extra
     return STUB + noise + raw_deflate(script) + b"".join(streams)
 
 
@@ -150,6 +153,41 @@ def test_write_is_idempotent() -> None:
         assert before == after
         assert (out / "Sounds" / "gun.wav").read_bytes() == FILES[0][1]
         assert not list(out.rglob("*rickler*"))
+
+
+APP_EVENT_SCRIPT = (
+    b"\n\x01\x00AppEvents\\EventLabels\\DWCashReg\x00Cash Register\x00\x00"
+    b"\n\x01\x00AppEvents\\EventLabels\\DWMugged\x00Mugged\x00\x00"
+    b"\n\x01\x00AppEvents\\Schemes\\Apps\\DopeWars\\DWCashReg\\.current\x00"
+    b"%MAINDIR%\\Sounds\\cashreg.wav\x00\x00"
+    b"\n\x01\x00AppEvents\\Schemes\\Apps\\DopeWars\\DWMugged\\.current\x00"
+    b"%MAINDIR%\\Sounds\\hrdpunch.wav\x00\x00"
+)
+
+
+def test_app_events_pairs_label_and_wav_per_event() -> None:
+    assert unwise.app_events(APP_EVENT_SCRIPT) == [
+        ("DWCashReg", "cashreg.wav", "Cash Register"),
+        ("DWMugged", "hrdpunch.wav", "Mugged"),
+    ]
+
+
+def test_app_events_matches_sounds_dir_case_insensitively() -> None:
+    script = APP_EVENT_SCRIPT.replace(b"Sounds\\hrdpunch", b"sounds\\hrdpunch")
+    assert ("DWMugged", "hrdpunch.wav", "Mugged") in unwise.app_events(script)
+
+
+def test_app_events_skips_events_without_a_label() -> None:
+    script = APP_EVENT_SCRIPT.replace(b"EventLabels\\DWMugged", b"EventLabels\\DWOther")
+    assert [row[0] for row in unwise.app_events(script)] == ["DWCashReg"]
+
+
+def test_installer_app_events_reads_the_script_stream() -> None:
+    installer = build_installer(FILES, script_extra=APP_EVENT_SCRIPT)
+    assert unwise.installer_app_events(installer) == [
+        ("DWCashReg", "cashreg.wav", "Cash Register"),
+        ("DWMugged", "hrdpunch.wav", "Mugged"),
+    ]
 
 
 def test_wanted_path_filters() -> None:

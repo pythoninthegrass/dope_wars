@@ -41,6 +41,11 @@ SCAN_START = 0x400
 SCRIPT_MARKER = b"%MAINDIR%\\"
 PATH_RE = re.compile(rb"%(?:MAINDIR|SYS)%\\([\x20-\x7e]+?)\x00")
 
+EVENT_LABEL_RE = re.compile(rb"AppEvents\\EventLabels\\(\w+)\x00([\x20-\x7e]+)\x00")
+EVENT_SOUND_RE = re.compile(
+    rb"AppEvents\\Schemes\\Apps\\DopeWars\\(\w+)\\\.current\x00%MAINDIR%\\[Ss]ounds\\([\x20-\x7e]+?)\x00"
+)
+
 # Byte offsets of the record fields, counted back from the '%' of the path.
 START_BACK = 0x28
 END_BACK = 0x24
@@ -49,6 +54,7 @@ SIZE_BACK = 0x1C
 # olchk32.dll is PC Guard's runtime check library; the installer puts it in the system dir and the game will not start without it.
 WANTED_ROOT_FILES = {"dopewars.exe", "cities.txt", "oldlady.txt", "olchk32.dll"}
 SOUNDS_DIR = "Sounds"
+APP_EVENTS_FILE = "appevents.tsv"
 
 
 @dataclass(frozen=True)
@@ -160,6 +166,26 @@ def extract_entries(data: bytes) -> list[Entry]:
     ]
 
 
+def app_events(script: bytes) -> list[tuple[str, str, str]]:
+    """(event, wav file name, label) for each AppEvents sound the Wise script registers, in label order."""
+    labels = dict(
+        (m.group(1).decode(), m.group(2).decode())
+        for m in EVENT_LABEL_RE.finditer(script)
+    )
+    wavs = {
+        m.group(1).decode(): m.group(2).decode()
+        for m in EVENT_SOUND_RE.finditer(script)
+    }
+    return [(event, wavs[event], label) for event, label in labels.items() if event in wavs]
+
+
+def installer_app_events(data: bytes) -> list[tuple[str, str, str]]:
+    for stream in find_streams(data):
+        if SCRIPT_MARKER in stream.data and (rows := app_events(stream.data)):
+            return rows
+    return []
+
+
 def write_entries(entries: list[Entry], out_dir: Path) -> int:
     """Write entries under out_dir, leaving files whose content already matches. Return the number changed."""
     changed = 0
@@ -191,6 +217,11 @@ def main() -> int:
         print(f"payload incomplete, missing: {missing or SOUNDS_DIR}", file=sys.stderr)
         return 1
     changed = write_entries(entries, args.out)
+    events = installer_app_events(args.exe.read_bytes())
+    (args.out / APP_EVENTS_FILE).write_text(
+        "".join("\t".join(row) + "\n" for row in events), encoding="utf-8"
+    )
+    print(f"{len(events)} AppEvents sounds in {args.out / APP_EVENTS_FILE}")
     print(
         f"{len(entries)} files in {args.out} ({changed} written, {len(entries) - changed} unchanged)"
     )
