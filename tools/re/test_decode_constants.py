@@ -63,6 +63,25 @@ def test_find_addresses_includes_string_references() -> None:
     assert decode_constants.find_addresses(src) == {0x4BA084, 0x4BA098, 0x4BEA4C, 0x4E20C8}
 
 
+def test_decode_text_known_values() -> None:
+    assert decode_constants.decode_text("50634B19") == "Acid"
+    assert decode_constants.decode_text("D06F1B58963765") == "Cocaine"
+    assert decode_constants.decode_text("D86F5B59") == "coke"
+
+
+def test_annotate_string_table_lookup() -> None:
+    pointers = {0x4DDF1C: 0x4B8884}
+    texts = {0x4B8884: "Acid"}
+    src = "FUN_004c21c8(param_1,DAT_004ddf1c,(int *)&local_c);\nFUN_004c21c8(param_1,0x4b8884,(int *)&x);"
+    out = decode_constants.annotate(src, {}, texts, pointers)
+    assert out == 'T("Acid",(int *)&local_c);\nT("Acid",(int *)&x);', out
+
+
+def test_find_cell_assignments() -> None:
+    src = "FUN_00403b88(&DAT_004ddf1c,(undefined4 *)0x4b7400);\nFUN_00403b88(&DAT_004dded8,0x4b7000);\nFUN_00403b88(&DAT_004e20b8,S(2000));"
+    assert decode_constants.find_cell_assignments(src) == {0x4DDF1C: 0x4B7400, 0x4DDED8: 0x4B7000}
+
+
 def test_find_addresses() -> None:
     src = "FUN_004c2c90(param_1,0x4bea4c); FUN_004c2c90(param_1,DAT_004e211c);"
     assert decode_constants.find_addresses(src) >= {0x4BEA4C}
