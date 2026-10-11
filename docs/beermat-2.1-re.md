@@ -78,7 +78,8 @@ Everything below is reproducible from `vendor/dopewars-2001/dw21.exe` and a 32-b
    - pe-sieve was used instead of the Scylla x86 named in the task because it is a command-line tool that rebuilds imports without a GUI, which suits a bottle with no scripted input.
 7. Extract and decompile with the existing pipeline:
    - `task re:extract EXE=vendor/dopewars-2001/dump/DopeWars.dump.exe OUT=vendor/dopewars-2001/re APPEVENTS=vendor/dopewars-2001/game/appevents.tsv`
-   - `task re:decompile` and `task re:disasm` with the same `EXE` and `OUT`.
+   - `task re:decompile` and `task re:disasm` with the same `EXE` and `OUT`. `re:decompile` writes about 4280 functions. The one reported failure is the PC Guard stub at the entry point, which times out in the decompiler and is not game code.
+   - `task re:sound-handlers OUT=vendor/dopewars-2001/re` writes `sound_handlers.tsv`, which maps each of the 38 events to the decompiled functions that reference its name string. All 38 resolve.
 
 What the extractor recovers from the dump: 25 forms, 298 VMTs, 24 classes with 305 published methods, 603 labels, and a 38-row `sounds.tsv`. `extract_beermat.py` treats a `.PCGW32` section as encrypted only while its entropy is at least 7.5, so a dump is handled as a normal image.
 
@@ -86,6 +87,8 @@ Findings from the dump:
 
 - The 2.1 sound table is not in the exe as 1.2's records are. The image holds only the `DW*` event names, and the wav paths live in the registry entries the installer writes, which the Wise script lists. The extractor therefore joins `appevents.tsv` (event to wav and label, from the Wise script) with the event names in the dump, matching case-insensitively. The six `DW<Weapon>Hit` events (`DWHandBagHit`, `DWPeaShooterHit` and so on) have no string of their own, because the game builds them at run time from the weapon event name and the three-character suffix, which is below the string scan's 4-character minimum.
 - `IntroDlg` and `NMShow` are form resources with no class in the image (no VMT, and no class-name string outside the resource). Their handlers (`FormActivate`, `Label8Click`, `Button1Click` to `Button5Click`) have no code, so the extractor warns about them and does not count them as unresolved.
+
+Ghidra needed two changes for the dump. `DiscoverFunctions.java` looked up a block named `CODE`, and now falls back to the first executable block, which is `.PCGW32` in a dump. `ApplyLabels.java` now clears an instruction that straddles a labeled entry: the string and padding before a function had been disassembled as code and blocked three handlers, among them `TCityEditor_FormShow`.
 
 Handling notes for the bottle:
 
