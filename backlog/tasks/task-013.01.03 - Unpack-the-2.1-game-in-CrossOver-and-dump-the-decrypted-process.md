@@ -4,7 +4,7 @@ title: Unpack the 2.1 game in CrossOver and dump the decrypted process
 status: To Do
 assignee: []
 created_date: '2026-10-11 04:02'
-updated_date: '2026-10-11 04:15'
+updated_date: '2026-10-11 04:23'
 labels:
   - beermat-2.1
   - reverse-engineering
@@ -35,3 +35,9 @@ The 2.1 game exe is encrypted by PC Guard and only decrypts in memory, so its co
 - [ ] #4 The 2.1 sound table (38 wavs) and the string table resolve to their handlers in the dump
 - [ ] #5 docs/beermat-2.1-re.md records the reproducible steps, the tool used and any fallback taken, with no key contents, bottle path or CLAUDE.local.md infra
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+From TASK-013.01.02: the 2.1 AppEvent sound table is not readable from the static exe (no AppEvents or .wav strings; the PC Guard sections are encrypted), so it can only be recovered from the dump. extract_beermat.py's EXPECTED_SOUNDS is the 10 cues of 1.2 and must be generalized to the 38-wav 2.1 table before parse_sounds can validate a 2.1 dump.
+<!-- SECTION:NOTES:END -->
