@@ -300,6 +300,9 @@ third_party/godot-cpp/.sconsign*.dblite
 # Beermat "Dope Wars for Windows" 1.2.0.0 (1999) reference assets, extracted for local research
 vendor/dopewars-1999/
 
+# Beermat "Dope Wars for Windows" 2.1.0.0 (2001) installer and license key, kept for local research
+vendor/dopewars-2001/
+
 # TASK-010.03 wav effects, copied from vendor/dopewars-1999/ by `task game:sounds`
 # (ignores the .import sidecar Godot generates per wav too, not just the wav itself)
 game/assets/sound/*
