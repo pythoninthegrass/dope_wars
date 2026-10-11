@@ -95,11 +95,15 @@ additive.
 
 **Approved because:** the borough and city names and the one-city-six-sub-locations model are not fidelity targets, so differences in them are not attributed to rule mismatches and are not ported. The per-borough police weights the engine used to hang off that model were a rule difference (M-04 in `docs/beermat-re.md`) and have been removed.
 
-## 6. New Game available at any time, not gated until day 6
+## 6. New Game available at any time, not gated
 
-**Beermat (`docs/beermat-re.md`, M-11):** the New Game button and the File > New menu item are disabled from the start of a game until the first travel made on day 5, so a restart is only possible from day 6. Finances is enabled from day 1.
+**Beermat 1.2 (`docs/beermat-re.md`, M-11):** the New Game button and the File > New menu item are disabled from the start of a game until the first travel made on day 5, so a restart is only possible from day 6. Finances is enabled from day 1.
+
+**Beermat 2.1 (`docs/beermat-2.1-re.md`):** the same lockout, one day earlier. `TDWForm_EnableNewGameButton` (`0x004b7f48`) disables the button and File > New while `day <= 4` (the day counter at `DAT_004e20e0`), so it unlocks on day 5 rather than day 5. The port still does not gate it.
 
 **Prototype and Godot port:** New Game is available on every day, including day 1.
+
+**Approved because:** Lance prefers being able to start a new game at any time rather than reproducing Beermat's restart lockout. This is a deliberate divergence, not an unported rule — `docs/beermat-re.md` M-11 and the 2.1 equivalent stay recorded as Beermat behavior for reference, but the port will not gate New Game to match either build.
 
 ## 7. Sound is Godot-only
 

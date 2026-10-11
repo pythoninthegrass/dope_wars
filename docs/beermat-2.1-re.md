@@ -62,6 +62,11 @@ Not established. Only the start state is confirmed, and only by text: IntroDlg s
 | Score `cash + bank - debt` | Unverified, now with several loans. |
 | 31-day game | Replaced by 15, 30, 60 and 90 days. |
 | Sound cues | Replaced, 38 wavs instead of 10. |
+| New Game gated until day 6 (M-11) | Still gated, one day earlier: unlocks on day 5. An intentional delta for the port. |
+
+### New Game gate (intentional delta)
+
+`TDWForm_EnableNewGameButton` (`0x004b7f48`) disables the New Game button and the File > New menu item while the day counter at `DAT_004e20e0` is 4 or below, so a restart is only possible from day 5. This mirrors 1.2's lockout (M-11 in `docs/beermat-re.md`, which unlocked on day 6) but one day earlier. The Godot port does not gate New Game — it is available on every day, including day 1. This is recorded as an intentional delta in `docs/parity-deltas.md` section 6, not as a rule the port is missing.
 
 ## Unpack approach
 
