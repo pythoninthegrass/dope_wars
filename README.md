@@ -1,38 +1,40 @@
 # dope_wars
 
-Research and planning for a Godot reference implementation of Dope Wars. See `AGENTS.md` for the source documents and how they're weighted.
+A Godot reference implementation of Dope Wars — a Mojo simulation core behind a frozen C ABI (`include/dopewars.h`), a C++ GDExtension shim (`extension/`), and a GDScript presentation layer (`game/`). See `AGENTS.md` for the architecture, source documents, and build/test runbook.
 
-## Playable prototype
+`index.html` is a single-file playable web prototype (`open index.html`), true to Beermat Software's "Dope Wars for Windows" 1.2.0.0 (1999), and the near-1:1 reference the Godot port is verified against.
 
-`index.html` is a single-file, no-build-step, no-dependency playable prototype, true to the spirit of Beermat Software's "Dope Wars for Windows" 1.2.0.0 (1999), with the Keymash web port (<https://keymash.com/games/dopewars/>) as the close reference implementation. Ruleset details and citations are documented inline in the `#engine` script block.
+## Minimum requirements
 
-Open it directly from disk:
-
-```sh
-open index.html            # macOS
-xdg-open index.html        # Linux
-```
-
-Append `?seed=<number>` to the URL for a reproducible run (e.g. `index.html?seed=1`).
-
-Keyboard shortcuts: `1`-`6` travel to a borough, `B`/`S`/`F` for Buy/Sell/Finances, `N` for New Game, `Enter`/`Esc` confirm/cancel the focused dialog.
-
-The game logic lives in `<script id="engine">` and is DOM-free by design — it's the near-1:1 reference the eventual GDScript port should match. `<script id="ui">` handles rendering and input only.
-
-### Running the tests
+- macOS 13+ or Linux (x86_64 or arm64)
+- [`mise`](https://mise.jdx.dev/) — installs every pinned tool from `.tool-versions` (Godot, Python, Node, uv, Task, SConstruct, Mojo via uv)
 
 ```sh
-node --test tests/engine.test.mjs
+mise install
+git submodule update --init --recursive
 ```
 
-The test file extracts `#engine` from `index.html` and evaluates it in `node:vm`, so it tests exactly what ships in the page — no separate module to drift out of sync.
+## Recommended
 
-### Deliberately out of scope for this pass
+- Godot editor at the pinned version (`.tool-versions`) for scene and resource editing
+- VS Code or Cursor with the [godot-tools extension](https://marketplace.visualstudio.com/items?itemName=geequlim.godot-tools) for GDScript LSP
 
-- The Godot port itself (macOS/Linux/Windows desktop + wasm web build).
-- Sound — a deliberate scope decision for `index.html` itself; the Godot port plays Beermat's wav cues (`game/README.md`).
-- Beermat's Discord menu button (Keymash-specific, dropped).
-- Server-authoritative multiplayer / leaderboards — high scores are local-only (`localStorage`).
+## Quickstart
+
+Build the full stack (Mojo core → GDExtension shim) and launch the game:
+
+```sh
+task run
+```
+
+`task check` runs the full gate set: parity tests, static ABI gates, conformance drivers, bridge tests, presentation tests, and a headless Godot smoke test.
+
+`task dev` watches `core/src/`, `include/`, `extension/src/`, and `game/` and restarts `task run` on every change.
+
+<!--
+Pre-built releases are available on the [releases page](https://github.com/pythoninthegrass/dope_wars/releases).
+Download the archive for your platform, unzip, and run the `dope_wars` binary.
+-->
 
 ## Credits
 
