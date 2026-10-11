@@ -1,10 +1,11 @@
 ---
 id: TASK-013.01.04
 title: Document Beermat 2.1's rules and re-check the 1.2 findings against it
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-11 04:02'
-updated_date: '2026-10-11 04:02'
+updated_date: '2026-10-11 06:41'
 labels:
   - beermat-2.1
   - reverse-engineering
@@ -32,3 +33,15 @@ With the decompiled dump from TASK-013.01.03, replace the "unverified" table in 
 - [ ] #4 Each new or changed rule has an N-xx ID and a mapping to the TASK-013.02 slice that implements it
 - [ ] #5 markdownlint passes and no key, bottle path or CLAUDE.local.md infra appears
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Map features to 2.1 handlers via methods.tsv, index.tsv, strings.txt (serial reading of the decompile, no parallel agents).
+2. Find the 2.1 Random/Randomize addresses, then re-check M-01..M-13 and classify each unchanged/changed/removed with VA, constants and RNG draw order.
+3. Document every new feature (loans, hospital, Super Store, weapons, cop chase, dump-drugs, jail, doctor, kidneys, dialysis, infection, Old Lady, game lengths, price model, bank interest, score, stats, sound table) with VA, constants, draw order, text; assign N-01+ IDs mapped to TASK-013.02.xx.
+4. Resolve the joke vs real weapon set from code.
+5. Confirm ambiguous rules in the CrossOver bottle (approved); Binary Ninja MCP for xref/x87 constant questions (approved).
+6. Rewrite docs/beermat-2.1-re.md in the style of beermat-re.md, replacing the unverified table; commit atomically after each section.
+7. markdownlint, grep for key/bottle path/CLAUDE.local.md infra, check ACs, add notes.
+<!-- SECTION:PLAN:END -->
