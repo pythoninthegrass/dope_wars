@@ -29,10 +29,10 @@ TEXT_KEY = b"Website"
 # Multipliers of the four passes, in the order the decoder applies them.
 MULTIPLIERS = (0xE2, 0xE4, 0xE6, 0xEA)
 
-CALL = re.compile(rf"{DECODER}\(\s*\w+\s*,\s*0x([0-9a-fA-F]+)\s*\)")
+CALL = re.compile(rf"{DECODER}\(\s*[^,;]+?\s*,\s*0x([0-9a-fA-F]+)\s*\)")
 # A string-table lookup: either a DAT_ cell holding a pointer to the encoded literal, or the literal's address.
 TEXT_CALL = re.compile(
-    rf"{TEXT_DECODER}\(\s*\w+\s*,\s*(?:DAT_([0-9a-f]{{8}})|0x([0-9a-f]+))\s*,\s*([^;]*)\)(?=;)"
+    rf"{TEXT_DECODER}\(\s*[^,;]+?\s*,\s*(?:DAT_([0-9a-f]{{8}})|0x([0-9a-f]+))\s*,\s*([^;]*)\)(?=;)"
 )
 # A reference to a string literal: Ghidra's s_<text>_<va> label or a DAT_<va> label, with the cast it usually wears.
 REFERENCE = re.compile(

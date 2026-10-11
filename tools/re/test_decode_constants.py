@@ -82,6 +82,15 @@ def test_find_cell_assignments() -> None:
     assert decode_constants.find_cell_assignments(src) == {0x4DDF1C: 0x4B7400, 0x4DDED8: 0x4B7000}
 
 
+def test_annotate_call_with_expression_receiver() -> None:
+    consts = {0x4A5300: "100"}
+    src = "x = FUN_004c2c90(*(undefined4 *)PTR_DAT_004d2608,0x4a5300);"
+    assert decode_constants.annotate(src, consts) == "x = K(100);"
+    texts = {0x4A5300: "Hi"}
+    src = "FUN_004c21c8(*(undefined4 *)PTR_DAT_004d2608,0x4a5300,&out);"
+    assert decode_constants.annotate(src, {}, texts) == 'T("Hi",&out);'
+
+
 def test_find_addresses() -> None:
     src = "FUN_004c2c90(param_1,0x4bea4c); FUN_004c2c90(param_1,DAT_004e211c);"
     assert decode_constants.find_addresses(src) >= {0x4BEA4C}
