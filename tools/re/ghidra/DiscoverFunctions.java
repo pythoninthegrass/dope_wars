@@ -16,9 +16,23 @@ public class DiscoverFunctions extends GhidraScript {
     private static final int RET_IMM = 0xC2;
     private static final int[] PADDING = {0x00, 0x90, 0xCC};
 
+    // Delphi names the block CODE; a PC Guard dump keeps its .PCGW32 names, so fall back to the first executable block.
+    private MemoryBlock findCodeBlock() {
+        MemoryBlock named = currentProgram.getMemory().getBlock("CODE");
+        if (named != null) {
+            return named;
+        }
+        for (MemoryBlock block : currentProgram.getMemory().getBlocks()) {
+            if (block.isExecute() && block.isInitialized()) {
+                return block;
+            }
+        }
+        throw new IllegalStateException("no code block found");
+    }
+
     @Override
     protected void run() throws Exception {
-        MemoryBlock code = currentProgram.getMemory().getBlock("CODE");
+        MemoryBlock code = findCodeBlock();
         List<Address> candidates = new ArrayList<>();
         for (Address a = code.getStart(); a.compareTo(code.getEnd().subtract(2)) < 0; a = a.add(1)) {
             if (isPrologue(a) && followsFunctionEnd(a) && getFunctionAt(a) == null) {

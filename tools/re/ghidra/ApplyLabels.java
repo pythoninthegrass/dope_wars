@@ -3,6 +3,8 @@
 
 import ghidra.app.script.GhidraScript;
 import ghidra.program.model.address.Address;
+import ghidra.program.model.listing.Function;
+import ghidra.program.model.listing.Instruction;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.List;
@@ -37,9 +39,20 @@ public class ApplyLabels extends GhidraScript {
                 createLabel(addr, name, true);
                 labels++;
                 if (!name.endsWith(VMT_SUFFIX)) {
+                    // an earlier mis-disassembly of padding can straddle the entry and block disassemble()
+                    Instruction straddling = getInstructionContaining(addr);
+                    if (straddling != null && !straddling.getMinAddress().equals(addr)) {
+                        clearListing(straddling.getMinAddress(), straddling.getMaxAddress());
+                    }
                     disassemble(addr);
-                    if (getFunctionAt(addr) == null && createFunction(addr, name) != null) {
-                        functions++;
+                    if (getFunctionAt(addr) == null) {
+                        if (createFunction(addr, name) != null) {
+                            functions++;
+                        } else {
+                            Function covering = getFunctionContaining(addr);
+                            printerr("WARN: no function created for " + name + " at " + addr
+                                    + (covering == null ? "" : ", inside " + covering.getName()));
+                        }
                     }
                 }
             } catch (Exception e) {

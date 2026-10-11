@@ -46,6 +46,7 @@ tasks:
     cmds:
       - uv run tools/re/test_extract_beermat.py
       - uv run tools/re/test_unwise.py
+      - uv run tools/re/test_sound_handlers.py
 
   unwise:
     desc: "Extract DopeWars.exe, cities.txt, oldlady.txt and Sounds/ from the 2.1 Wise installer into the gitignored vendor/dopewars-2001/game/"
@@ -56,6 +57,11 @@ tasks:
     desc: "Extract forms from EXE (default vendor/dopewars-1999/DopeWars.exe) into the gitignored OUT (default vendor/dopewars-1999/re/), e.g. task re:extract EXE=vendor/dopewars-2001/dump/DopeWars.dump.exe OUT=vendor/dopewars-2001/re APPEVENTS=vendor/dopewars-2001/game/appevents.tsv"
     cmds:
       - uv run tools/re/extract_beermat.py --exe "{{.EXE}}" --out "{{.OUT}}"{{if .APPEVENTS}} --appevents "{{.APPEVENTS}}"{{end}}
+
+  sound-handlers:
+    desc: "Map each AppEvents sound event to the decompiled functions that reference it, into OUT/sound_handlers.tsv (run after re:decompile), e.g. task re:sound-handlers OUT=vendor/dopewars-2001/re"
+    cmds:
+      - uv run tools/re/sound_handlers.py --re "{{.OUT}}"
 
   apply-labels-check:
     desc: "Import DopeWars.exe into a throwaway Ghidra project and apply the extracted labels"
