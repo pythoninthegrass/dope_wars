@@ -39,14 +39,15 @@ CRC_LEN = 4
 MAX_INFLATED = 64 * 1024 * 1024
 SCAN_START = 0x400
 SCRIPT_MARKER = b"%MAINDIR%\\"
-PATH_RE = re.compile(rb"%MAINDIR%\\([\x20-\x7e]+?)\x00")
+PATH_RE = re.compile(rb"%(?:MAINDIR|SYS)%\\([\x20-\x7e]+?)\x00")
 
 # Byte offsets of the record fields, counted back from the '%' of the path.
 START_BACK = 0x28
 END_BACK = 0x24
 SIZE_BACK = 0x1C
 
-WANTED_ROOT_FILES = {"dopewars.exe", "cities.txt", "oldlady.txt"}
+# olchk32.dll is PC Guard's runtime check library; the installer puts it in the system dir and the game will not start without it.
+WANTED_ROOT_FILES = {"dopewars.exe", "cities.txt", "oldlady.txt", "olchk32.dll"}
 SOUNDS_DIR = "Sounds"
 
 

@@ -46,20 +46,26 @@ def raw_deflate(payload: bytes) -> bytes:
     )
 
 
-def record(name: str, start: int, end: int, size: int) -> bytes:
+def record(name: str, start: int, end: int, size: int, root: str = "MAINDIR") -> bytes:
     """Mirror the layout seen in dw21.exe: start, end, datetime, size, padding, then the path."""
     fields = struct.pack("<IIII", start, end, 0, size)
     return (
-        fields.ljust(unwise.START_BACK, b"\0") + b"%MAINDIR%\\" + name.encode() + b"\0"
+        fields.ljust(unwise.START_BACK, b"\0")
+        + f"%{root}%\\".encode()
+        + name.encode()
+        + b"\0"
     )
 
 
-def build_installer(files: list[tuple[str, bytes]], noise: bytes = b"") -> bytes:
+def build_installer(
+    files: list[tuple[str, bytes]], noise: bytes = b"", sys_files: tuple[str, ...] = ()
+) -> bytes:
     streams = [raw_deflate(data) for _, data in files]
     records = b""
     start = 0
     for (name, data), stream in zip(files, streams):
-        records += record(name, start, start + len(stream), len(data))
+        root = "SYS" if name in sys_files else "MAINDIR"
+        records += record(name, start, start + len(stream), len(data), root)
         start += len(stream)
     # a trailing uninstall-style listing without usable record fields
     listing = b"\0" * 0x30 + b"%MAINDIR%\\" + files[0][0].encode() + b"\0"
@@ -81,6 +87,16 @@ def test_extracts_wanted_files() -> None:
         "DopeWars.exe": FILES[5][1],
     }
     assert got == expected, sorted(got)
+
+
+def test_extracts_pcguard_check_dll_from_system_dir() -> None:
+    files = FILES + [
+        ("Olchk32.dll", b"MZ" + b"pcguard" * 100),
+        ("Other.dll", b"MZ" + b"other" * 100),
+    ]
+    got = extract(build_installer(files, sys_files=("Olchk32.dll", "Other.dll")))
+    assert got["Olchk32.dll"] == files[-2][1]
+    assert "Other.dll" not in got
 
 
 def test_never_extracts_gator_or_helpers() -> None:
