@@ -4,7 +4,7 @@ title: Unpack the 2.1 game in CrossOver and dump the decrypted process
 status: To Do
 assignee: []
 created_date: '2026-10-11 04:02'
-updated_date: '2026-10-11 04:02'
+updated_date: '2026-10-11 04:15'
 labels:
   - beermat-2.1
   - reverse-engineering
@@ -32,6 +32,6 @@ The 2.1 game exe is encrypted by PC Guard and only decrypts in memory, so its co
 - [ ] #1 The game runs in the CrossOver bottle and reports itself as registered
 - [ ] #2 A dump exists in gitignored vendor/dopewars-2001/ whose code sections are decrypted (readable x86, entropy well below 8.0) and which Ghidra imports
 - [ ] #3 task re:decompile and task re:disasm accept the dump and produce a 2.1 index.tsv plus per-function C files
-- [ ] #4 The 2.1 sound table (39 wavs) and the string table resolve to their handlers in the dump
+- [ ] #4 The 2.1 sound table (38 wavs) and the string table resolve to their handlers in the dump
 - [ ] #5 docs/beermat-2.1-re.md records the reproducible steps, the tool used and any fallback taken, with no key contents, bottle path or CLAUDE.local.md infra
 <!-- AC:END -->

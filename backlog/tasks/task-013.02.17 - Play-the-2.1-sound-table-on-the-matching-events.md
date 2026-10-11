@@ -4,6 +4,7 @@ title: Play the 2.1 sound table on the matching events
 status: To Do
 assignee: []
 created_date: '2026-10-11 04:03'
+updated_date: '2026-10-11 04:15'
 labels:
   - beermat-2.1
 milestone: m-4
@@ -26,7 +27,7 @@ ordinal: 70000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-2.1 ships 39 wavs (weapon fire and hit per weapon, jail door, chainsaw, window, hospital, store, borrow, airport, warnings, headlines, last day and more) versus the ten cues of 1.2 that `game/platform/sound_player.gd` plays today (TASK-010.03). Extend the event-to-file table from the 2.1 findings and play each cue at its trigger in the Godot build, skipping cues for features not ported (airport). The wavs are copyrighted and never committed: copy them at build time from gitignored `vendor/dopewars-2001/game/Sounds/` the way `task game:sounds` does for 1.2, and the game must run silently without them. Needs the feature slices whose events trigger the cues.
+2.1 ships 38 wavs (weapon fire and hit per weapon, jail door, chainsaw, window, hospital, store, borrow, airport, warnings, headlines, last day and more) versus the ten cues of 1.2 that `game/platform/sound_player.gd` plays today (TASK-010.03). Extend the event-to-file table from the 2.1 findings and play each cue at its trigger in the Godot build, skipping cues for features not ported (airport). The wavs are copyrighted and never committed: copy them at build time from gitignored `vendor/dopewars-2001/game/Sounds/` (written by `task re:unwise`) the way `task game:sounds` does for 1.2, and the game must run silently without them. Needs the feature slices whose events trigger the cues.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
