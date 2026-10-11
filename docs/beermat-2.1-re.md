@@ -65,7 +65,32 @@ Not established. Only the start state is confirmed, and only by text: IntroDlg s
 
 ## Unpack approach
 
-1. Run `task re:unwise` to extract the inner `DopeWars.exe`, `cities.txt`, `oldlady.txt` and the wavs from the Wise payload into gitignored `vendor/dopewars-2001/game/` (TASK-013.01.01). It is idempotent, and its self-test runs under `task re:test`. The installer itself is not run.
-2. Run the extracted game in a dedicated 32-bit CrossOver bottle, enter the license key, and check that the registered-only features unlock (TASK-013.01.03).
-3. Dump the running process once PC Guard has decrypted it, rebuild its import table, and point the existing Ghidra pipeline at the dump (TASK-013.01.03). The first fallback is a `winedbg` minidump, the second is the Windows oracle described in `CLAUDE.local.md`.
-4. Re-check every row of the table above and record the 2.1 virtual addresses and constants in this document (TASK-013.01.04).
+Everything below is reproducible from `vendor/dopewars-2001/dw21.exe` and a 32-bit Windows XP bottle in CrossOver (or any Wine that runs a 32-bit prefix). The installer is never run, and the Gator stub is never extracted.
+
+1. Run `task re:unwise`. It writes `DopeWars.exe`, `cities.txt`, `oldlady.txt`, `Olchk32.dll`, the wavs and `appevents.tsv` (38 event, wav and label rows read from the Wise script) into gitignored `vendor/dopewars-2001/game/`.
+2. Copy those files into a directory in the bottle (for example `C:\dopewars`). `Olchk32.dll` is PC Guard's runtime check library, and the installer puts it in the system directory. Without it the game stops with "DLL loading error: OLCHK32.DLL".
+3. Seed the settings the installer would have written, under `HKCU\Software\Beermat Software\DopeWars\2.0\Settings`. The Wise script holds 33 values as key, data and name triples. Numbers must be `REG_DWORD`, and names, dates, the proxy values and `License` are strings, with `Name` and `License` left empty. Delphi's errors tell the cases apart: "Failed to get data for X" means the value is missing, and "Invalid data type for X" means the wrong type. One more value, `Registered` (`REG_DWORD`, 0), is not in the script, and the game fails with "Failed to get data for registered" without it once a key has been entered.
+4. Start the game with the bottle's `wine` from the install directory, for example `wine --bottle <name> --workdir 'C:\dopewars' 'C:\dopewars\DopeWars.exe'`. PC Guard unpacks for about 45 to 60 seconds at roughly 100% CPU, and then the process idles. The disclaimer dialog appears first.
+5. Enter the license key in the registration dialog. The game then lists the registered features (15, 60 and 90 day games, Price History, direction indicators, extra weapons, Top 20 scores, the Elite league) and shows itself as registered. The key never goes into the repo or this document.
+6. Dump the running process with `pe-sieve32.exe /pid <windows pid> /imp 3 /dmode 3 /dir <dump dir>` (hasherezade's pe-sieve, v0.4.1.1). Take the Windows pid from `wine tasklist`. Copy the `400000.DopeWars.exe` file to gitignored `vendor/dopewars-2001/dump/DopeWars.dump.exe`.
+   - `/dmode 3` (realigned) is required. The default virtual layout leaves the section headers inconsistent with the file, and pefile then reads none of the form resources.
+   - The code section drops from entropy near 8.0 to about 6.5 once decrypted. The dump has no import directory, but pe-sieve lists about 530 recovered imports in `*.imports.txt`, and 61 of them are PC Guard redirect thunks (`0x1000xxxx`) rather than API addresses. The entry point is still in the PC Guard stub, so function discovery in Ghidra comes from the VMTs, not the entry point.
+   - pe-sieve was used instead of the Scylla x86 named in the task because it is a command-line tool that rebuilds imports without a GUI, which suits a bottle with no scripted input.
+7. Extract and decompile with the existing pipeline:
+   - `task re:extract EXE=vendor/dopewars-2001/dump/DopeWars.dump.exe OUT=vendor/dopewars-2001/re APPEVENTS=vendor/dopewars-2001/game/appevents.tsv`
+   - `task re:decompile` and `task re:disasm` with the same `EXE` and `OUT`.
+
+What the extractor recovers from the dump: 25 forms, 298 VMTs, 24 classes with 305 published methods, 603 labels, and a 38-row `sounds.tsv`. `extract_beermat.py` treats a `.PCGW32` section as encrypted only while its entropy is at least 7.5, so a dump is handled as a normal image.
+
+Findings from the dump:
+
+- The 2.1 sound table is not in the exe as 1.2's records are. The image holds only the `DW*` event names, and the wav paths live in the registry entries the installer writes, which the Wise script lists. The extractor therefore joins `appevents.tsv` (event to wav and label, from the Wise script) with the event names in the dump, matching case-insensitively. The six `DW<Weapon>Hit` events (`DWHandBagHit`, `DWPeaShooterHit` and so on) have no string of their own, because the game builds them at run time from the weapon event name and the three-character suffix, which is below the string scan's 4-character minimum.
+- `IntroDlg` and `NMShow` are form resources with no class in the image (no VMT, and no class-name string outside the resource). Their handlers (`FormActivate`, `Label8Click`, `Button1Click` to `Button5Click`) have no code, so the extractor warns about them and does not count them as unresolved.
+
+Handling notes for the bottle:
+
+- Shut the bottle down with `WINEPREFIX=<bottle> wineserver -k` followed by `wineserver -w`. A kill -9 of the wineserver loses unflushed registry writes, and every wine command needs an explicit `WINEPREFIX` or it can act on another bottle's server.
+- Do not trace. `WINEDEBUG=+reg` made PC Guard hit a privileged instruction and crash under winedbg. Leftover wine processes from a previous run caused the same crash once, so clean up first.
+- Fallbacks if pe-sieve fails, in order: a `winedbg` minidump, then the Windows oracle described in `CLAUDE.local.md`. Neither was needed.
+
+Next: re-check every row of the table above against the decompiled functions and record the 2.1 virtual addresses and constants here (TASK-013.01.04).
