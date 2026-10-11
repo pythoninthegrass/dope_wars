@@ -17,6 +17,7 @@ Usage: uv run tools/re/extract_beermat.py [--exe PATH] [--out DIR]
 """
 
 import argparse
+import math
 import os
 import re
 import struct
@@ -33,11 +34,14 @@ DEFAULT_OUT = REPO_ROOT / "vendor" / "dopewars-1999" / "re"
 
 RT_RCDATA = 10
 PCGUARD_SECTION = b".PCGW32"
+ENCRYPTED_ENTROPY = 7.5
+MIN_ENCRYPTED_SECTION_LEN = 0x1000
 TPF0_MAGIC = b"TPF0"
 FLAG_PREFIX_MASK = 0xF0
 FLAG_CHILD_POS = 0x02
 
 MIN_STRING_LEN = 4
+HIT_SUFFIX = "hit"
 SOUND_CURRENT_RE = re.compile(r"AppEvents\\Schemes\\Apps\\DopeWars\\(\w+)\\\.current")
 EVENT_LABEL_PREFIX = "AppEvents\\EventLabels\\"
 EXPECTED_SOUNDS = {
@@ -352,6 +356,33 @@ def parse_sounds(strings: list[tuple[int, str]]) -> list[tuple[str, str, str]]:
     return [(event, *found[event]) for event in EXPECTED_SOUNDS]
 
 
+def load_app_events(path: Path) -> list[tuple[str, str, str]]:
+    return [
+        (event, wav, label)
+        for event, wav, label in (
+            line.split("\t") for line in path.read_text(encoding="utf-8").splitlines()
+        )
+    ]
+
+
+def resolve_app_events(
+    strings: list[tuple[int, str]], table: list[tuple[str, str, str]]
+) -> list[tuple[str, str, str]]:
+    """Check each Wise-registered event name is in the image (2.1 keeps no wav records); registry names are case-insensitive and <weapon>Hit is built at run time."""
+    present = {text.lower() for _, text in strings}
+
+    def in_image(event: str) -> bool:
+        name = event.lower()
+        return name in present or (
+            name.endswith(HIT_SUFFIX) and name.removesuffix(HIT_SUFFIX) in present
+        )
+
+    missing = [event for event, _, _ in table if not in_image(event)]
+    if missing:
+        raise ValueError("AppEvent names not in the image: " + ", ".join(missing))
+    return table
+
+
 def write_strings(
     data: bytes, offset_to_va: Callable[[int], int], out: Path
 ) -> list[tuple[int, str]]:
@@ -366,11 +397,18 @@ def write_strings(
 
 
 def write_string_outputs(
-    data: bytes, offset_to_va: Callable[[int], int], out: Path
+    data: bytes,
+    offset_to_va: Callable[[int], int],
+    out: Path,
+    app_events: list[tuple[str, str, str]] | None = None,
 ) -> int:
     strings = write_strings(data, offset_to_va, out)
     try:
-        rows = parse_sounds(strings)
+        rows = (
+            parse_sounds(strings)
+            if app_events is None
+            else resolve_app_events(strings, app_events)
+        )
     except ValueError as err:
         print(f"error: {err}", file=sys.stderr)
         return 1
@@ -490,6 +528,12 @@ def collect_methods(image: Image) -> list[tuple[str, str, int]]:
     return flatten_methods(read_vmts(image))
 
 
+def orphan_forms(forms: list[Component], vmts: list[Vmt]) -> list[Component]:
+    """Form resources whose class was not linked into the image, so they have no code."""
+    linked = {v.class_name for v in vmts}
+    return [f for f in forms if f.class_name not in linked]
+
+
 def unresolved_handlers(
     forms: list[Component], methods: list[tuple[str, str, int]]
 ) -> list[tuple[str, str, str]]:
@@ -531,8 +575,22 @@ def write_labels(vmts: list[Vmt], out: Path) -> None:
     )
 
 
+def entropy(data: bytes) -> float:
+    counts = [data.count(b) for b in set(data)]
+    return -sum(c / len(data) * math.log2(c / len(data)) for c in counts)
+
+
 def is_pcguard(pe: pefile.PE) -> bool:
-    return any(s.Name.rstrip(b"\0") == PCGUARD_SECTION for s in pe.sections)
+    """True while a PC Guard section still holds ciphertext; a process dump keeps the names but not the encryption."""
+    for section in pe.sections:
+        data = section.get_data()
+        if (
+            section.Name.rstrip(b"\0") == PCGUARD_SECTION
+            and len(data) >= MIN_ENCRYPTED_SECTION_LEN
+            and entropy(data) >= ENCRYPTED_ENTROPY
+        ):
+            return True
+    return False
 
 
 def resolve_exe(arg: str | None) -> Path:
@@ -551,6 +609,10 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument(
         "--out", help="output directory (default: vendor/dopewars-1999/re/)"
+    )
+    parser.add_argument(
+        "--appevents",
+        help="appevents.tsv from `task re:unwise`; use it as the sound table (2.1 keeps no wav records in the image)",
     )
     args = parser.parse_args(argv)
 
@@ -585,7 +647,10 @@ def main(argv: list[str] | None = None) -> int:
 
     image_base = pe.OPTIONAL_HEADER.ImageBase
     strings_status = write_string_outputs(
-        data, lambda off: image_base + pe.get_rva_from_offset(off), out
+        data,
+        lambda off: image_base + pe.get_rva_from_offset(off),
+        out,
+        load_app_events(Path(args.appevents)) if args.appevents else None,
     )
 
     vmts = read_vmts(Image.from_pe(pe, data))
@@ -595,7 +660,12 @@ def main(argv: list[str] | None = None) -> int:
     print(f"{len(label_rows(vmts))} labels written to {out / 'labels.csv'}")
     classes = len({cls for cls, _, _ in methods})
     print(f"{len(vmts)} VMTs, {classes} classes with {len(methods)} published methods")
-    missing = unresolved_handlers(forms, methods)
+    orphans = orphan_forms(forms, vmts)
+    for form in orphans:
+        print(f"warning: form {form.name} ({form.class_name}) has no VMT in the image")
+    missing = unresolved_handlers(
+        [f for f in forms if f not in orphans], methods
+    )
     for owner, event, handler in missing:
         print(f"error: unresolved handler {owner}.{event} = {handler}", file=sys.stderr)
     return 0 if forms and strings_status == 0 and methods and not missing else 1

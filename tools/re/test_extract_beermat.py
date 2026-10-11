@@ -286,6 +286,59 @@ def test_write_sounds_outputs_tsv_and_strings() -> None:
         assert len(strings) == len(sound_strings())
 
 
+APP_EVENTS = [
+    ("DWCashReg", "cashreg.wav", "Cash Register"),
+    ("DWMugged", "hrdpunch.wav", "Mugged"),
+]
+
+
+def test_resolve_app_events_requires_each_event_name_in_the_image() -> None:
+    strings = eb.scan_strings(pack_strings(["DWCashReg", "DWMugged", "Other"]))
+    assert eb.resolve_app_events(strings, APP_EVENTS) == APP_EVENTS
+
+
+def test_resolve_app_events_matches_case_insensitively() -> None:
+    strings = eb.scan_strings(pack_strings(["dwcashreg", "DWMUGGED"]))
+    assert eb.resolve_app_events(strings, APP_EVENTS) == APP_EVENTS
+
+
+def test_resolve_app_events_accepts_hit_events_built_from_a_weapon_name() -> None:
+    table = [("DWMonkeyHit", "monkey.wav", "Monkey Hit")]
+    strings = eb.scan_strings(pack_strings(["DWMonkey"]))
+    assert eb.resolve_app_events(strings, table) == table
+    try:
+        eb.resolve_app_events(eb.scan_strings(pack_strings(["Other"])), table)
+    except ValueError:
+        return
+    raise AssertionError("a Hit event with no weapon name was accepted")
+
+
+def test_resolve_app_events_missing_event_raises() -> None:
+    strings = eb.scan_strings(pack_strings(["DWCashReg"]))
+    try:
+        eb.resolve_app_events(strings, APP_EVENTS)
+    except ValueError as err:
+        assert "DWMugged" in str(err), err
+        return
+    raise AssertionError("a missing event name was accepted")
+
+
+def test_write_string_outputs_uses_app_events_table_when_given() -> None:
+    data = pack_strings(["DWCashReg", "DWMugged"])
+    with tempfile.TemporaryDirectory() as tmp:
+        out = Path(tmp)
+        assert eb.write_string_outputs(data, lambda off: off, out, APP_EVENTS) == 0
+        tsv = (out / "sounds.tsv").read_text().splitlines()
+        assert tsv == ["DWCashReg\tcashreg.wav\tCash Register", "DWMugged\thrdpunch.wav\tMugged"]
+
+
+def test_load_app_events_reads_tsv() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "appevents.tsv"
+        path.write_text("DWCashReg\tcashreg.wav\tCash Register\n")
+        assert eb.load_app_events(path) == [APP_EVENTS[0]]
+
+
 def test_write_sounds_missing_row_exits_nonzero() -> None:
     data = pack_strings(sound_strings(skip="DWDead"))
     with tempfile.TemporaryDirectory() as tmp:
@@ -372,6 +425,13 @@ def test_unresolved_handlers_reports_missing_names() -> None:
     ]
 
 
+def test_orphan_forms_are_forms_without_a_vmt() -> None:
+    root = eb.decode_tpf0(synthetic_blob())
+    vmt = eb.Vmt(va=0x401000, class_name="TForm1", parent=0, methods=[])
+    assert eb.orphan_forms([root], [vmt]) == []
+    assert eb.orphan_forms([root], []) == [root]
+
+
 def test_write_methods_tsv() -> None:
     rows = [("TFakeForm1", "BuyBtnClick", 0x401234)]
     with tempfile.TemporaryDirectory() as tmp:
@@ -405,11 +465,25 @@ def test_write_labels_csv() -> None:
         assert text == "00401234,TFakeForm1_BuyBtnClick\n00450000,TFakeForm1_VMT\n"
 
 
+ENCRYPTED_SECTION = bytes(range(256)) * 16
+DECRYPTED_SECTION = b"\x55\x8b\xec\x83\xc4" * 800
+
+
 class FakePE:
     """Stand-in for pefile.PE: one RT_RCDATA form resource and the given section names."""
 
-    def __init__(self, section_names: list[bytes], blob: bytes) -> None:
-        self.sections = [SimpleNamespace(Name=n.ljust(8, b"\0")) for n in section_names]
+    def __init__(
+        self,
+        section_names: list[bytes],
+        blob: bytes,
+        section_data: bytes = ENCRYPTED_SECTION,
+    ) -> None:
+        self.sections = [
+            SimpleNamespace(
+                Name=n.ljust(8, b"\0"), get_data=lambda data=section_data: data
+            )
+            for n in section_names
+        ]
         self.OPTIONAL_HEADER = SimpleNamespace(ImageBase=IMAGE_BASE)
         self._blob = blob
         leaf = SimpleNamespace(struct=SimpleNamespace(OffsetToData=0, Size=len(blob)))
@@ -427,13 +501,17 @@ class FakePE:
         return offset
 
 
-def run_main_on_fake_pe(section_names: list[bytes]) -> "tuple[int, str, Path, Path]":
+def run_main_on_fake_pe(
+    section_names: list[bytes], section_data: bytes = ENCRYPTED_SECTION
+) -> "tuple[int, str, Path, Path]":
     tmp = Path(tempfile.mkdtemp())
     exe = tmp / "fake.exe"
     exe.write_bytes(b"MZ" + b"\x00" * 16 + b"some text here\x00")
     out = tmp / "out"
     real_pe = eb.pefile.PE
-    eb.pefile.PE = lambda _path: FakePE(section_names, synthetic_blob())
+    eb.pefile.PE = lambda _path: FakePE(
+        section_names, synthetic_blob(), section_data
+    )
     stdout = io.StringIO()
     try:
         with contextlib.redirect_stdout(stdout):
@@ -446,6 +524,10 @@ def run_main_on_fake_pe(section_names: list[bytes]) -> "tuple[int, str, Path, Pa
 def test_is_pcguard_detects_pcgw32_sections() -> None:
     assert eb.is_pcguard(FakePE([b".text", b".PCGW32"], b""))
     assert not eb.is_pcguard(FakePE([b".text", b".data"], b""))
+
+
+def test_is_pcguard_false_once_sections_are_decrypted() -> None:
+    assert not eb.is_pcguard(FakePE([b".PCGW32"], b"", DECRYPTED_SECTION))
 
 
 def test_main_pcguard_exe_skips_code_recovery_and_exits_zero() -> None:

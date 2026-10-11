@@ -53,9 +53,9 @@ tasks:
       - uv run tools/re/unwise.py
 
   extract:
-    desc: "Extract forms from EXE (default vendor/dopewars-1999/DopeWars.exe) into the gitignored OUT (default vendor/dopewars-1999/re/), e.g. task re:extract EXE=vendor/dopewars-2001/game/DopeWars.exe OUT=vendor/dopewars-2001/re"
+    desc: "Extract forms from EXE (default vendor/dopewars-1999/DopeWars.exe) into the gitignored OUT (default vendor/dopewars-1999/re/), e.g. task re:extract EXE=vendor/dopewars-2001/dump/DopeWars.dump.exe OUT=vendor/dopewars-2001/re APPEVENTS=vendor/dopewars-2001/game/appevents.tsv"
     cmds:
-      - uv run tools/re/extract_beermat.py --exe "{{.EXE}}" --out "{{.OUT}}"
+      - uv run tools/re/extract_beermat.py --exe "{{.EXE}}" --out "{{.OUT}}"{{if .APPEVENTS}} --appevents "{{.APPEVENTS}}"{{end}}
 
   apply-labels-check:
     desc: "Import DopeWars.exe into a throwaway Ghidra project and apply the extracted labels"
