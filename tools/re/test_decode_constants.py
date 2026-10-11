@@ -43,9 +43,29 @@ def test_annotate_leaves_unknown_addresses() -> None:
     assert decode_constants.annotate(src, {}) == src
 
 
+def test_annotate_string_references() -> None:
+    consts = {0x4BA084: "5500", 0x4BA098: "1"}
+    src = (
+        "LStrAsg(&DAT_004e11f0,(undefined4 *)s_58502354_004ba084);\n"
+        "LStrAsg(&DAT_004e211c,(undefined4 *)&DAT_004ba098);\n"
+        "LStrAsg(&DAT_004e1258,DAT_004e20c8);"
+    )
+    out = decode_constants.annotate(src, consts)
+    assert out == (
+        "LStrAsg(&DAT_004e11f0,S(5500));\n"
+        "LStrAsg(&DAT_004e211c,S(1));\n"
+        "LStrAsg(&DAT_004e1258,DAT_004e20c8);"
+    ), out
+
+
+def test_find_addresses_includes_string_references() -> None:
+    src = "x(s_58502354_004ba084); y(&DAT_004ba098); z(FUN_004c2c90(p,0x4bea4c)); w(DAT_004e20c8);"
+    assert decode_constants.find_addresses(src) == {0x4BA084, 0x4BA098, 0x4BEA4C, 0x4E20C8}
+
+
 def test_find_addresses() -> None:
     src = "FUN_004c2c90(param_1,0x4bea4c); FUN_004c2c90(param_1,DAT_004e211c);"
-    assert decode_constants.find_addresses(src) == {0x4BEA4C}
+    assert decode_constants.find_addresses(src) >= {0x4BEA4C}
 
 
 def test_annotate_directory() -> None:
