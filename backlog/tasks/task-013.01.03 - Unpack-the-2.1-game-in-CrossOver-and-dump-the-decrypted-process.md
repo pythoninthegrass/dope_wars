@@ -1,10 +1,10 @@
 ---
 id: TASK-013.01.03
 title: Unpack the 2.1 game in CrossOver and dump the decrypted process
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-10-11 04:02'
-updated_date: '2026-10-11 06:34'
+updated_date: '2026-10-12 16:05'
 labels:
   - beermat-2.1
   - reverse-engineering
@@ -53,3 +53,9 @@ IntroDlg and NMShow are orphan form resources (no VMT in the image); the extract
 
 Open for TASK-013.01.04: `TCityEditor_FormShow`-style functions are fine now, but the Binary Ninja MCP (added to .mcp.json) was not used here; the xref work was done on the decompiled C.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+All 5 acceptance criteria met. Dumped the decrypted 2.1 process with pe-sieve32 v0.4.1.1 (`/imp 3 /dmode 3`) instead of Scylla x86 (CLI rebuilds imports without GUI input). The dump's code entropy drops from ~8.0 to ~6.5 once decrypted, Ghidra imports it, and the existing pipeline produces a 2.1 index.tsv plus ~4280 per-function C files. All 38 sound events resolve to handlers. docs/beermat-2.1-re.md records the reproducible steps, tool, and fallbacks with no key, bottle path, or CLAUDE.local.md infra. No fallback was needed. Next up: TASK-013.01.04 (document 2.1 rules and re-check 1.2 findings).
+<!-- SECTION:FINAL_SUMMARY:END -->
