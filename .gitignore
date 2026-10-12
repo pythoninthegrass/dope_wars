@@ -2,6 +2,24 @@
 CLAUDE.md
 CLAUDE.local.md
 screenshots/*
+vendor/dopewars-1999/
+.task/
+.venv/
+core/build-output/
+extension/.sconsign*.dblite
+extension/src/*.os
+game/.godot/
+game/bin/libdopewars.*
+game/translations/*.translation
+third_party/godot-cpp/bin/
+third_party/godot-cpp/gen/**/*.os
+third_party/godot-cpp/.sconsign*.dblite
+game/assets/sound/*
+libKGENCompilerRTShared.*
+libMSupportGlobals.*
+.tools/
+libAsyncRTRuntimeGlobals.*
+artifacts/
 
 # General
 .DS_Store
@@ -40,15 +58,6 @@ lost+found
 Network Trash Folder
 Temporary Items
 .apdisk
-
-# Mac OS 6 to 9
-Desktop DB
-Desktop DF
-TheFindByContentFolder
-TheVolumeSettingsFolder
-.FBCIndex
-.FBCSemaphoreFile
-.FBCLockFolder
 
 # Quota system
 .quota.group
@@ -248,28 +257,6 @@ dmypy.json
 # Cython debug symbols
 cython_debug/
 
-# PyCharm
-#   JetBrains specific template is maintained in a separate JetBrains.gitignore that can
-#   be found at https://github.com/github/gitignore/blob/main/Global/JetBrains.gitignore
-#   and can be added to the global gitignore or merged into this file.  For a more nuclear
-#   option (not recommended) you can uncomment the following to ignore the entire idea folder.
-# .idea/
-
-# Abstra
-#   Abstra is an AI-powered process automation framework.
-#   Ignore directories containing user credentials, local state, and settings.
-#   Learn more at https://abstra.io/docs
-.abstra/
-
-# Visual Studio Code
-#   Visual Studio Code specific template is maintained in a separate VisualStudioCode.gitignore that
-#   can be found at https://github.com/github/gitignore/blob/main/Global/VisualStudioCode.gitignore
-#   and can be added to the global gitignore or merged into this file. However, if you prefer, you
-#   could uncomment the following to ignore the entire vscode folder
-# .vscode/
-# Temporary file for partial code execution
-tempCodeRunnerFile.py
-
 # Ruff stuff:
 .ruff_cache/
 
@@ -283,41 +270,6 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
-
-# TASK-001.03 build outputs
-.task/
-core/.venv/
-core/build-output/
-extension/.sconsign*.dblite
-extension/src/*.os
-game/.godot/
-game/bin/libdopewars.*
-game/translations/*.translation
-third_party/godot-cpp/bin/
-third_party/godot-cpp/gen/**/*.os
-third_party/godot-cpp/.sconsign*.dblite
-
-# Beermat "Dope Wars for Windows" 1.2.0.0 (1999) reference assets, extracted for local research
-vendor/dopewars-1999/
-
-# Beermat "Dope Wars for Windows" 2.1.0.0 (2001) installer and license key, kept for local research
-vendor/dopewars-2001/
-
-# TASK-010.03 wav effects, copied from vendor/dopewars-1999/ by `task game:sounds`
-# (ignores the .import sidecar Godot generates per wav too, not just the wav itself)
-game/assets/sound/*
-
-# TASK-002 vendored Mojo runtime (copied into game/bin by the extension build)
-libKGENCompilerRTShared.*
-libMSupportGlobals.*
-
-# TASK-012.02 checksum-verified export-template download and fake XDG_DATA_HOME,
-# so `task export:templates` never touches the user's real ~/.local/share/godot
-.tools/
-libAsyncRTRuntimeGlobals.*
-
-# Screenshots from task capture:linux
-artifacts/
 
 # INCLUDE
 !**/.gitkeep
