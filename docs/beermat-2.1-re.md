@@ -76,18 +76,20 @@ Names are the strings at `0x004b88f0`-`0x004b8c30`. Two drugs were renamed betwe
 6. New Game unlocks when the day is above 4 (see "New Game gate").
 7. Last day (`0x004bce80`) when the day counter reaches the limit.
 
-Chase start is `Random(6) == 0` (`0x004bc9d4` line ~108 tests the day counter against `0x004bcde0` = 13, then a `Random` draw); the two are exclusive — a chase suppresses the arrival events and dealers.
+Chase start is `Random(0x4bcde0 = 8) == 0` (`0x004bc9d4` line ~129 tests the day counter against `DAT_004e20f0`); the two are exclusive — a chase suppresses the arrival events and dealers.
 
 | Rule | VA | Beermat | Engine | Class |
 | --- | --- | --- | --- | --- |
 | Game length | `0x004c2a0c`-`0x004c2a44` | 15, 30, 60 or 90 days, chosen at new game; `DAT_004e20f0` holds the limit | `numDays` | changed, N-01 |
 | Start state | new game | cash 2000, debt 5500, bank 0, health 100, coat 200 | `startCash`, `startDebt`, `startHealth`, `startCoatCapacity` | match (start cash/debt confirmed by IntroDlg text) |
-| Chase start chance | `0x004bc9d4` | `Random(6) == 0`, 1 in 6, the same at every location | `randInt(0, 5) === 0` | match |
-| New Game gate | `0x004b7f48` | New Game disabled until day > 4, so usable from day 5 | New Game available any time | intentional, `docs/parity-deltas.md` section 6 |
+| Chase start chance | `0x004bc9d4` | `Random(8) == 0`, 1 in 8, the same at every location | `randInt(0, 5) === 0` | mismatch, N-22 |
+| New Game gate | `0x004bc9d4` | New Game disabled until day > 4, so usable from day 5 | New Game available any time | intentional, `docs/parity-deltas.md` section 6 |
+
+The chase start chance is a mismatch: 2.1 draws `Random(8)` (1 in 8) where the engine draws `randInt(0, 5)` (1 in 6). This is a new difference N-22.
 
 ## Arrival events and dealers
 
-`0x004be728` runs after every non-chase travel. It rolls the new market, then, in order, the loan release check, the dialysis-machine offer, the infection check, the doctor event, and the Old Lady. The dealer visit and the find/mugging/friend/police-dog events are folded into the price-generation loop (`0x004bbfc4`) and the doctor handler (`0x004bf420`); the exact split between "dealer visit" and "arrival event" is not yet separated in the decompile and needs the bottle.
+In 2.1 the arrival sequence is split differently from 1.2's two-stage dealer-then-event model. `0x004bc9d4` (the travel handler) calls the price-generation loop `0x004bbfc4`, which rolls the new market, then folds in the price spike/crash draws and the "found on a dead dude" find event; then `0x004be728` runs after every non-chase travel and rolls, in order, the loan-release check, the coat-dealer offer, the dialysis-machine offer, the infection check, the doctor event, and the Old Lady. The mugging, friend, and police-dog outcomes are the doctor handler (`0x004bf420`) and two price-loop helpers (`0x004bf134` found, `0x004bf8b4` police dog). The exact split between "dealer visit" and "arrival event" is therefore: dealer visit (coat) in `0x004be728` via `0x004bee64`; find/mugging/friend/police-dog events across `0x004bbfc4`/`0x004bf134`/`0x004bf420`/`0x004bf680`/`0x004bf8b4`.
 
 The events read from `DAT_004dde88`-`DAT_004ddf68`, built at startup by `0x004b657c`:
 
@@ -108,21 +110,26 @@ The events read from `DAT_004dde88`-`DAT_004ddf68`, built at startup by `0x004b6
 
 ## Chase
 
-`0x004a528c` (Run), `0x004a5308` (Stay), `0x004a5860` (Fight), `0x004a5748` (Dump) are the cop-chase dialog handlers. The deputy count is `DAT_004d398c` with a max of `0x004a5278` = 11 (1.2's max); the sample caption on the form showed 22, which is a form placeholder, not a runtime value. Fight draws the weapon hit against `Random(100)`; run draws `Random(0x004a5300)` then `Random(3)`.
+`0x004bd758` starts it: `deputies = Random(0x4bda1c) + 2` (2-8), shows "Officer Hardass and N of his deputies are chasing you !" (`0x004bdc30`). `TCopChaseDlg.FormShow` (`0x004a3c34`) sets `DAT_004d398c = 0` and opens the dialog. `0x004a4c7c` is the cop-chase timer; `0x004a3f30` plays the next event. There is a single cop tier (Officer Hardass); the deputy count is not scaled by day or location. Dying (health 0) ends the game: "They wasted you man. What a drag!" (`0x004ddf20`), plays `DWDead`, records the score.
+
+The cop-chase dialog is a real-time timer, not a turn menu: the deputy count is `DAT_004d398c` with a max of `0x004a5278` = 11 (a form placeholder; the runtime draw is 2-8), and `DAT_004d3998` is the event queue. Run (`0x004a528c`), Stay (`0x004a5308`), Fight (`0x004a5860`) and Dump (`0x004a5748`) each append an event to the queue; the timer (`0x004a4c7c`) drains it and plays the matching message/sound. Fight draws the weapon hit against `Random(100)` (`0x004a5860` line 33); run draws `Random(0x004a5300 = 10)` then `Random(3)`.
 
 | Rule | VA | Beermat | Engine | Class |
 | --- | --- | --- | --- | --- |
-| Deputy count | `0x004a5278` | 2 to 11 | `randInt(2, 11)` | match |
-| Run | `0x004a528c` | `Random(0x004a5300)`, then `Random(3)`: escape or fire | `randInt` | changed, N-02 |
-| Fight | `0x004a5860` | weapon hit vs `Random(100)` | `fight` | changed, N-03 |
-| Stay | `0x004a5308` | cops fire; arrest on a failed run | `stayInChase` | changed, N-04 |
-| Dump drugs | `0x004a5748` | "Dump the drugs in your trenchcoat" | none | new, N-05 |
+| Deputy count | `0x004bd758` | `Random(7) + 2`, 2-8 | `randInt(2, 11)` | mismatch, N-23 |
+| Run | `0x004a528c` | `Random(10) < 2`: escape (event 7), else `Random(3)`: 0 = fire (event 1), else fire (event 2) | `randInt` | mismatch, N-24 |
+| Fight | `0x004a5860` | weapon hit vs `Random(100)`: hit on `Random(100) <= weapon`; kill (event 4) or wound (event 3) | `fight` | mismatch, N-25 |
+| Stay | `0x004a5308` | cops fire; arrest on a failed run; "Officer Hardass pats you down for assault" | `stayInChase` | mismatch, N-26 |
+| Dump drugs | `0x004a5748` | "Are you sure you want to dump all your drugs?" clears held drugs and weapons | none | new, N-06 |
+| Chase win reward | `0x004bd758` | free drugs: `Random(0x4bda54 = 13)` drugs, quantity up to `Random(0x4bda48 = 2)`, min 1 | `fight` | mismatch, N-27 |
+
+The win reward is a mismatch: 2.1 gives free drugs (constants `0x4bda34 = 1000` is a flag, `0x4bda48 = 2` is the max quantity draw, `0x4bda54 = 13` is the drug count pool, `0x4bda64 = 10` is a minimum quantity), where the engine gives a gun and cash. This is a new difference N-27.
 
 ## Loan sharks
 
 `0x004bcfe8` (`ProcessLoanSharks`) processes due loans. `0x0047d720` (`FinanceDlg_DrawOfferings`) shows the offer; `0x0047d02c` (`LoanSharkDlg_SkinPayNowBtn1Click`) and `0x0047d0cc` (`LoanSharkDlg_SkinPayLaterBtnClick`) handle repayment. The loan-shark names are built at `0x004b7fe0` via `FUN_004bbe4c`: Honest Harry, Sandy Schwing, Tank NoNeck, Bulbous Bertha, Midget Mickey. The max total debt is `0x0047d8bc` = 1,000,000.
 
-Loan sharks in 2.1 replace 1.2's single compounding debt. Each shark has a rate, a duration and an amount; borrowing raises the total debt, and a loan past due triggers a visit that can send the player to jail. The exact rate/duration/amount per shark and the jail-release order are not yet decoded from the builder and need the bottle.
+Loan sharks in 2.1 replace 1.2's single compounding debt. Each shark has a rate, a duration and an amount; borrowing raises the total debt, and a loan past due triggers a visit that can send the player to jail. The loan record is built by `0x004bbe4c` (called 5 times from `0x004b7fe0`, indices 0-4). It stores the name pointer at `0x004d27f8 + i*0x20`, the amount at `0x004d260c + i*0x20`, and the duration at `0x004d2720 + i*0x10`. The borrow handler `0x0047e558` reads the selected shark's amount, adds it to debt (`DAT_004e20c8`), bank (`DAT_004e20b8`), and the loan record, then increments the loan counter. The visit handler `0x004bcfe8` (`ProcessLoanSharks`) iterates the 5 loan slots, and for each due loan shows a visit dialog (`0x0047cf44` `DrawShark`) and, on non-payment, sends the player to jail (`0x004bdc34` `EndGame` with the jail outcome). The exact per-shark rate/duration/amount values are stored in the record fields at `0x004d27f8/0x004d260c/0x004d2720` and the jail-release order is not yet decoded from the builder and needs the bottle.
 
 | Rule | VA | Beermat | Engine | Class |
 | --- | --- | --- | --- | --- |
@@ -154,11 +161,14 @@ Weapons are built at `0x004b7fe0` via `FUN_004bbd34` (6 joke weapons): Handbag, 
 
 `0x004be728` rolls the infection check (`0x004beaac` = 3), the dialysis offer (`0x004bed10` = 3), and the doctor event. `0x004befd8` (`BuyDialysisMachine`) offers a portable dialysis machine for `0x004bf0d4` = 100,000. Infection below 80% health for 5 days (`0x004bea4c` = 5, `0x004bc9b0` = 80) kills the player; kidney failure also kills (`0x004ddf24`).
 
+`0x004bf420` is the doctor event. It runs when the doctor flag is set (`0x004be728` case 2). It rolls `Random(0x4bf5f4 = 10)` minus current health; if positive it deducts that amount from health (`DAT_004e20dc`) and, with a `Random(2)` draw, either triggers kidney death (`0x004ddf24`) or a "kidney removed" event (`0x004be178` "kidney"). It then plays `DWMugged` ("You were mugged at the airport!") and deducts a portion of cash. The doctor dialog text is at `0x004b7668` ("Welcome to my surgery! ... for a mere 300 per health point") and the hospital is `0x004b3198` (`HospitalDlg_FormPaint`) at 300 per health point.
+
 | Rule | VA | Beermat | Engine | Class |
 | --- | --- | --- | --- | --- |
 | Dialysis machine | `0x004befd8` | 100,000 | none | new, N-13 |
 | Infection death | `0x004beaac` | below 80% health for 5 days | none | new, N-14 |
 | Kidney death | `0x004ddf24` | kidney failure kills | none | new, N-15 |
+| Doctor event | `0x004bf420` | health deduction + kidney risk + mugged-at-airport | none | new, N-21 |
 
 ## Old Lady
 
@@ -259,3 +269,10 @@ Handling notes for the bottle:
 | N-18 | Deposit All But withhold | Finances | TASK-013.02.06 |
 | N-19 | Score list 30 entries | Score | TASK-013.02 |
 | N-20 | Score pages 15/30/60/90 | Score | TASK-013.02 |
+| N-21 | Doctor event (health deduction + kidney risk) | Health | TASK-013.02.10 |
+| N-22 | Chase start chance 1 in 8 (Random(8)) | Travel | TASK-013.02.04 |
+| N-23 | Deputy count 2-8 (Random(7)+2) | Chase | TASK-013.02.09 |
+| N-24 | Run resolution Random(10) escape threshold | Chase | TASK-013.02.09 |
+| N-25 | Fight resolution weapon hit vs Random(100) | Chase | TASK-013.02.09 |
+| N-26 | Stay resolution cops fire, arrest | Chase | TASK-013.02.09 |
+| N-27 | Chase win reward free drugs | Chase | TASK-013.02.09 |
