@@ -201,15 +201,15 @@ Loan sharks replace 1.2's single debt. The finance dialog (`0x0047d680`) lists t
 | 3 | Bulbous Bertha | 30 | 1 | 50x | 3 | F |
 | 4 | Midget Mickey | 25 | 5 | 100x | 4 | M |
 
-The Amount column is a multiplier: the offering text appends an `x` (`0x0047d918`). When a shark is selected (`0x0047ec50`) the borrow box is limited to `multiplier * (cash + bank)` (the two pointer cells `PTR_DAT_004d260c` and `PTR_DAT_004d25d8`, read as cash and bank from how the chase reward uses them), further capped at `1,000,000 - total debt`; with nothing left the box is disabled. Borrowing (`0x0047e558`) needs an amount above 0, adds it to cash and total debt, marks the shark borrowed, appends a loan record (shark, amount, rate, a value copied from `PTR_DAT_004d28f0`, duration) and increments the loan count. 2.2 later limits this to one loan per day (changelog); 2.1 has no such check.
+The Amount column is a multiplier: the offering text appends an `x` (`0x0047d918`) and the running game lists Bulbous Bertha as "30, 1, 50x" and Midget Mickey as "25, 5, 100x". When a shark is selected (`0x0047ec50`) the borrow box is limited to `multiplier * (cash + bank)` (the two pointer cells `PTR_DAT_004d260c` and `PTR_DAT_004d25d8`, read as cash and bank from how the chase reward uses them), further capped at `1,000,000 - total debt`; with nothing left the box is disabled. On the running game, selecting Bertha with 1,780 cash and 65 in the bank filled the box with 92250, which is 50 x 1,845. Borrowing (`0x0047e558`) needs an amount above 0, adds it to cash and total debt, marks the shark borrowed, appends a loan record (shark, amount, rate, a value copied from `PTR_DAT_004d28f0`, duration) and increments the loan count. 2.2 later limits this to one loan per day (changelog); 2.1 has no such check.
 
 The starter debt is a real loan: new game (`0x004b9ac0`) writes loan 0 as shark 0 (Honest Harry), amount 5500, rate 15, that field 1, duration 10, marks Harry borrowed and released, and sets the released count and loan count to 1.
 
 ### Daily interest and early payoff
 
-`0x004c0420` rebuilds `DAT_004e20c8` each day: total debt is reset to 0, then every loan is compounded, `amount = Round(amount * (rate / 100.0) + amount)` (single-precision constant `100.0` at `0x004c055c`, x87 `Round`), added to the total, and its days-left counter is decremented. Compounding is per day at the shark's percentage, so Harry's 5500 becomes 6325 after one day. The rate is not the old fixed 10%.
+`0x004c0420` rebuilds `DAT_004e20c8` each day: total debt is reset to 0, then every loan is compounded, `amount = Round(amount * (rate / 100.0) + amount)` (single-precision constant `100.0` at `0x004c055c`, x87 `Round`), added to the total, and its days-left counter is decremented. Compounding is per day at the shark's percentage, so Harry's 5500 becomes 6325 after one day. The rate is not the old fixed 10%. The rate is `15 / 100.0` as a double, so it is a hair below 0.15 and exact ties round down: 22,250 became 25,587 on the running game (22,250 * 1.15 is 25,587.5, which ties-to-even or a plain integer `* 115 / 100` would turn into 25,588). A port has to reproduce `Round(amount * (rate / 100.0) + amount)` in double precision, not integers.
 
-Paying early (days left above 0, `0x0047c3a4`): the loan is projected forward by days-left compoundings, the interest remaining is the projection minus today's balance, and the payoff is `balance + Round(remaining * 30 / 100.0)`, so the player pays 30% of the remaining interest. The dialog says "Because you are paying early, `<shark>` is adding 30% of the interest remaining."
+Paying early (days left above 0, `0x0047c3a4`): the loan is projected forward by days-left compoundings, the interest remaining is the projection minus today's balance, and the payoff is `balance + Round(remaining * 30 / 100.0)`, so the player pays 30% of the remaining interest. The running game showed "You owe: $11,103" for a 6,325 balance with 9 days left at 15%, which this formula reproduces exactly. The dialog says "Because you are paying early, `<shark>` is adding 30% of the interest remaining."
 
 ### Visits (`0x004bcfe8`, `0x0047c3a4`)
 
@@ -239,7 +239,7 @@ The sharks start in jail except Harry. Each travel, `0x004be728` rolls `Random(7
 
 ## Hospital
 
-`0x004c402c` (`SkinHospitalBtnClick`) opens the hospital (`0x004b3198`). At full health it only says "You are perfectly healthy." The price per health point is `DAT_004e2118 * K(50)`, where `DAT_004e2118` is the `Random(9) + 1` rolled with the day's prices, so a point costs 50 to 450 and changes daily. The "$300 per HEALTH POINT" in the form caption and in the doctor's welcome text (`0x0053e25e`) is a design-time sample, not the runtime price. The affordable maximum is `cash div price` and the dialog caps the quantity at `100 - health`; with a maximum of 0 the player is told they cannot afford a point.
+`0x004c402c` (`SkinHospitalBtnClick`) opens the hospital (`0x004b3198`). At full health it only says "You are perfectly healthy." The price per health point is `DAT_004e2118 * K(50)`, where `DAT_004e2118` is the `Random(9) + 1` rolled with the day's prices, so a point costs 50 to 450 and changes daily. The "$300 per HEALTH POINT" in the form caption and in the doctor's welcome text (`0x0053e25e`) is a design-time sample, not the runtime price: a running 2.1 quoted "a mere $200 per health point. You can afford 8 health points" with 1,780 cash (200 is 4 x 50, inside the range). The affordable maximum is `cash div price` and the dialog caps the quantity at `100 - health`; with a maximum of 0 the player is told they cannot afford a point.
 
 After a purchase, `Random(5) == 0` (1 in 5) and `day < limit - 1` trigger the "nasty doctor" roll `Random(3) + 1`: 1 removes all drugs (`RemoveDrugs`, becomes 3 when no drugs are held), 2 caps health below 80 and sets the infection counter and warning flag (becomes 4 when `DAT_004e20f8` equals a decoded literal), and 3 or 4 show a text from `_DAT_004ddf40`-`_DAT_004ddf4c`. The draw order and the 1-in-5 gate are read from the decompile; the texts and the effect of outcomes 3 and 4 on cash and kidneys were not decoded (unresolved, N-31 carries the confirmed part).
 
@@ -254,7 +254,7 @@ After a purchase, `Random(5) == 0` (1 in 5) and `day < limit - 1` trigger the "n
 
 Weapons are built at `0x004b7fe0` via `FUN_004bbd34(Self, index, name, class, accuracy, ammoField, price, ...)`, 11 dwords per record from `DAT_004e1008`. The shipped build uses the 6 joke weapons; the "real" weapons (Stick, Beretta, Colt-45, Shotgun, Uzi-9mm, Bazooka) exist only as design-time captions in the store form.
 
-| Index | Weapon | Class (+0x1c) | Accuracy (+0x18) | Field +0x10 | Price (+0x14) |
+| Index | Weapon | Class (+0x1c) | Accuracy (+0x18) | Ammo price per round (+0x10) | Builder price (+0x14, store shows x1.2) |
 | --- | --- | --- | --- | --- | --- |
 | 0 | Handbag | 1 | 5 | 0 | 50 |
 | 1 | Pea Shooter | 2 | 30 | 20 | 2,000 |
@@ -263,12 +263,12 @@ Weapons are built at `0x004b7fe0` via `FUN_004bbd34(Self, index, name, class, ac
 | 4 | Catapult | 3 | 200 | 700 | 30,000 |
 | 5 | Rubber Chicken Launcher | 4 | 500 | 5,000 | 450,000 |
 
-Accuracy is the value tested in `Random(100) + 1 <= accuracy` in the chase (above 100 it scares several deputies away at once). The field at +0x10 is not used by anything traced; it is probably the ammo price and is unresolved. The names of the weapon rows were read from the weapon builder calls and the store form (`DAT_004e1008`); the price column mapping comes from the argument order and was not checked against a running store.
+Accuracy is the value tested in `Random(100) + 1 <= accuracy` in the chase (above 100 it scares several deputies away at once). The store shows every price 20% above the builder value: Handbag 60, Pea Shooter 2,400, Water Pistol 7,200, Monkey 14,400, Catapult 36,000, Rubber Chicken Launcher 540,000, identical on day 2 and day 12, so the markup is a constant. The field at +0x10 is the ammo price per round: the store sells ammo in packs of 10 at `field * 10 * 1.2` (10 peas for the Pea Shooter 240, 10 water cups 480, 10 bananas 840, 10 marshmallows 8,400, 10 rubber chickens 60,000); the Handbag has no ammo. The store has no real weapons. These rows were confirmed on a running 2.1 (see "Verification on the 2.1 build").
 
 | Rule | VA | Beermat | Engine | Class |
 | --- | --- | --- | --- | --- |
 | Gun dealer | 1.2 | replaced by Super Store | none | changed, N-11 |
-| Weapon set | `0x004b7fe0` | 6 joke weapons, prices 50 to 450,000 | none | new, N-12 |
+| Weapon set | `0x004b7fe0` | 6 joke weapons; store prices are the builder value times 1.2 (60 to 540,000); ammo in packs of 10 | none | new, N-12 |
 
 ## Health: infection, dialysis, kidneys
 
@@ -320,7 +320,7 @@ How kidneys are removed is the unresolved part of the nasty doctor (see "Hospita
 
 `0x004bfbe0`, which the first pass of this document took for the interest handler, is the status-line refresh: it writes "Day `<day>`/`<limit>`" and the cash, bank and debt labels, and shrinks the LCD font once cash plus bank passes 1,000,000,000 (the 2.1 changelog's "LCD font decreases" entry). The BSS addresses `0x004bfffc`, `0x004c000c` and `0x004c001c` are format-string cells it passes to the display helpers, not rates.
 
-Bank interest is `0x004c0358`, called once per travel after the arrival events. When bank is above 0 it computes `rate = K(5) / 100.0` (a single-precision `100.0` at `0x004c041c`) and `bank += Round(bank * rate)`, so the rate is 5% per day, which matches the changelog's cut to 3% in 2.2. `Round` is the same x87 `FISTP` (`0x004029f4`) as in 1.2. Because the rate is built as a double from `5 / 100.0` and the product is formed in extended precision, an exact `.5` tie (bank of 10 mod 20) lands a hair above the tie and rounds up, so the 1.2 ties-to-even and the extended-`1.05` analysis in `docs/beermat-re.md` ("Interest arithmetic") do not carry over; N-33 carries a port of the 2.1 arithmetic and needs a check against the Windows reference before it is trusted.
+Bank interest is `0x004c0358`, called once per travel after the arrival events. When bank is above 0 it computes `rate = K(5) / 100.0` (a single-precision `100.0` at `0x004c041c`) and `bank += Round(bank * rate)`, so the rate is 5% per day, which matches the changelog's cut to 3% in 2.2. `Round` is the same x87 `FISTP` (`0x004029f4`) as in 1.2. Because the rate is built as a double from `5 / 100.0` and the product is formed in extended precision, an exact `.5` tie (bank of 10 mod 20) lands a hair above the tie and rounds up, so the 1.2 ties-to-even and the extended-`1.05` analysis in `docs/beermat-re.md` ("Interest arithmetic") do not carry over. The running game confirmed it: a bank of 30 became 32 and a bank of 50 became 53 (1.2 gave 31 and 52); the other balances seen (32, 34, 36, 38, 40, 42, 46, 48, 53, 56, 59, 62) all moved by `Round(bank * 0.05)`. N-33 carries this arithmetic.
 
 Debt interest is per loan (see "Loan sharks"): `0x004c0420` compounds each loan at its shark's daily rate.
 
@@ -446,6 +446,38 @@ Every 1.2 rule M-01 to M-13 from `docs/beermat-re.md`, with its 2.1 address and 
 
 No 1.2 rule is removed outright, though the 1.2 gun dealer and the cash-plus-bank mugging cap lose their 2.1 counterparts, which is recorded under M-05 and M-06. Buying and selling are not re-read in this pass.
 
+## Verification on the 2.1 build
+
+2.1 was run natively on a Windows 11 machine (the PC Guard protection needs no unpacking there), registered, and played for 15 days of a 90-day game in New York. The observations below were read off the running game. The game's randomness is wall-clock seeded, so only deterministic rules and rare events seen first-hand count as confirmed; rates are not measured.
+
+| Rule | Observed on the running game | Result |
+| --- | --- | --- |
+| Registration and game lengths | the registered build offers 15, 30, 60 and 90 day games | confirms N-01 |
+| Start state | cash 2,000, bank 0, debt 5,500, health 100%, two kidney icons, coat space 100/100 | confirms the start-state row and the coat 100 correction |
+| Starter loan | Honest Harry, 5,500, 15%, 10 days left | confirms the starter loan |
+| Debt interest | 5,500, 6,325, 7,274, 8,365, 9,620, 11,063, 12,722, 14,630, 16,824, 19,348, 22,250, 25,587, 29,425, 33,839, 38,915, 44,752 | confirms per-loan daily compounding; the 25,587 step confirms the double-precision rounding |
+| Bank interest | 30 to 32, 50 to 53, and the other balances above | confirms N-33 including tie rounding |
+| Early payoff | "You owe $11,103" on a 6,325 loan with 9 days left | confirms N-30 exactly |
+| Shark offers | Bulbous Bertha 30 / 1 / 50x and Midget Mickey 25 / 5 / 100x appeared after day 5, none on day 1 | confirms the shark table and release |
+| Borrow cap | 92250 for Bertha with 1,780 cash and 65 bank | confirms the multiple of cash plus bank |
+| Visit warnings | "will be visiting you tomorrow" on day 10, then "due today", "was due yesterday", "2 days past due", "3 days past due" with the "had better pay your loan" text | confirms the visit levels and texts |
+| Beating | at "4 days past due" health went from 55% to 34% (21 points) with the chainsaw text and "his boys" for a male shark | confirms N-08 and the 15-30 range |
+| Hospital | "$200 per health point", affordable 8 with 1,780 cash | confirms N-10 and that $300 is a caption |
+| Store | weapons 60 / 2,400 / 7,200 / 14,400 / 36,000 / 540,000, ammo packs of 10, the same on day 2 and day 12 | confirms N-12 with the 1.2x markup |
+| Drug set and ranges | 13 drugs including MDA, Mushrooms, Special K; every price seen inside the table ranges; prices kept for a day on some drugs (Crack, Special K, Cocaine, Opium) | confirms N-34 and the flat pricing |
+| Price crash | "The market has been flooded with cheap home-made acid!" with Acid at 316; "The Marrakesh Express has arrived!" (Hashish 78) and "Rival dealers raided a pharmacy and are selling cheap ecstasy!" (Ecstasy 2) on one day | confirms the crash texts and the divide by 10 |
+| Price spike | "Cops made a big MDA bust! Prices are outrageous!" with MDA at 18,165 | confirms the spike text and the multiply by 5 |
+| New Game gate | New Game was greyed on days 1-4 and enabled once the day reached 5 | confirms N-22's companion row |
+| Chase | "Officer Hardass and 2 / 8 / 5 of his deputies are chasing you!" (2 and 8 are the range ends); Dump greyed with an empty coat | confirms N-23 |
+| Stay, nothing carried | the pat-down text with no cop fire | confirms N-26 |
+| Stay, drugs carried | the arrest text, drugs confiscated, and the day counter jumped from 7 to 9 | confirms N-26 and the lost day; debt and bank compounded for both days |
+| Run | 8 runs in one chase: 7 failed (5 hits of 10, 9, 5, 12 and 9 health, 2 misses) and the 8th escaped | consistent with N-24 (hit damage 5-15) |
+| Chases seen | 3 chases in about 15 travels | consistent with 1 in 8, not a measurement |
+
+Not observed in 15 days, so still read from the decompile only: the arrival event table (find, friend, mugging, police dogs, brownies), the coat dealer, the dialysis offer, the Old Lady, infection and kidney damage, the nasty doctor, the Fight resolution with a weapon, the chase win reward, and the shark release news text (the offers appeared, but the news line was not caught).
+
+Seeding note for reproducing the run: besides the `Settings` values, the game reads a `Registered` value from each score key under `Scores15`, `Scores30`, `Scores60` and `Scores90`; without them it stops at startup with "Failed to get data for 'Registered'". The Wise script holds 80 score keys with `Name`, `Key` and `Registered`, and all of them have to be present.
+
 ## Open questions
 
 All four questions from the first pass are answered from the decompile:
@@ -460,11 +492,10 @@ Still unresolved, each with the reason:
 - How many deputies a Fight hit scares away (`0x004a3f30` case 4): the weapon field mapping is read from the builder arguments only, and the compare against `DAT_004d236c` was not traced.
 - The outcomes of the nasty doctor beyond the 1-in-5 gate and the drug removal (`0x004c402c`): the texts at `_DAT_004ddf40`-`_DAT_004ddf4c` and the cash and kidney effects are not decoded.
 - The exact joining words of the Old Lady and post-arrest tip texts: they are assembled at run time from a prefix, the drug name and a suffix.
-- The meaning of the weapon record field at +0x10: no reader was traced.
 - What `DAT_004e2160` (the Old Lady phrase count) and `oldlady.txt` contain beyond the 13 phrases noted from `0x004bed1c`.
 - The effect of changing any of the above on 2.2: this document is 2.1 only.
 
-The rows above the unresolved items were read from decompiled code and cross-checked against the form captions; none was run against a live game in this pass.
+Rows not listed under "Verification on the 2.1 build" were read from decompiled code and cross-checked against the form captions only.
 
 ## New difference index
 
