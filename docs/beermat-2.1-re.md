@@ -38,13 +38,13 @@ Classifications compare each rule with the engine (`index.html`, `<script id="en
 | `DAT_004e2148` | player was arrested in a chase | `0x004bd758` |
 | `DAT_004e214c` | travelling by air (new city) flag | text choice at `0x004bf420` |
 | `DAT_004e2143` | Old Lady muted | `0x004be728` |
-| `DAT_004de45c` | drug records, 13 x 0xd7 bytes | built by `0x004bbc04` from `0x004b7fe0` |
+| `DAT_004de45c` | drug records, 13 x 860 bytes | built by `0x004bbc04` from `0x004b7fe0` |
 | `DAT_004e1250` | loan shark records, 5 x 0x20 bytes | built by `0x004bbe4c` |
 | `DAT_004e11ec` | loan records, 5 x 0x14 bytes | `0x004b9ac0`, `0x004c0420` |
 
 ## Drug table and price generation
 
-`0x004b7fe0` builds the game's tables at new game. It calls `FUN_004bbc04` 13 times (drug indices 0-12), `FUN_004bbe4c` 5 times (loan sharks) and `FUN_004bbd34` 6 times (joke weapons). Each drug record is 0xd7 (215) bytes at `DAT_004de45c + index*0xd7`. `FUN_004bbc04(Self, index, name, crashMark, spikeMark, spread, min, ...)` stores the name at +0, the plural at +4, the singular at +8, min at +0xc, spread at +0x10, the price at +0x14, the availability byte at +0x28, the spike mark at +0x20 and the crash mark at +0x24. The per-day price history is at +0x28 + day*4 and the per-day event flag (0 none, 1 spike, 2 crash) at +0x1f0 + day*4.
+`0x004b7fe0` builds the game's tables at new game. It calls `FUN_004bbc04` 13 times (drug indices 0-12), `FUN_004bbe4c` 5 times (loan sharks) and `FUN_004bbd34` 6 times (joke weapons). Each drug record is 0xd7 dwords (860 bytes) at `DAT_004de45c + index*0x35c`. The average cost is at +0x18 and the units held at +0x1c. `FUN_004bbc04(Self, index, name, crashMark, spikeMark, spread, min, ...)` stores the name at +0, the plural at +4, the singular at +8, min at +0xc, spread at +0x10, the price at +0x14, the availability byte at +0x28, the spike mark at +0x20 and the crash mark at +0x24. The per-day price history is at +0x28 + day*4 and the per-day event flag (0 none, 1 spike, 2 crash) at +0x1f0 + day*4.
 
 A drug is a spike drug when its spike mark is 10 and a crash drug when its crash mark is 30; 11 means "not flagged". The marks come straight from the builder calls at `0x004b7fe0`:
 
@@ -119,24 +119,50 @@ The chase start chance is a mismatch: 2.1 draws `Random(8)` (1 in 8) where the e
 
 ## Arrival events and dealers
 
-In 2.1 the arrival sequence is split differently from 1.2's two-stage dealer-then-event model. `0x004bc9d4` (the travel handler) calls the price-generation loop `0x004bbfc4`, which rolls the new market, then folds in the price spike/crash draws and the "found on a dead dude" find event; then `0x004be728` runs after every non-chase travel and rolls, in order, the loan-release check, the coat-dealer offer, the dialysis-machine offer, the infection check, the doctor event, and the Old Lady. The mugging, friend, and police-dog outcomes are the doctor handler (`0x004bf420`) and two price-loop helpers (`0x004bf134` found, `0x004bf8b4` police dog). The exact split between "dealer visit" and "arrival event" is therefore: dealer visit (coat) in `0x004be728` via `0x004bee64`; find/mugging/friend/police-dog events across `0x004bbfc4`/`0x004bf134`/`0x004bf420`/`0x004bf680`/`0x004bf8b4`.
+`0x004be728` runs after every non-chase travel that is not on the last day. It rolls five independent stages in a fixed order, so one arrival can show several. This replaces 1.2's two-stage "dealer, then event" model, and answers the arrival-event split question: the dealer and the event are no longer both `Random(14)`.
 
-The events read from `DAT_004dde88`-`DAT_004ddf68`, built at startup by `0x004b657c`:
+| Stage | Draws | Beermat 2.1 | Engine (1.2 model) | Class |
+| --- | --- | --- | --- | --- |
+| 1. Shark release | `Random(7)`, then `Random(5)` until an unreleased shark comes up | only while fewer than 5 sharks are released: `Random(7) < 3` (3 in 7) releases one shark chosen uniformly among those still in jail, news "`<shark>` was released from jail today!" | none | new, N-09 |
+| 2. Coat dealer | `Random(15)` | `Random(15) == 0` (1 in 15), and only while coat capacity is below `day + 150`; then `0x004bee64` | `Random(14) == 0` then `Random(4)` | mismatch, N-28 |
+| 3. Dialysis machine | `Random(3)` | `Random(3) == 0`, only with no machine and 0 or 1 kidneys; then `0x004befd8` | none | new, N-13 |
+| 4. Event | `Random(13)`, then outcome draws | `Random(13) == 0` (1 in 13) fires an event | `Random(14) == 0` | mismatch, N-29 |
+| 5. Old Lady | `Random(5)` | `Random(5) == 0` (1 in 5), only with no pending tip and not muted | none | new, N-16 |
 
-| Event | VA | Text | Trigger |
+The gun dealer is gone (see "Super Store"), so the 1.2 `Random(4)` coat-or-gun draw no longer exists. 1.2's wealth cap (`cash + bank > 99,999,999` forces a mugging) is not in `0x004be728`, so it is removed in 2.1.
+
+### Coat dealer (`0x004bee64`)
+
+Price `Random(150) + 201` (201-350, as in 1.2), drawn before the cash check; offered only when `price < cash`. Prompt "Would you like to buy a trenchcoat with more pockets for $`<price>`?" (a Yes/No box). On Yes the pockets are `Random(10) + 11` (11-20, drawn only on acceptance) and the price is paid from cash. Matches 1.2 apart from the trigger.
+
+### Event outcomes
+
+Event draws: `Random(2)`. A 0 gives outcome `Random(2)` (0 or 1). A 1 gives outcome `Random(3) + 2` (2 to 4). Two substitutions then apply: outcome 2 becomes 3 when cash is 0, and outcome 4 becomes 3 when neither Weed (`DAT_004e096c`, held count) nor Hashish (`DAT_004deb30`, held count) is held.
+
+| Outcome | Chance given an event | VA | Behaviour |
 | --- | --- | --- | --- |
-| Loan due | `0x004ddea4` | "Your loan is due ..." | loan shark visit |
-| Raid warning | `0x004dde88` | "I hear there is going to be an air raid tomorrow." | Old Lady |
-| Friend | `0x004ddecc` | "You meet a friend! He gives you some" | arrival event |
-| Trenchcoat | `0x004ddec8` | "Would you like to buy a trenchcoat with more pockets for" | coat dealer |
-| Spike prefix | `0x004ddee0` | "Cops made a big" | spike |
-| Spike suffix | `0x004ddee4` | "bust! Prices are outrageous!" | spike |
-| Crash messages | `0x004ddef0`-`0x004ddf00` | see table above | crash |
-| Death: wasted | `0x004ddf20` | "They wasted you man. What a drag!" | chase death |
-| Death: infection | `0x004ddf24` | "Your infection got the better of you. You're dead. What a drag!" | infection death |
-| Death: kidney | `0x004ddf28` | "Your kidney problems killed you. You're dead. What a drag!" | kidney death |
-| Death: out of time | `0x004ddf2c` | "You ran out of time for peddling your wares!" | end of game |
-| Last day | `0x004ddf60` | "This is your last day, man." | last day |
+| 0 find | 1/4 | `0x004bf134` | Skipped when the coat is full, before any draw. Drug `Random(13)` redrawn until available (all 13 drugs, 1.2 used 11), then `N = min(Random(7) + 2, free space)`. "You find N units of `<drug>` on a dead dude in the `<location>`!" (airport variant "... at the airport!"). Average cost diluted as in 1.2. Plays `DWGoodEvent`. |
+| 1 friend | 1/4 | `0x004bf680` | Same drug and quantity draws. "You meet a friend! He gives you some `<drug>`". Plays `DWGoodEvent`. |
+| 2 mugging | 1/6 | `0x004bf420` | Health loses `Random(10) + 1`, floored at 1. Plays `DWMugged`. "You were mugged on the `<location>`!" (airport variant "You were mugged at the airport!"). Cash `-= cash div (Random(2) + 3)`. |
+| 3 police dogs | 1/6 | `0x004bf8b4` | Plays `DWPoliceDog`. With drugs held: drug `Random(12)` redrawn up to 21 times until one is held, then `Random(4) > 1` drops `min(Random(held) + 1, 10)` units. Then `Random(4) + 2` blocks: "Police dogs chased you for N blocks." plus " You dropped some drugs! That's a drag, man!" when units dropped. |
+| 4 brownies | 1/6 | `0x004bed68` | "Your mother made some brownies, and used your `<drug>`. They were great!" The drug is Weed (index 11) if Weed is held, otherwise Hashish (index 2); its held count and average cost are zeroed. |
+
+Mugging now costs health, which 1.2's did not, and brownies are an outcome the 1.2 binary did not have. The found and given picks read the availability flags of the previous roll, as in 1.2. The found and given drug loops never end when no drug is available, as in 1.2.
+
+### Event text
+
+| Event | VA | Text |
+| --- | --- | --- |
+| Loan visit tomorrow | `0x004bcdec` | "`<shark>` will be visiting you tomorrow. Better get some cash from the bank!" |
+| Tip (Old Lady) | `0x004beae0` | "I hear there is going to be `<drug plural>` raid tomorrow." |
+| Tip (after arrest) | `0x004bd758` | "As you leave the jail, you overhear cops talking about making `<drug>` raid tomorrow." |
+| Death: wasted | `0x004ddf20` | "They wasted you man. What a drag!" |
+| Death: infection | `0x004ddf24` | "Your infection got the better of you. You're dead. What a drag!" |
+| Death: kidney | `0x004ddf28` | "Your kidney problems killed you. You're dead. What a drag!" |
+| Death: out of time | `0x004ddf2c` | "You ran out of time for peddling your wares!" |
+| Last day | `0x004ddf60` | "This is your last day, man." |
+
+The tip texts are assembled from a prefix and the drug name and are not exact strings in the image; the exact joining words were not decoded (unresolved, cosmetic).
 
 ## Chase
 
