@@ -3,7 +3,8 @@
 # Ported from shouldStartChase / startChase / runFromChase / stayInChase /
 # fight / acceptDoctorOffer in index.html (docs/beermat-re.md, M-04, M-07 to M-09).
 #
-# shouldStartChase is Beermat's Random(6) == 0: a flat 1 in 6 at every location.
+# shouldStartChase is Beermat 2.1's Random(8) == 0 (1 in 8, N-22), and suppressed
+# on the last two days.
 # Run escapes on Random(6) < 3 whatever the player carries. Anything but an
 # escape (and Stay) lets the cops fire: Random(2), 1 hits for Random(11) + 5.
 # Fight is the player's shot (Random(2), 1 kills a deputy) and then, while the
@@ -75,7 +76,9 @@ struct FightResult(Copyable, Movable):
 
 
 def should_start_chase(mut game: world.World) raises -> Bool:
-    return rng_mod.rand_int(game.rng, 0, 5) == 0
+    if game.day >= game.num_days - 1:
+        return False
+    return rng_mod.rand_int(game.rng, 0, 7) == 0
 
 
 def start_chase(mut game: world.World) raises -> Chase:

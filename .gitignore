@@ -2,8 +2,7 @@
 CLAUDE.md
 CLAUDE.local.md
 screenshots/*
-vendor/dopewars-1999/
-vendor/dopewars-2001/
+**/dopewars-*
 home/
 .task/
 .venv/

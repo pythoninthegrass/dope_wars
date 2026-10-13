@@ -20,7 +20,7 @@ extends RefCounted
 signal state_changed()
 signal finished()
 
-enum Step { TOAST, EVENT_ROLL, COAT_DEALER, GUN_DEALER }
+enum Step { TOAST, EVENT_ROLL, COAT_DEALER }
 
 ## The live chase, or {} when none is unresolved. Carries the deputy count
 ## and whether the player may fight, both read off dw_start_chase.
@@ -71,12 +71,8 @@ func _build() -> void:
 		return
 
 	var visit := _world.roll_dealer_visit()
-	if int(visit.get("result", SimWorld.ERR_INVALID_ARGUMENT)) == SimWorld.OK:
-		match int(visit.get("kind", SimWorld.DEALER_NONE)):
-			SimWorld.DEALER_COAT:
-				_queue.append({"step": Step.COAT_DEALER})
-			SimWorld.DEALER_GUN:
-				_queue.append({"step": Step.GUN_DEALER})
+	if int(visit.get("result", SimWorld.ERR_INVALID_ARGUMENT)) == SimWorld.OK and int(visit.get("kind", SimWorld.DEALER_NONE)) == SimWorld.DEALER_COAT:
+		_queue.append({"step": Step.COAT_DEALER})
 	_queue.append({"step": Step.EVENT_ROLL})
 
 
@@ -106,9 +102,7 @@ func _advance() -> void:
 			else:
 				_advance()
 		Step.COAT_DEALER:
-			_present_dealer(false)
-		Step.GUN_DEALER:
-			_present_dealer(true)
+			_present_dealer()
 
 
 func _present_alert(title_key: String, message: String, icon: String) -> void:
@@ -132,21 +126,18 @@ func _present_event(event: Dictionary) -> void:
 	)
 
 
-func _present_dealer(is_gun: bool) -> void:
-	var offer := _world.roll_gun_dealer_offer() if is_gun else _world.roll_coat_dealer_offer()
+func _present_dealer() -> void:
+	var offer := _world.roll_coat_dealer_offer()
 	if not bool(offer.get("offered", false)):
 		_advance()
 		return
 	var dialog := DealerDialog.new()
 	dialog.offer = offer
-	dialog.present(is_gun)
+	dialog.present(false)
 
 	_dialogs.open(dialog, func(key: String) -> void:
 		if key == "dealerBuy":
-			if is_gun:
-				_world.accept_gun_offer(dialog.price(), dialog.name_index())
-			else:
-				_world.accept_coat_offer(dialog.price())
+			_world.accept_coat_offer(dialog.price())
 		state_changed.emit()
 		_advance()
 	)
