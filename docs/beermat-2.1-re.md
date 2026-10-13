@@ -92,26 +92,30 @@ Spike news, all via `TDWForm_AddNews`: "Cops made a big `<drug>` bust! Prices ar
 
 ## Travel, chase start and the day loop
 
-`0x004bc9d4` is the common handler behind all six location buttons (`0x004c168c`-`0x004c177c`, argument 1-6) and the Finish button (`0x004c35f0`, argument 7). Order of operations on a travel:
+`0x004bc9d4` is the common handler behind all six location buttons (`0x004c168c`-`0x004c177c`, argument 1-6) and the Finish button (`0x004c35f0`, argument 7). Order of operations on a travel, from the decompile:
 
-1. `day += 1` (the day counter is `DAT_004e20e0`, incremented in `LoseDay`).
-2. `ProcessLoanSharks` (`0x004bcfe8`): process any due loans before the arrival sequence.
-3. Price generation (`0x004bbfc4`), which also rolls the new prices and their availability and spike/crash draws.
-4. Interest: bank (`0x004bfbe0`) then debt.
-5. Day-end health checks (`0x004bc790`): debt above the loan cap, health from the dialysis machine, and death from zero health or unpaid loans.
-6. New Game unlocks when the day is above 4 (see "New Game gate").
-7. Last day (`0x004bce80`) when the day counter reaches the limit.
+1. `ProcessLoanSharks` (`0x004bcfe8`) runs first, before the day advances, for every loan whose days-left counter is 0 or below (see "Loan sharks").
+2. `0x004bce30` runs, and the news flag `DAT_004e2124` is cleared.
+3. If the day already equals the day limit, `EndGame(5)` ends the game ("You ran out of time for peddling your wares!"). Otherwise `day += 1`.
+4. From day 5 on (after the increment) the New Game button is enabled (`TDWForm_EnableNewGameButton`).
+5. Day-end health checks (`0x004bc790`, see "Health"). On the day limit `TDWForm_SetLastDay` shows the last-day message.
+6. The tip drug is moved: when `DAT_004e212c` is not 1000 it is copied to `DAT_004e2130` and reset.
+7. Chase roll: `Random(8) == 0` (1 in 8) draws on every travel, but a chase only starts when `day < limit - 1`. A chase calls `0x004bd758`; if health is 0 afterwards `EndGame(4)`. With no chase, and unless the day equals the limit, `0x004be728` runs the arrival events (see "Arrival events"). The two are exclusive.
+8. Bank interest `0x004c0358`, then loan interest `0x004c0420` (see "Interest").
+9. Price roll `0x004bbfc4`, then the display refresh `0x004bfbe0` (this draws the day and the cash, bank and debt labels, and shrinks the LCD font past 1,000,000,000; it is not an interest handler) and `0x004c0034`.
+10. Every loan with exactly 1 day left shows "`<shark>` will be visiting you tomorrow. Better get some cash from the bank!" (`0x004bcdec`).
+11. If any news was queued, `TDWForm_DisplayNews` shows it.
 
-Chase start is `Random(0x4bcde0 = 8) == 0` (`0x004bc9d4` line ~129 tests the day counter against `DAT_004e20f0`); the two are exclusive — a chase suppresses the arrival events and dealers.
+`LoseDay` (`0x004bdb8c`) is the lost-day path used after an arrest: it rolls prices, both interest handlers, `0x004bce30` and the day-end checks, then advances the day.
 
 | Rule | VA | Beermat | Engine | Class |
 | --- | --- | --- | --- | --- |
 | Game length | `0x004c2a0c`-`0x004c2a44` | 15, 30, 60 or 90 days, chosen at new game; `DAT_004e20f0` holds the limit | `numDays` | changed, N-01 |
-| Start state | new game | cash 2000, debt 5500, bank 0, health 100, coat 200 | `startCash`, `startDebt`, `startHealth`, `startCoatCapacity` | match (start cash/debt confirmed by IntroDlg text) |
-| Chase start chance | `0x004bc9d4` | `Random(8) == 0`, 1 in 8, the same at every location | `randInt(0, 5) === 0` | mismatch, N-22 |
-| New Game gate | `0x004bc9d4` | New Game disabled until day > 4, so usable from day 5 | New Game available any time | intentional, `docs/parity-deltas.md` section 6 |
+| Start state | `0x004b9ac0` | cash 2000, one starter loan of 5500 from the first shark (10 days, 15%), bank 0, health 100, kidneys 2, coat 100 | `startCash`, `startDebt`, `startHealth`, `startCoatCapacity` | match for the numbers; the starter loan carries a rate and a due date, N-06 |
+| Chase start chance | `0x004bc9d4` | `Random(8) == 0`, 1 in 8, only while `day < limit - 1` | `randInt(0, 5) === 0` | mismatch, N-22 |
+| New Game gate | `0x004bc9d4` | New Game enabled once the day reaches 5 (after the increment), so usable from day 5 | New Game available any time | intentional, `docs/parity-deltas.md` section 6 |
 
-The chase start chance is a mismatch: 2.1 draws `Random(8)` (1 in 8) where the engine draws `randInt(0, 5)` (1 in 6). This is a new difference N-22.
+The chase start chance is a mismatch: 2.1 draws `Random(8)` (1 in 8) where the engine draws `randInt(0, 5)` (1 in 6). The chase is also suppressed on the last two days.
 
 ## Arrival events and dealers
 
