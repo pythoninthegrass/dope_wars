@@ -14,7 +14,7 @@ from std.testing import assert_equal, assert_true, assert_false, TestSuite
 
 
 def test_scalar_rules_match_js() raises:
-    assert_equal(rules.NUM_DAYS, 31)
+    assert_equal(rules.NUM_DAYS, 30)
     assert_equal(rules.START_CASH, 2000)
     assert_equal(rules.START_DEBT, 5500)
     assert_equal(rules.START_HEALTH, 100)

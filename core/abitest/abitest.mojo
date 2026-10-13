@@ -175,7 +175,8 @@ struct HighscoreEntryView(Copyable, Movable):
     var score: Int64
     var day: UInt32
     var dead: UInt8
-    var _pad0: Array[UInt8, 3]
+    var _pad0: UInt8
+    var num_days: UInt16
 
 
 # ---------------------------------------------------------------------------
@@ -490,8 +491,8 @@ def test_every_result_code_is_reachable() raises:
     # DW_ERR_SCORE_TOO_LOW: a score of 0 or below is never recorded (M-13)
     var scores = List[HighscoreEntryView]()
     for _ in range(DW_MAX_HIGHSCORES):
-        scores.append(HighscoreEntryView(Array[UInt8, 32](fill=0), Int64(0), UInt32(0), UInt8(0), Array[UInt8, 3](fill=0)))
-    var zero_score = HighscoreEntryView(_cstr_array("dave"), Int64(0), UInt32(31), UInt8(0), Array[UInt8, 3](fill=0))
+        scores.append(HighscoreEntryView(Array[UInt8, 32](fill=0), Int64(0), UInt32(0), UInt8(0), UInt8(0), UInt16(0)))
+    var zero_score = HighscoreEntryView(_cstr_array("dave"), Int64(0), UInt32(31), UInt8(0), UInt8(0), UInt16(0))
     var out_count: UInt = 0
     assert_equal(external_call["dw_insert_highscore", Int32](scores.unsafe_ptr(), UInt(DW_MAX_HIGHSCORES), UInt(0), Pointer(to=zero_score), Pointer(to=out_count)), DW_ERR_SCORE_TOO_LOW)
 
@@ -678,7 +679,7 @@ def test_load_rejects_wrong_length() raises:
 
 
 def test_rules_accessors() raises:
-    assert_equal(external_call["dw_rules_default_num_days", UInt32](), UInt32(31))
+    assert_equal(external_call["dw_rules_default_num_days", UInt32](), UInt32(30))
     assert_equal(external_call["dw_rules_default_start_cash", Int32](), Int32(2000))
     assert_equal(external_call["dw_rules_default_start_debt", Int64](), Int64(5500))
     assert_equal(external_call["dw_rules_default_start_health", Int32](), Int32(100))
@@ -926,28 +927,29 @@ def test_finish_and_highscore() raises:
 
     var scores = List[HighscoreEntryView]()
     for _ in range(DW_MAX_HIGHSCORES):
-        scores.append(HighscoreEntryView(Array[UInt8, 32](fill=0), Int64(0), UInt32(0), UInt8(0), Array[UInt8, 3](fill=0)))
-    var entry = HighscoreEntryView(_cstr_array("alice"), Int64(1234), UInt32(31), UInt8(0), Array[UInt8, 3](fill=0))
+        scores.append(HighscoreEntryView(Array[UInt8, 32](fill=0), Int64(0), UInt32(0), UInt8(0), UInt8(0), UInt16(0)))
+    var entry = HighscoreEntryView(_cstr_array("alice"), Int64(1234), UInt32(31), UInt8(0), UInt8(0), UInt16(60))
     var count: UInt = 0
     assert_equal(external_call["dw_insert_highscore", Int32](scores.unsafe_ptr(), UInt(DW_MAX_HIGHSCORES), UInt(0), Pointer(to=entry), Pointer(to=count)), DW_OK)
     assert_equal(count, UInt(1))
     assert_equal(_bytes_to_string(scores[0].name), "alice")
     assert_equal(scores[0].score, Int64(1234))
+    assert_equal(scores[0].num_days, UInt16(60))
 
     # A too-small table is rejected.
     var tiny = List[HighscoreEntryView]()
-    tiny.append(HighscoreEntryView(Array[UInt8, 32](fill=0), Int64(0), UInt32(0), UInt8(0), Array[UInt8, 3](fill=0)))
+    tiny.append(HighscoreEntryView(Array[UInt8, 32](fill=0), Int64(0), UInt32(0), UInt8(0), UInt8(0), UInt16(0)))
     assert_equal(external_call["dw_insert_highscore", Int32](tiny.unsafe_ptr(), UInt(1), UInt(0), Pointer(to=entry), Pointer(to=count)), DW_ERR_BUFFER_TOO_SMALL)
 
     # A score of 0 or below is rejected (docs/beermat-re.md M-13): the table
     # and out_count are unchanged.
-    var zero_entry = HighscoreEntryView(_cstr_array("bob"), Int64(0), UInt32(31), UInt8(0), Array[UInt8, 3](fill=0))
+    var zero_entry = HighscoreEntryView(_cstr_array("bob"), Int64(0), UInt32(31), UInt8(0), UInt8(0), UInt16(0))
     var before_count: UInt = 1
     assert_equal(external_call["dw_insert_highscore", Int32](scores.unsafe_ptr(), UInt(DW_MAX_HIGHSCORES), UInt(1), Pointer(to=zero_entry), Pointer(to=before_count)), DW_ERR_SCORE_TOO_LOW)
     assert_equal(before_count, UInt(1))
     assert_equal(_bytes_to_string(scores[0].name), "alice")
 
-    var negative_entry = HighscoreEntryView(_cstr_array("carol"), Int64(-1), UInt32(31), UInt8(0), Array[UInt8, 3](fill=0))
+    var negative_entry = HighscoreEntryView(_cstr_array("carol"), Int64(-1), UInt32(31), UInt8(0), UInt8(0), UInt16(0))
     assert_equal(external_call["dw_insert_highscore", Int32](scores.unsafe_ptr(), UInt(DW_MAX_HIGHSCORES), UInt(1), Pointer(to=negative_entry), Pointer(to=before_count)), DW_ERR_SCORE_TOO_LOW)
     assert_equal(before_count, UInt(1))
 

@@ -91,8 +91,8 @@ const CASE_FLOORS := {
 	"persistence_round_trip": 16,
 	"finances": 7,
 	"typed_quantity": 21,
-	"endgame_and_highscores": 22,
-	"new_game_dialog": 9,
+	"endgame_and_highscores": 24,
+	"new_game_dialog": 11,
 	"win98_chrome": 82,
 	"linux_display_driver": 1,
 	"window_pinned": 5,
@@ -201,7 +201,7 @@ func _test_new_game_boot() -> void:
 
 	_assert(
 		hud.title_text() == "Day %d of %d" % [state["day"], state["num_days"]],
-		"the day readout should read 'Day 1 of 31', got '%s'" % hud.title_text()
+		"the day readout should read 'Day 1 of 30', got '%s'" % hud.title_text()
 	)
 	_assert(hud.led_text("cash") == "2.000", "cash LED should be 2.000, got '%s'" % hud.led_text("cash"))
 	_assert(hud.led_text("bank") == "0", "bank LED should be 0, got '%s'" % hud.led_text("bank"))
@@ -441,7 +441,7 @@ func _test_travel_advances_day() -> void:
 	_assert(int(world.state_get()["day"]) == from_day + 1, "travel should advance the day")
 	_assert(int(world.state_get()["location_index"]) == destination, "travel should move the player")
 	_assert(
-		hud.title_text() == "Day %d of 31" % (from_day + 1),
+		hud.title_text() == "Day %d of 30" % (from_day + 1),
 		"the day readout should show the new day, got '%s'" % hud.title_text()
 	)
 	_assert(hud.selected_buy_drug == -1 and hud.selected_sell_drug == -1, "travel should clear both selections (index.html:1372-1373)")
@@ -798,6 +798,7 @@ func _test_endgame_and_highscores() -> void:
 		_assert(int(table[0]["score"]) == expected, "the persisted score should be %d, got %s" % [expected, table[0]["score"]])
 		_assert(int(table[0]["day"]) == int(world.state_get()["day"]), "the persisted day should match the run")
 		_assert(not bool(table[0]["dead"]), "a clean finish should not be recorded as dead")
+		_assert(int(table[0]["num_days"]) == int(world.state_get()["num_days"]), "the persisted row should carry the game length, got %s" % table[0].get("num_days"))
 		_assert(String(table[0]["date"]) == Time.get_date_string_from_system(true), "the date should be today's UTC date")
 
 	# index.html:1592-1606 -- the Scores menu renders the table back.
@@ -805,6 +806,7 @@ func _test_endgame_and_highscores() -> void:
 	await _idle()
 	_assert(_main.dialogs().current() is ScoresDialog, "the Scores menu should open a scores dialog")
 	_assert(_copy_text(_main.dialogs().current()).contains("Player"), "the scores dialog should list the saved name")
+	_assert(_copy_text(_main.dialogs().current()).contains(str(int(world.state_get()["num_days"]))), "the scores dialog should show the game length")
 	_main.dialogs().cancel()
 	await _idle()
 
@@ -852,25 +854,23 @@ func _test_new_game_dialog() -> void:
 	_assert(dialog != null, "the new game dialog should open")
 	if dialog == null:
 		return
-	_assert(dialog.num_days() == 31, "the days field should default to the ruleset's 31, got %d" % dialog.num_days())
+	_assert(dialog.num_days() == 30, "the length selector should default to the ruleset's 30, got %d" % dialog.num_days())
+	_assert(dialog.length_options() == [15, 30, 60, 90], "the selector should offer 15, 30, 60 and 90 days, got %s" % [dialog.length_options()])
 	_assert(dialog.start_cash() == 2000, "the cash field should default to the ruleset's 2000, got %d" % dialog.start_cash())
 	_assert(dialog.requested_seed() == -1, "a new game with no seed asked for should report -1")
 
-	# index.html:1622-1623 -- a blank field falls back to the prototype's
-	# default (31 / 2000), not to the field's minimum. This is the typed path
-	# the set_values() below bypasses, so it needs its own check.
-	_spinbox_of(dialog).get_line_edit().text = ""
-	_assert(dialog.num_days() == 31, "a blank days field should read 31, got %d" % dialog.num_days())
-
-	dialog.set_values(7, 5000, 999)
+	dialog.set_values(90, 5000, 999)
+	_assert(dialog.num_days() == 90, "selecting 90 days should read back 90, got %d" % dialog.num_days())
+	dialog.set_values(15, 5000, 999)
+	_assert(dialog.num_days() == 15, "selecting 15 days should read back 15, got %d" % dialog.num_days())
 	_main.dialogs().confirm()
 	await _idle()
 
 	var world := _main.simulation()
-	_assert(int(world.state_get()["num_days"]) == 7, "starting a new game should apply the day count")
+	_assert(int(world.state_get()["num_days"]) == 15, "starting a new game should apply the day count")
 	_assert(int(world.state_get()["cash"]) == 5000, "starting a new game should apply the starting cash")
 	_assert(int(world.state_get()["day"]) == 1, "a new game should start on day 1")
-	_assert(_main.hud().title_text() == "Day 1 of 7", "the day readout should show the new game's length, got '%s'" % _main.hud().title_text())
+	_assert(_main.hud().title_text() == "Day 1 of 15", "the day readout should show the new game's length, got '%s'" % _main.hud().title_text())
 
 
 # index.html:253-270, :45-63. The reference's chrome is a 2px two-tone border

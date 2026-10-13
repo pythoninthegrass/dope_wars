@@ -10,11 +10,11 @@ func present(records: Array) -> ScoresDialog:
 	custom_minimum_size = Vector2(400, 0)
 
 	var table := GridContainer.new()
-	table.columns = 5
+	table.columns = 6
 	table.add_theme_constant_override("h_separation", 12)
 	body().add_child(table)
 
-	for header_key in [Copy.LBL_NAME, Copy.LBL_SCORE, Copy.LBL_DAY, Copy.LBL_STATUS, Copy.LBL_DATE]:
+	for header_key in [Copy.LBL_NAME, Copy.LBL_SCORE, Copy.LBL_DAY, Copy.LBL_LENGTH, Copy.LBL_STATUS, Copy.LBL_DATE]:
 		var head := Label.new()
 		head.text = tr(header_key)
 		head.theme_type_variation = &"TableTitle"
@@ -29,6 +29,8 @@ func present(records: Array) -> ScoresDialog:
 			table.add_child(_cell(String(row["name"])))
 			table.add_child(_cell(Copy.money(int(row["score"]))))
 			table.add_child(_cell(str(int(row["day"]))))
+			# Rows saved before the length was recorded read 0 and show blank.
+			table.add_child(_cell(str(int(row["num_days"])) if int(row.get("num_days", 0)) > 0 else ""))
 			# index.html:1594 leaves Status blank for a clean finish.
 			table.add_child(_cell(tr(Copy.STATUS_DEAD) if bool(row["dead"]) else ""))
 			table.add_child(_cell(String(row.get("date", ""))))

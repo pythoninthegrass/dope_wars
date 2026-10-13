@@ -221,7 +221,7 @@ func finish() -> Dictionary:
 	return _world.finish()
 
 
-## `scores` and `entry` are arrays/dicts of {name, score, day, dead}. Returns
+## `scores` and `entry` are arrays/dicts of {name, score, day, dead, num_days}. Returns
 ## {result, scores, count}, sorted by score descending and truncated to
 ## MAX_HIGHSCORES. Keys outside that set are dropped, so a caller cannot smuggle
 ## extra per-row state through here.

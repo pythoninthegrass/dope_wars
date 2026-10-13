@@ -110,7 +110,7 @@ Spike news, all via `TDWForm_AddNews`: "Cops made a big `<drug>` bust! Prices ar
 
 | Rule | VA | Beermat | Engine | Class |
 | --- | --- | --- | --- | --- |
-| Game length | `0x004c2a0c`-`0x004c2a44` | 15, 30, 60 or 90 days, chosen at new game; `DAT_004e20f0` holds the limit | `numDays` | changed, N-01 |
+| Game length | `0x004c2a0c`-`0x004c2a44` | 15, 30, 60 or 90 days, chosen at new game; `DAT_004e20f0` holds the limit | `num_days`, default 30, chosen at new game (TASK-013.02.02); the registration gate is an intentional delta, `docs/parity-deltas.md` section 9 | match |
 | Start state | `0x004b9ac0` | cash 2000, one starter loan of 5500 from the first shark (10 days, 15%), bank 0, health 100, kidneys 2, coat 100 | `startCash`, `startDebt`, `startHealth`, `startCoatCapacity` | match for the numbers; the starter loan carries a rate and a due date, N-06 |
 | Chase start chance | `0x004bc9d4` | `Random(8) == 0`, 1 in 8, only while `day < limit - 1` | `randInt(0, 5) === 0` | mismatch, N-22 |
 | New Game gate | `0x004bc9d4` | New Game enabled once the day reaches 5 (after the increment), so usable from day 5 | New Game available any time | intentional, `docs/parity-deltas.md` section 6 |

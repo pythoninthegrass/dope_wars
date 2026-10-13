@@ -13,7 +13,8 @@
 # dw_find_location_index in include/dopewars.h. -1 means "not found", which is
 # the Mojo equivalent of the JS findDrug/findLocation returning undefined.
 
-comptime NUM_DAYS = 31
+# The default game length; 2.1 also offers 15, 60 and 90 (docs/beermat-2.1-re.md, N-01).
+comptime NUM_DAYS = 30
 comptime START_CASH = 2000
 comptime START_DEBT = 5500
 comptime START_HEALTH = 100

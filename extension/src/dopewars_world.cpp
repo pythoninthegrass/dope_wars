@@ -615,6 +615,7 @@ Dictionary DopeWarsWorld::insert_highscore(const Array &scores, const Dictionary
 		e.score = static_cast<int64_t>(existing.get("score", 0));
 		e.day = static_cast<uint32_t>(existing.get("day", 0));
 		e.dead = existing.get("dead", false) ? 1 : 0;
+		e.num_days = static_cast<uint16_t>(existing.get("num_days", 0));
 		entries[in_count] = e;
 		in_count++;
 	}
@@ -624,6 +625,7 @@ Dictionary DopeWarsWorld::insert_highscore(const Array &scores, const Dictionary
 	new_entry.score = static_cast<int64_t>(entry.get("score", 0));
 	new_entry.day = static_cast<uint32_t>(entry.get("day", 0));
 	new_entry.dead = entry.get("dead", false) ? 1 : 0;
+	new_entry.num_days = static_cast<uint16_t>(entry.get("num_days", 0));
 
 	size_t out_count = 0;
 	dw_result result = dw_insert_highscore(entries.data(), entries.size(), in_count, &new_entry, &out_count);
@@ -636,6 +638,7 @@ Dictionary DopeWarsWorld::insert_highscore(const Array &scores, const Dictionary
 			e["score"] = entries[i].score;
 			e["day"] = entries[i].day;
 			e["dead"] = entries[i].dead;
+			e["num_days"] = entries[i].num_days;
 			out_scores.push_back(e);
 		}
 		out["scores"] = out_scores;

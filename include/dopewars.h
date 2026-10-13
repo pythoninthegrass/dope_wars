@@ -210,7 +210,7 @@ typedef struct dw_config {
     uint16_t abi_version;  /* must equal DW_ABI_VERSION */
     uint16_t _pad0;         /* specified-zero; pads rng_seed to a 4-byte offset */
     uint32_t rng_seed;      /* mulberry32 seed; may be any uint32_t */
-    uint32_t num_days;      /* 0 means "use the ruleset default of 31" */
+    uint32_t num_days;      /* 0 means "use the ruleset default of 30" */
     int32_t  start_cash;    /* negative sentinel (-1) means "use ruleset default" */
 } dw_config;
 DW_STATIC_ASSERT(sizeof(dw_config) == 16, "dw_config layout changed");
@@ -402,7 +402,8 @@ typedef struct dw_highscore_entry {
     int64_t score;
     uint32_t day;
     uint8_t  dead;
-    uint8_t  _pad0[3]; /* specified-zero */
+    uint8_t  _pad0;    /* specified-zero */
+    uint16_t num_days; /* game length the score was played at; 0 when unrecorded */
 } dw_highscore_entry;
 DW_STATIC_ASSERT(sizeof(dw_highscore_entry) == 48, "dw_highscore_entry layout changed");
 

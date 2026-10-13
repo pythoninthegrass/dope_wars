@@ -294,8 +294,9 @@ def replay_fixture(fixture: String) raises:
     assert_true(len(records) > 0)
     ref first = records[0]
     assert_equal(first.call, "newGame")
+    # The oracle fixtures were recorded at the 1.2 length of 31 days.
     var game = world.new_game(
-        UInt32(first.args.int_at("seed")), 0, -1
+        UInt32(first.args.int_at("seed")), 31, -1
     )
     harness.assert_state_matches(game, first.state)
     for i in range(1, len(records)):

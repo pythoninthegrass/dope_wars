@@ -62,7 +62,7 @@ DW_MAX_HIGHSCORES = 10
 # change is an ABI-visible semantic change and must update both core/src/rules.mojo
 # and this table, in the same commit, with a DW_ABI_VERSION bump.
 EXPECTED_RULES = {
-    "dw_rules_default_num_days": (ctypes.c_uint32, 31),
+    "dw_rules_default_num_days": (ctypes.c_uint32, 30),
     "dw_rules_default_start_cash": (ctypes.c_int32, 2000),
     "dw_rules_default_start_debt": (ctypes.c_int64, 5500),
     "dw_rules_default_start_health": (ctypes.c_int32, 100),

@@ -36,7 +36,7 @@ OUT = REPO_ROOT / "game" / "bridge_expectations.gd"
 # table in three places is deliberate: it is the ABI's definition of "v1", and an
 # update that only lands in one of the three is exactly the drift being guarded.
 PINNED: dict[str, int] = {
-    "dw_rules_default_num_days": 31,
+    "dw_rules_default_num_days": 30,
     "dw_rules_default_start_cash": 2000,
     "dw_rules_default_start_debt": 5500,
     "dw_rules_default_start_health": 100,
