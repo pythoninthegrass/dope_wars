@@ -239,44 +239,63 @@ The sharks start in jail except Harry. Each travel, `0x004be728` rolls `Random(7
 
 ## Hospital
 
-`0x004b3198` (`HospitalDlg_FormPaint`) draws the dialog. The price is `0x004b8bf0` = 300 per health point (from the form caption "$300 per HEALTH POINT"). `0x004c402c` (`SkinHospitalBtnClick`) opens it. Buying health back is a 2.0 feature; the price and the quantity box are 2.1.
+`0x004c402c` (`SkinHospitalBtnClick`) opens the hospital (`0x004b3198`). At full health it only says "You are perfectly healthy." The price per health point is `DAT_004e2118 * K(50)`, where `DAT_004e2118` is the `Random(9) + 1` rolled with the day's prices, so a point costs 50 to 450 and changes daily. The "$300 per HEALTH POINT" in the form caption and in the doctor's welcome text (`0x0053e25e`) is a design-time sample, not the runtime price. The affordable maximum is `cash div price` and the dialog caps the quantity at `100 - health`; with a maximum of 0 the player is told they cannot afford a point.
+
+After a purchase, `Random(5) == 0` (1 in 5) and `day < limit - 1` trigger the "nasty doctor" roll `Random(3) + 1`: 1 removes all drugs (`RemoveDrugs`, becomes 3 when no drugs are held), 2 caps health below 80 and sets the infection counter and warning flag (becomes 4 when `DAT_004e20f8` equals a decoded literal), and 3 or 4 show a text from `_DAT_004ddf40`-`_DAT_004ddf4c`. The draw order and the 1-in-5 gate are read from the decompile; the texts and the effect of outcomes 3 and 4 on cash and kidneys were not decoded (unresolved, N-31 carries the confirmed part).
 
 | Rule | VA | Beermat | Engine | Class |
 | --- | --- | --- | --- | --- |
-| Hospital price | `0x004b8bf0` | 300 per health point | none | new, N-10 |
+| Hospital price | `0x004c402c` | `(Random(9) + 1) * 50` per health point, rolled daily | none | new, N-10 |
+| Nasty doctor | `0x004c402c` | 1 in 5 after a purchase: drugs taken, infection, or cash and kidney outcomes (partly decoded) | none | new, N-31 |
 
 ## Super Store
 
-`0x004b0288` (`StoreDlg_ShowWeapons`) and `0x004b03e8` (`StoreDlg_ShowAmmo`) show the catalogue. `0x004b0968` (`SkinWeaponBtnClick`) and `0x004b0b18` (`SkinAmmoBtnClick`) select tabs; `0x004b0ca0` (`SkinRemoveBtnClick`) and `0x004b05b4` (`SkinOKBtnClick`) handle the basket. The store replaces the 1.2 gun dealer.
+`0x004b0288` (`StoreDlg_ShowWeapons`) and `0x004b03e8` (`StoreDlg_ShowAmmo`) show the catalogue (weapons with Weapon and Price columns, ammo with Ammo and Price columns, a shopping basket and Checkout). `0x004b0968` (`SkinWeaponBtnClick`) and `0x004b0b18` (`SkinAmmoBtnClick`) add items; `0x004b0ca0` (`SkinRemoveBtnClick`) and `0x004b05b4` (`SkinOKBtnClick`) handle the basket. The store replaces the 1.2 gun dealer, which no longer appears among the arrival stages.
 
-Weapons are built at `0x004b7fe0` via `FUN_004bbd34` (6 joke weapons): Handbag, Pea Shooter, Water Pistol, Monkey, Catapult, Rubber Chicken Launcher. The "real" weapons (Stick, Beretta, Colt-45, Shotgun, Uzi-9mm, Bazooka) appear only in the form's sample captions (`0x004b88a8` area) as layout placeholders. **The shipped build uses the 6 joke weapons** — this resolves the open question from the resource-only table.
+Weapons are built at `0x004b7fe0` via `FUN_004bbd34(Self, index, name, class, accuracy, ammoField, price, ...)`, 11 dwords per record from `DAT_004e1008`. The shipped build uses the 6 joke weapons; the "real" weapons (Stick, Beretta, Colt-45, Shotgun, Uzi-9mm, Bazooka) exist only as design-time captions in the store form.
+
+| Index | Weapon | Class (+0x1c) | Accuracy (+0x18) | Field +0x10 | Price (+0x14) |
+| --- | --- | --- | --- | --- | --- |
+| 0 | Handbag | 1 | 5 | 0 | 50 |
+| 1 | Pea Shooter | 2 | 30 | 20 | 2,000 |
+| 2 | Water Pistol | 2 | 50 | 40 | 6,000 |
+| 3 | Monkey | 2 | 80 | 70 | 12,000 |
+| 4 | Catapult | 3 | 200 | 700 | 30,000 |
+| 5 | Rubber Chicken Launcher | 4 | 500 | 5,000 | 450,000 |
+
+Accuracy is the value tested in `Random(100) + 1 <= accuracy` in the chase (above 100 it scares several deputies away at once). The field at +0x10 is not used by anything traced; it is probably the ammo price and is unresolved. The names of the weapon rows were read from the weapon builder calls and the store form (`DAT_004e1008`); the price column mapping comes from the argument order and was not checked against a running store.
 
 | Rule | VA | Beermat | Engine | Class |
 | --- | --- | --- | --- | --- |
 | Gun dealer | 1.2 | replaced by Super Store | none | changed, N-11 |
-| Weapon set | `0x004b7fe0` | 6 joke weapons | none | new, N-12 |
+| Weapon set | `0x004b7fe0` | 6 joke weapons, prices 50 to 450,000 | none | new, N-12 |
 
 ## Health: infection, dialysis, kidneys
 
-`0x004be728` rolls the infection check (`0x004beaac` = 3), the dialysis offer (`0x004bed10` = 3), and the doctor event. `0x004befd8` (`BuyDialysisMachine`) offers a portable dialysis machine for `0x004bf0d4` = 100,000. Infection below 80% health for 5 days (`0x004bea4c` = 5, `0x004bc9b0` = 80) kills the player; kidney failure also kills (`0x004ddf24`).
+Day-end checks run at `0x004bc790` on every travel and from `LoseDay`. They draw nothing.
 
-`0x004bf420` is the doctor event. It runs when the doctor flag is set (`0x004be728` case 2). It rolls `Random(0x4bf5f4 = 10)` minus current health; if positive it deducts that amount from health (`DAT_004e20dc`) and, with a `Random(2)` draw, either triggers kidney death (`0x004ddf24`) or a "kidney removed" event (`0x004be178` "kidney"). It then plays `DWMugged` ("You were mugged at the airport!") and deducts a portion of cash. The doctor dialog text is at `0x004b7668` ("Welcome to my surgery! ... for a mere 300 per health point") and the hospital is `0x004b3198` (`HospitalDlg_FormPaint`) at 300 per health point.
+- Infection: each day with health below 80 (`K(80)`) increments the counter `DAT_004e2110`. At 5 days (`K(5)`) the player first sees "You have a nasty infection. You should see a doctor, or your health will just get worse." and from then on loses 10 health a day; 0 health ends the game with `EndGame(1)` ("Your infection got the better of you. You're dead. What a drag!"). The hospital clears the counter and the warning flag when health is restored to 80 or more (`0x004c402c`).
+- Kidneys: with fewer than 2 kidneys and no dialysis machine the player loses `(2 - kidneys) * 5` health a day (5 with one kidney, 10 with none); 0 health ends the game with `EndGame(2)` ("Your kidney problems killed you. You're dead. What a drag!").
+- Dialysis machine: `0x004be728` offers it with `Random(3) == 0` when the player has no machine and 0 or 1 kidneys. `0x004befd8` (`BuyDialysisMachine`) asks "Would you like to buy a portable dialysis machine for $100,000?" (a Yes/No box) and only when cash is above 100,000 (`K(100000)`); Yes sets `DAT_004e2147` and subtracts 100,000 from cash. A machine stops the daily kidney damage.
 
 | Rule | VA | Beermat | Engine | Class |
 | --- | --- | --- | --- | --- |
-| Dialysis machine | `0x004befd8` | 100,000 | none | new, N-13 |
-| Infection death | `0x004beaac` | below 80% health for 5 days | none | new, N-14 |
-| Kidney death | `0x004ddf24` | kidney failure kills | none | new, N-15 |
-| Doctor event | `0x004bf420` | health deduction + kidney risk + mugged-at-airport | none | new, N-21 |
+| Dialysis machine | `0x004befd8` | 100,000, 1 in 3 offer per travel with 0 or 1 kidneys | none | new, N-13 |
+| Infection | `0x004bc790` | health below 80 for 5 days, then 10 health a day, death at 0 | none | new, N-14 |
+| Kidney damage and death | `0x004bc790` | `(2 - kidneys) * 5` a day without a machine, death at 0 | none | new, N-15 |
+| Mugging health loss | `0x004bf420` | `Random(10) + 1` health, floored at 1 | none | new, N-21 |
+
+How kidneys are removed is the unresolved part of the nasty doctor (see "Hospital").
 
 ## Old Lady
 
-`0x004beae0` (`OldLadyComment`) shows the Old Lady's phrase. `0x004bed1c` = 13 phrases from `oldlady.txt`. The mute option (`MuteOldLady`) is a 2.1 feature. The Old Lady can say the player's name.
+`0x004beae0` (`OldLadyComment`) runs from `0x004be728` with `Random(5) == 0` when no tip is pending and she is not muted (`DAT_004e2143`, set by the mute option). The dialog text is "An old lady on the `<location>` says:" followed by a line. `Random(3) == 0` (1 in 3) gives a tip: a spike drug (`Random(13)` redrawn until the drug has the spike mark) becomes the tip drug and the line is "I hear there is going to be `<drug plural>` raid tomorrow." The tip forces that drug to spike on the next price roll (see "Price roll"). Otherwise the line is phrase `Random(DAT_004e2160)` from `oldlady.txt`. She can say the player's name in her phrases (2.1 changelog); the `%NAME%` token is at `0x004bed3c` area.
 
 | Rule | VA | Beermat | Engine | Class |
 | --- | --- | --- | --- | --- |
-| Old Lady | `0x004beae0` | phrases from oldlady.txt | none | new, N-16 |
-| Mute | `0x004797e` | mute option | none | new, N-17 |
+| Old Lady | `0x004beae0` | 1 in 5 per travel; 1 in 3 of those is a spike tip, else a file phrase | none | new, N-16 |
+| Tip raid | `0x004beae0`, `0x004bbfc4` | tipped drug spikes next day | none | new, N-32 |
+| Mute | `0x004be728` | mute flag `DAT_004e2143` stops her | none | new, N-17 |
 
 ## Finances
 
@@ -299,7 +318,16 @@ Weapons are built at `0x004b7fe0` via `FUN_004bbd34` (6 joke weapons): Handbag, 
 
 ## Interest
 
-`0x004bfbe0` handles bank interest. The rate constants are at `0x004bfffc`, `0x004c000c`, `0x004c001c` (BSS, not decoded). The changelog has the bank interest cut to 3% in 2.2, which implies 5% in 2.1. The debt handling is replaced by loan sharks (N-06).
+`0x004bfbe0`, which the first pass of this document took for the interest handler, is the status-line refresh: it writes "Day `<day>`/`<limit>`" and the cash, bank and debt labels, and shrinks the LCD font once cash plus bank passes 1,000,000,000 (the 2.1 changelog's "LCD font decreases" entry). The BSS addresses `0x004bfffc`, `0x004c000c` and `0x004c001c` are format-string cells it passes to the display helpers, not rates.
+
+Bank interest is `0x004c0358`, called once per travel after the arrival events. When bank is above 0 it computes `rate = K(5) / 100.0` (a single-precision `100.0` at `0x004c041c`) and `bank += Round(bank * rate)`, so the rate is 5% per day, which matches the changelog's cut to 3% in 2.2. `Round` is the same x87 `FISTP` (`0x004029f4`) as in 1.2. Because the rate is built as a double from `5 / 100.0` and the product is formed in extended precision, an exact `.5` tie (bank of 10 mod 20) lands a hair above the tie and rounds up, so the 1.2 ties-to-even and the extended-`1.05` analysis in `docs/beermat-re.md` ("Interest arithmetic") do not carry over; N-33 carries a port of the 2.1 arithmetic and needs a check against the Windows reference before it is trusted.
+
+Debt interest is per loan (see "Loan sharks"): `0x004c0420` compounds each loan at its shark's daily rate.
+
+| Rule | VA | Beermat | Engine | Class |
+| --- | --- | --- | --- | --- |
+| Bank interest | `0x004c0358` | 5% per day, `Round(bank * 0.05)`, only above 0 | 5%, `bank * 1.05` ties-to-even | changed, N-33 |
+| Debt interest | `0x004c0420` | per loan, daily compounding at the shark's rate | 10% on one debt | changed, N-06 |
 
 ## Sounds
 
