@@ -1,5 +1,0 @@
-{
-  "seed": 42,
-  "description": "serialize -> deserialize preserves state",
-  "mechanic": "save/load fidelity"
-}

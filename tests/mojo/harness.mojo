@@ -5,9 +5,10 @@
 # every field, and compares the ordered maps (prices, prevPrices, inventory) in
 # the oracle's own key order rather than by drug index.
 #
-# The comparison is deliberately total: a field the oracle records but this does
-# not check would be a silent hole in the parity gate. The generator's closed
-# allow-list is what keeps the oracle's field set from growing unnoticed; this
+# The comparison is deliberately total over the fields a record carries: a field
+# the oracle records but this does not check would be a silent hole in the parity
+# gate. A fixture's stateFields projection decides which fields a record carries.
+# The generator's closed allow-list is what keeps the oracle's field set from growing unnoticed; this
 # file is what keeps the Mojo side honest about every field it does record.
 
 import dealers
@@ -105,26 +106,45 @@ def assert_price_events_match(ref game: world.World, ref expected: record.Group)
 
 
 def assert_state_matches(ref game: world.World, ref expected: record.Group) raises:
-    assert_equal(Int64(game.seed), expected.int_at("seed"))
-    assert_equal(game.day, expected.int_at("day"))
-    assert_equal(game.num_days, expected.int_at("numDays"))
-    assert_equal(game.cash, expected.float_at("cash"))
-    assert_equal(game.debt, expected.float_at("debt"))
-    assert_equal(game.bank, expected.float_at("bank"))
-    assert_equal(game.health, expected.int_at("health"))
-    assert_equal(game.coat_capacity, expected.int_at("coatCapacity"))
-    assert_equal(game.guns, expected.int_at("guns"))
-    assert_equal(game.dead, expected.bool_at("dead"))
-    assert_equal(game.last_day_warned, expected.bool_at("lastDayWarned"))
-    assert_equal(
-        game.location_index,
-        rules.find_location_index(expected.string_at("location")),
-    )
-    assert_equal(Int64(game.rng.get_state()), expected.int_at("rngState"))
-    assert_prices_match(game, expected)
-    assert_prev_prices_match(game, expected)
-    assert_inventory_match(game, expected)
-    assert_price_events_match(game, expected)
+    # A fixture's stateFields projection leaves some fields out of the record;
+    # only the fields the record carries are compared.
+    if expected.has_field("seed"):
+        assert_equal(Int64(game.seed), expected.int_at("seed"))
+    if expected.has_field("day"):
+        assert_equal(game.day, expected.int_at("day"))
+    if expected.has_field("numDays"):
+        assert_equal(game.num_days, expected.int_at("numDays"))
+    if expected.has_field("cash"):
+        assert_equal(game.cash, expected.float_at("cash"))
+    if expected.has_field("debt"):
+        assert_equal(game.debt, expected.float_at("debt"))
+    if expected.has_field("bank"):
+        assert_equal(game.bank, expected.float_at("bank"))
+    if expected.has_field("health"):
+        assert_equal(game.health, expected.int_at("health"))
+    if expected.has_field("coatCapacity"):
+        assert_equal(game.coat_capacity, expected.int_at("coatCapacity"))
+    if expected.has_field("guns"):
+        assert_equal(game.guns, expected.int_at("guns"))
+    if expected.has_field("dead"):
+        assert_equal(game.dead, expected.bool_at("dead"))
+    if expected.has_field("lastDayWarned"):
+        assert_equal(game.last_day_warned, expected.bool_at("lastDayWarned"))
+    if expected.has_field("location"):
+        assert_equal(
+            game.location_index,
+            rules.find_location_index(expected.string_at("location")),
+        )
+    if expected.has_field("rngState"):
+        assert_equal(Int64(game.rng.get_state()), expected.int_at("rngState"))
+    if expected.has_field("prices"):
+        assert_prices_match(game, expected)
+    if expected.has_field("prevPrices"):
+        assert_prev_prices_match(game, expected)
+    if expected.has_field("inventory"):
+        assert_inventory_match(game, expected)
+    if expected.has_field("priceEvents"):
+        assert_price_events_match(game, expected)
 
 
 # ---- return-value comparators ------------------------------------------------

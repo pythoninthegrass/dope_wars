@@ -61,6 +61,14 @@ struct Group(Copyable, Movable):
                 return True
         return False
 
+    # True when `name` is a field of the group, scalar or container, empty or not.
+    def has_field(ref self, name: String) -> Bool:
+        var dotted = name + "."
+        for pair in self.pairs:
+            if pair.path == name or pair.path.startswith(dotted):
+                return True
+        return False
+
     def int_at(ref self, path: String) raises -> Int64:
         for pair in self.pairs:
             if pair.path == path:

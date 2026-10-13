@@ -1,9 +1,9 @@
 # tests/mojo/events_test.mojo — the arrival event's draw order and arithmetic.
 #
-# The parity corpus pins the event end to end (tests/fixtures/04-arrival-events.jsonl)
-# but asserts whole post-step states. These tests isolate the Beermat rules
-# (docs/beermat-re.md, M-06) with a scripted Rng, which raises if the code ever
-# draws more than the script holds.
+# These tests pin the current (1.2) arrival event rules (docs/beermat-re.md, M-06),
+# which Beermat 2.1 replaces (docs/beermat-2.1-re.md); the pending 2.1 versions are
+# in pending_2_1_test.mojo. They isolate the rules with a scripted Rng, which
+# raises if the code ever draws more than the script holds.
 
 import events
 import rules

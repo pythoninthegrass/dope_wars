@@ -1,5 +1,9 @@
 {
   "seed": 1,
-  "description": "travel across 5 days",
-  "mechanic": "10% debt compounding, 5% bank interest, ties-to-even whole dollars, skipped at 0 or less, day advancement"
+  "description": "travel day advancement and bank interest",
+  "mechanic": "5% bank interest at the 1050 and 70 balances, skipped at 0 or less, day advancement",
+  "stateFields": [
+    "day",
+    "bank"
+  ]
 }

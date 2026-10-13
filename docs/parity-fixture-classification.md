@@ -38,3 +38,37 @@ Every step's `expect.state` is a deep-equal against the full state snapshot (`te
 ## Summary of verdicts
 
 Retire: 04, 06, 12. Split: 01, 03, 05, 07, 10, 11. Needs human decision: 02, 08, 09, plus the cross-cutting state-shape decision above.
+
+## Resolution (TASK-013.02.01, decided with Lance on 2026-10-13)
+
+The table above is the read-only classification. This section records what was done with it. Every fixture now ends as kept or retired; the "needs human decision" rows are settled below.
+
+### Decisions
+
+- **02 buy/sell and 11 deposit/withdraw (steps 2-5, 8-12): keep.** No 2.1 observation contradicts them, and 2.1's buy dialog agrees with the maximum-quantity rule. If TASK-013.01.05 (playtest of the unobserved rules) contradicts a step, that step is retired then.
+- **08 serialize round-trip: retire the JS golden, re-home as Mojo-native.** The round-trip is a property of the core's own save format, not a 1.2 rule, and it must survive the state-shape changes 2.1 brings. `tests/mojo/serialize_test.mojo` compares re-dumped bytes.
+- **09 31-day full run: retire, replace with a Mojo-native run.** Game length, pricing, interest and events all change in 2.1, and `index.html` is frozen at 1.2 so no oracle can regenerate the golden. `tests/mojo/run_test.mojo` pins determinism per seed and per-day invariants instead of exact goldens.
+- **Cross-cutting state shape: per-fixture projection.** Each kept fixture lists the state fields it exercises in `stateFields` in its `.meta.json`; the Mojo replay compares only those. The node replay stays full deep-equal because the engine is frozen.
+
+### Final state of each group
+
+| Group | Outcome | Detail |
+| --- | --- | --- |
+| 01-price-generation | retired | All 11 golden steps drew the 1.2 stream. The range, x5 spike, divide-by-10 crash and absent-drug rules are live Mojo tests in `prices_test.mojo`; the 13-drug roster is a pending test (N-34). |
+| 02-buy-sell-edges | kept | Unchanged. Projects cash, coatCapacity, inventory, prices. |
+| 03-travel-interest | split | Kept steps 0-2 (day+1, 1000 to 1050) and a rebuilt bank 70 to 74 tie and bank 0 and -100 cases, projected on day and bank. The 1.2 bank chain, the 30 and 50 ties and every debt expectation are retired; the 2.1 bank ties are a pending test (N-33). |
+| 04-arrival-events | retired | Pinned the 1.2 event table, wealth cap and 1 in 14 gate. The 1.2 rules stay pinned by `events_test.mojo` until their slice replaces them; the wealth cap removal, mugging health loss are pending tests (N-21, N-29). |
+| 05-dealers | split | Kept steps 0-6 (coat dealer), projected on cash, bank, coatCapacity. Gun dealer steps retired with the gun dealer (N-28); the Super Store has no entry point yet. |
+| 06-chase-combat | retired | Run, stay, fight and the win reward are all replaced. Pending tests cover the deputy count (N-23), run (N-24) and chase start (N-22); fight accuracy, stay arrest and the cash reward (N-25, N-26, N-27) need the weapon API and get their tests with it. |
+| 07-finish-scoring | split | Kept steps 0-4, projected on cash, bank, dead, day. The 10-entry truncation steps are retired; the 30-entry list is a pending test (N-19). |
+| 08-serialize-roundtrip | retired | Re-homed as `serialize_test.mojo`. |
+| 09-full-run-31day | retired | Re-homed as `run_test.mojo`. |
+| 10-rolls-and-helpers | split | Kept the coat dealer offer range and `price < cash` rule and `applyDamage`, projected on cash, health, dead. The 1 in 6 chase start, travel and gun dealer offer steps are retired. |
+| 11-finances | split | Kept deposit, withdraw and unknown-action steps, projected on cash and bank. The `payLoan` steps are retired with the single debt (N-06); per-loan repayment (N-06, N-30) has no entry point yet. |
+| 12-dealer-visits | retired | Pinned the 1.2 combined visit draw. The 2.1 trigger is a pending test (N-28). |
+
+### Rules with no entry point yet
+
+These 2.1 rules cannot be written as tests against today's API. Their tests arrive with the API: loan records, interest per loan and early payoff (N-06, N-30), the weapon set and the Super Store (N-11, N-12), fight accuracy, stay arrest and the cash reward (N-25, N-26, N-27), game length (N-01) and the 13-drug price roll (N-34, N-35).
+
+Owners of the pending tests in `tests/mojo/pending_2_1_test.mojo`: N-19 (TASK-013.02.02), N-23 and N-24 (TASK-013.02.09), N-34 (TASK-013.02.03), N-33 (TASK-013.02.19), N-22 and N-28 (TASK-013.02.20), N-21 and the wealth cap removal (TASK-013.02.21). The slice that implements a rule un-skips its test.

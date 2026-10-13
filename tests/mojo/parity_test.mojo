@@ -1,15 +1,13 @@
 # tests/mojo/parity_test.mojo — the parity gate.
 #
 # Replays every oracle fixture against the Mojo core. Each fixture is one test,
-# so a failure names the fixture that diverged. Fixture 09 is the 31-day
-# full-game run, which is the end-to-end determinism check.
+# so a failure names the fixture that diverged. The corpus holds only rules that
+# Beermat 2.1 keeps; fixtures for replaced 1.2 rules were retired (see
+# docs/parity-fixture-classification.md) and their 2.1 replacements live in the
+# Mojo-native tests.
 
 import replay
 from std.testing import TestSuite
-
-
-def test_01_price_generation() raises:
-    replay.replay_fixture("01-price-generation")
 
 
 def test_02_buy_sell_edges() raises:
@@ -20,28 +18,12 @@ def test_03_travel_interest() raises:
     replay.replay_fixture("03-travel-interest")
 
 
-def test_04_arrival_events() raises:
-    replay.replay_fixture("04-arrival-events")
-
-
 def test_05_dealers() raises:
     replay.replay_fixture("05-dealers")
 
 
-def test_06_chase_combat() raises:
-    replay.replay_fixture("06-chase-combat")
-
-
 def test_07_finish_scoring() raises:
     replay.replay_fixture("07-finish-scoring")
-
-
-def test_08_serialize_roundtrip() raises:
-    replay.replay_fixture("08-serialize-roundtrip")
-
-
-def test_09_full_run_31day() raises:
-    replay.replay_fixture("09-full-run-31day")
 
 
 def test_10_rolls_and_helpers() raises:
@@ -50,10 +32,6 @@ def test_10_rolls_and_helpers() raises:
 
 def test_11_finances() raises:
     replay.replay_fixture("11-finances")
-
-
-def test_12_dealer_visits() raises:
-    replay.replay_fixture("12-dealer-visits")
 
 
 def main() raises:

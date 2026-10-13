@@ -1,5 +1,11 @@
 {
   "seed": 1,
   "description": "buy/sell edge cases",
-  "mechanic": "coat overflow, unaffordable, non-tradeable, partial sell"
+  "mechanic": "coat overflow, unaffordable, non-tradeable, partial sell",
+  "stateFields": [
+    "cash",
+    "coatCapacity",
+    "inventory",
+    "prices"
+  ]
 }

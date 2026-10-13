@@ -1,5 +1,11 @@
 {
   "seed": 1,
-  "description": "finish + high score table",
-  "mechanic": "score = cash + bank - debt, top-10 sort/truncate, scores <= 0 rejected (Beermat M-13)"
+  "description": "finish scoring",
+  "mechanic": "score = cash + bank - debt, dead player scores (Beermat M-13)",
+  "stateFields": [
+    "cash",
+    "bank",
+    "dead",
+    "day"
+  ]
 }
