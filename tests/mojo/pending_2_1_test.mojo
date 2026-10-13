@@ -103,7 +103,6 @@ def test_pending_n34_thirteen_drug_roster() raises:
 
 def main() raises:
     var suite = TestSuite.discover_tests[__functions_in_module()]()
-    suite.skip[test_pending_n33_bank_interest_ties_round_up]()
     suite.skip[test_pending_n22_chase_starts_one_in_eight]()
     suite.skip[test_pending_n23_deputies_range_two_to_eight]()
     suite.skip[test_pending_n24_run_escapes_two_in_ten]()

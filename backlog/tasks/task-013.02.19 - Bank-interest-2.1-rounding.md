@@ -1,7 +1,7 @@
 ---
 id: TASK-013.02.19
 title: Bank interest 2.1 rounding
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-10-13 05:13'
 labels:
@@ -24,8 +24,8 @@ Bank interest in 2.1 is `bank += Round(bank * (5 / 100.0))`, only above 0 (docs/
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 interest.bank_after_interest follows Round(bank * 0.05) with the 2.1 tie behaviour and skips balances of 0 or below
-- [ ] #2 test_pending_n33_bank_interest_ties_round_up in tests/mojo/pending_2_1_test.mojo is un-skipped and passes
-- [ ] #3 interest_test.mojo no longer pins the 1.2 bank ties, and fixture 03's kept steps (bank 1050 and 70) still pass
-- [ ] #4 task core:test and task check are green
+- [x] #1 interest.bank_after_interest follows Round(bank * 0.05) with the 2.1 tie behaviour and skips balances of 0 or below
+- [x] #2 test_pending_n33_bank_interest_ties_round_up in tests/mojo/pending_2_1_test.mojo is un-skipped and passes
+- [x] #3 interest_test.mojo no longer pins the 1.2 bank ties, and fixture 03's kept steps (bank 1050 and 70) still pass
+- [x] #4 task core:test and task check are green
 <!-- AC:END -->
