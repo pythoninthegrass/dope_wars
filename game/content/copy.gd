@@ -110,6 +110,8 @@ const MSG_PRICE_CRASH_ACID := "MSG_PRICE_CRASH_ACID"
 const MSG_PRICE_CRASH_HASHISH := "MSG_PRICE_CRASH_HASHISH"
 const MSG_PRICE_CRASH_ECSTASY := "MSG_PRICE_CRASH_ECSTASY"
 const MSG_PRICE_CRASH_WEED := "MSG_PRICE_CRASH_WEED"
+const MSG_PRICE_CRASH_CRACK := "MSG_PRICE_CRASH_CRACK"
+const MSG_PRICE_VET := "MSG_PRICE_VET"
 const MSG_PRICE_EXPENSIVE := "MSG_PRICE_EXPENSIVE"
 const MSG_COAT_OFFER := "MSG_COAT_OFFER"
 const MSG_GUN_OFFER := "MSG_GUN_OFFER"
@@ -223,16 +225,14 @@ static func health_percent(health: int) -> String:
 	return t(HEALTH_PERCENT).format([health])
 
 
-## The ▲/▼/— glyph for a market row. `previous` is null when the drug was not
-## traded last turn, and the prototype renders a neutral dash for that case
-## too (index.html:1182). Nothing is shown at all on day 1, which is
+## The ▲/▼/— glyph for a market row, from the core's price direction (-1, 0, 1).
+## A drug with no earlier price to compare with, or one at an event price, reads
+## 0 and gets the neutral dash. Nothing is shown at all on day 1, which is
 ## `show_trend`'s job, not this one's.
-static func trend(current: int, previous: Variant) -> String:
-	if previous == null:
-		return TREND_NEUTRAL
-	if current > int(previous):
+static func trend(direction: int) -> String:
+	if direction > 0:
 		return TREND_UP
-	if current < int(previous):
+	if direction < 0:
 		return TREND_DOWN
 	return TREND_NEUTRAL
 
@@ -243,13 +243,15 @@ static func units_at(price: float) -> String:
 
 
 ## The price-event toasts: a crash has one fixed line per drug, a spike takes
-## the drug's display name (never its id) in one of two lines.
+## the drug's display name (never its id) in one of three lines.
 static func price_event_message(kind: int, drug_id: String, drug_name: String) -> String:
 	match kind:
 		SimWorld.PRICE_EVENT_BUST:
 			return t(MSG_PRICE_BUST).format([drug_name])
 		SimWorld.PRICE_EVENT_EXPENSIVE:
 			return t(MSG_PRICE_EXPENSIVE).format([drug_name])
+		SimWorld.PRICE_EVENT_VET:
+			return t(MSG_PRICE_VET).format([drug_name])
 	return t("MSG_PRICE_CRASH_" + drug_id.to_upper())
 
 

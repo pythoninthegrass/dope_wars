@@ -58,16 +58,17 @@ def test_drugs_match_js() raises:
     var expected: List[String] = [
         "acid|Acid|1000|4500|t|f",
         "cocaine|Cocaine|15000|30000|f|t",
-        "crack|Crack|1000|3500|f|f",
+        "crack|Crack|1000|3500|t|f",
         "ecstasy|Ecstasy|10|60|t|f",
         "hashish|Hashish|450|1350|t|f",
         "heroin|Heroin|5000|14000|f|t",
         "opium|Opium|500|1300|f|t",
         "peyote|Peyote|200|700|f|f",
-        "shrooms|Shrooms|600|1350|f|f",
-        "smack|Smack|1500|4500|f|f",
+        "mushrooms|Mushrooms|600|1350|f|f",
+        "mda|MDA|1500|4500|f|t",
         "speed|Speed|70|250|f|t",
         "weed|Weed|300|900|t|f",
+        "specialk|Special K|450|1450|f|t",
     ]
     var table = rules.drugs()
     assert_equal(len(table), len(expected))
@@ -103,11 +104,25 @@ def test_find_drug_index() raises:
     assert_equal(rules.find_drug_index("heroin"), 5)
     assert_equal(rules.find_drug_index("opium"), 6)
     assert_equal(rules.find_drug_index("peyote"), 7)
-    assert_equal(rules.find_drug_index("shrooms"), 8)
-    assert_equal(rules.find_drug_index("smack"), 9)
+    assert_equal(rules.find_drug_index("mushrooms"), 8)
+    assert_equal(rules.find_drug_index("mda"), 9)
     assert_equal(rules.find_drug_index("speed"), 10)
     assert_equal(rules.find_drug_index("weed"), 11)
+    assert_equal(rules.find_drug_index("specialk"), 12)
+    assert_equal(rules.find_drug_index("smack"), -1)
     assert_equal(rules.find_drug_index("aspirin"), -1)
+
+
+def test_roster_has_thirteen_drugs_in_beermat_slot_order() raises:
+    # N-34: Beermat's drug slots, which the price roll and the event loops draw over.
+    assert_equal(rules.NUM_DRUGS, 13)
+    var expected: List[String] = [
+        "acid", "cocaine", "hashish", "heroin", "ecstasy", "mda", "opium",
+        "crack", "peyote", "mushrooms", "speed", "weed", "specialk",
+    ]
+    var table = rules.drugs()
+    for slot in range(len(expected)):
+        assert_equal(table[rules.beermat_slot_drug_index(slot)].id, expected[slot])
 
 
 def test_drug_ids_are_unique() raises:

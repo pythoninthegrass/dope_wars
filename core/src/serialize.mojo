@@ -29,8 +29,9 @@ import world
 # + start_cash(17) + health/coat_capacity/guns/location_index(4*8)
 # + dead/last_day_warned(2) + price_order(4+12) + price slots(12*10)
 # + prev_price_order(4+12) + prev price slots(12*9) + inv_order(4+12)
-# + inv slots(12*26) + price_events(4+8*16)
-comptime DUMP_LEN = 846
+# + inv slots(12*26) + price_events(4+8*16) with 12 drugs and 8 events; now 13 drugs and
+# 13 events, plus last_price/seen_price(13*8 each) and last_event/price_direction(13 each).
+comptime DUMP_LEN = 1208
 
 
 struct ByteWriter:
@@ -150,6 +151,12 @@ def dump(ref game: world.World) raises -> List[UInt8]:
         writer.i64(Int64(game.price_events[i].kind))
         writer.i64(Int64(game.price_events[i].drug_index))
 
+    for i in range(rules.NUM_DRUGS):
+        writer.i64(game.last_price[i])
+        writer.u8(game.last_event[i])
+        writer.i64(game.seen_price[i])
+        writer.u8(UInt8(Int(game.price_direction[i]) + 1))
+
     if len(writer.bytes) != DUMP_LEN:
         raise Error(
             "serialized world is "
@@ -207,5 +214,11 @@ def load(bytes: List[UInt8]) raises -> world.World:
         var kind = Int(reader.i64())
         var drug_index = Int(reader.i64())
         game.price_events[i] = world.PriceEvent(kind, drug_index)
+
+    for i in range(rules.NUM_DRUGS):
+        game.last_price[i] = reader.i64()
+        game.last_event[i] = reader.u8()
+        game.seen_price[i] = reader.i64()
+        game.price_direction[i] = Int8(Int(reader.u8()) - 1)
 
     return game^

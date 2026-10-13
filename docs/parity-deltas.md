@@ -133,3 +133,11 @@ additive.
 **Godot port (`game/presentation/dialogs/new_game_dialog.gd`):** the new-game form offers all four lengths (`NewGameDialog.GAME_LENGTHS`), and the core default is 30 (`rules.NUM_DAYS`). The core accepts any `num_days`, since its tests and ABI callers use short games, so the four-length set is a presentation rule. A high-score row records its game length (`dw_highscore_entry.num_days`, carved from the old padding without changing the struct size) and the Scores dialog shows it in a Length column. The per-length score pages (N-20) and the 30-entry list (N-19) are separate slices.
 
 **Approved because:** registration and license keys are out of scope (section 8), and gating three of four lengths would only lock out features the port already implements.
+
+## 10. Price roll: no tip drug yet, event prices show the flat arrow, crash text follows 2.1
+
+**Beermat 2.1:** the price roll can be forced by a tip (Old Lady or after an arrest), draws and stores the hospital multiplier, and the drug list draws a fourth icon on a spiked or crashed price.
+
+**Godot port:** the core rolls prices as `docs/beermat-2.1-re.md` "Price roll" describes, minus the tip drug and the stored hospital multiplier (the `Random(9)` is drawn and discarded so the stream matches; the Old Lady, arrest and hospital slices add the rest). An event price shows the flat glyph in the direction column instead of Beermat's fourth icon, because the icon was not identified. The arrow compares with the last day the drug was on sale, as Beermat does, so a drug absent yesterday still gets an arrow against an older day.
+
+**Approved because:** each omitted piece belongs to a slice that owns the state it needs, and the omission changes no draw the port makes today.

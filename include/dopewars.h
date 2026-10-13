@@ -80,7 +80,7 @@ uint32_t dw_abi_version(void);
 /* Frozen simulation dimensions, mirroring `index.html:641-681`'s RULES.
  * Every ABI struct below is sized against these. */
 #define DW_NUM_LOCATIONS 6u
-#define DW_NUM_DRUGS 12u
+#define DW_NUM_DRUGS 13u
 #define DW_MAX_HIGHSCORES 10u
 
 /* Maximum length (bytes, including the trailing NUL) of the fixed-size
@@ -175,12 +175,15 @@ enum {
 
 /* dw_price_event.kind. CHEAP is a price crash (div 10), EXPENSIVE a spike
  * (x5) announced with the "addicts" text, BUST a spike announced with the
- * "cops made a big bust" text. See docs/beermat-re.md (M-02). */
+ * "cops made a big bust" text, and VET a Special K spike announced with the
+ * "local vet" text. See docs/beermat-re.md (M-02) and docs/beermat-2.1-re.md,
+ * "Price roll". */
 typedef uint8_t dw_price_event_kind;
 enum {
     DW_PRICE_EVENT_CHEAP = 0,
     DW_PRICE_EVENT_EXPENSIVE = 1,
     DW_PRICE_EVENT_BUST = 2,
+    DW_PRICE_EVENT_VET = 3,
 };
 
 /* dw_finances action selector. */
@@ -275,12 +278,15 @@ DW_STATIC_ASSERT(sizeof(dw_inventory_slot) == 16, "dw_inventory_slot layout chan
 /* One entry in a two-call price-list copy. Only drugs actually traded at
  * the current location this turn appear; the required length is the
  * count of traded drugs. `was_event` marks a slot whose price came from
- * a cheap/expensive event roll rather than the normal min..max band. */
+ * a cheap/expensive event roll rather than the normal min..max band.
+ * `direction` is the price arrow, 0 on an event price and on a previous-turn
+ * copy (dw_prev_prices_copy). */
 typedef struct dw_price_slot {
     uint32_t drug_index;       /* < DW_NUM_DRUGS */
     int32_t  price;
     uint8_t  was_event;        /* 0 or 1 */
-    uint8_t  _pad0[3];         /* specified-zero */
+    int8_t   direction;        /* -1 down, 0 flat or no basis, 1 up against the last day the drug was on sale */
+    uint8_t  _pad0[2];         /* specified-zero */
 } dw_price_slot;
 DW_STATIC_ASSERT(sizeof(dw_price_slot) == 12, "dw_price_slot layout changed");
 

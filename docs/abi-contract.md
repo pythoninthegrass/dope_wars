@@ -173,6 +173,8 @@ float64, so save/load stays bit-exact.
 - **v9 (TASK-010.02.08)**: Beermat's interest rounding (`docs/beermat-re.md`, M-10). `dw_travel` rounds debt and bank interest to whole dollars with ties-to-even (computed in integers to match the binary's x87 product) and skips a balance of 0 or less, so `bank` is always integral. No signature, struct layout or dump length changes, but the observable result of `dw_travel` does, which the policy above counts as a bump.
 - **v10 (TASK-010.02.11)**: Beermat only records a final score above 0 (`docs/beermat-re.md`, M-13). `dw_insert_highscore` now returns the new `DW_ERR_SCORE_TOO_LOW` (14) instead of `DW_OK` when `entry->score <= 0`, leaving `scores` and `*out_count` unchanged. The new enum constant is appended, not renumbered, but the function's observable behavior changes for that input, which the policy above counts as a bump. No struct layout or dump length changes.
 
+Beermat 2.1 slices that keep the signatures and struct sizes are additive and do not bump the version. TASK-013.02.02 carved `dw_highscore_entry.num_days` (`uint16_t`, the game length) out of the padding. TASK-013.02.03 raised `DW_NUM_DRUGS` to 13 (MDA and Mushrooms replace Smack and Shrooms in their slots, Special K is slot 12), added `DW_PRICE_EVENT_VET` (3) for the Special K spike, carved `dw_price_slot.direction` (`int8_t`, -1, 0 or 1) out of the padding, and grew the dump from 846 to 1208 bytes (13 drugs, 13 price-event slots and the roll history). A save from an earlier build fails the dump length check and starts a new game.
+
 ## Serialization
 
 - `dw_world_dump_len()` reports the exact byte count `dw_world_dump` will
@@ -184,7 +186,8 @@ float64, so save/load stays bit-exact.
   last-day-warned), then each ordered map as a live count followed by all
   `DW_NUM_DRUGS` order slots (zero-padded past the live count) and all
   `DW_NUM_DRUGS` dense slots, then the price-event list as a count followed by
-  `MAX_PRICE_EVENTS` slots. Floats are stored as an exact
+  `MAX_PRICE_EVENTS` slots, then the roll history per drug (last price, last
+  event flag, last-seen price, price direction). Floats are stored as an exact
   (sign, exponent, mantissa) decomposition, so a save/load cycle is bit-exact.
   Deterministic little-endian encoding, no compression, no framing.
 - `dw_world_load` accepts exactly the byte sequence `dw_world_dump` produced

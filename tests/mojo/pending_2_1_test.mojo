@@ -110,11 +110,6 @@ def test_pending_n19_high_score_list_holds_thirty() raises:
     assert_equal(len(scores), 30)
 
 
-# N-34: the roster has 13 drugs (MDA, Mushrooms and Special K replace and extend 1.2's 12).
-def test_pending_n34_thirteen_drug_roster() raises:
-    assert_equal(rules.NUM_DRUGS, 13)
-
-
 def main() raises:
     var suite = TestSuite.discover_tests[__functions_in_module()]()
     suite.skip[test_pending_n23_deputies_range_two_to_eight]()
@@ -122,5 +117,4 @@ def main() raises:
     suite.skip[test_pending_wealth_cap_removed]()
     suite.skip[test_pending_n21_mugging_costs_health]()
     suite.skip[test_pending_n19_high_score_list_holds_thirty]()
-    suite.skip[test_pending_n34_thirteen_drug_roster]()
     suite^.run()

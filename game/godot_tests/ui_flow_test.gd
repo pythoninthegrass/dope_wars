@@ -67,7 +67,7 @@ const CASES := [
 	"linux_display_driver",
 	"window_pinned",
 	"capture_states",
-	"tables_fit_twelve_drugs",
+	"tables_fit_all_drugs",
 	"chase_and_doctor",
 	"dealer_dialogs",
 	"travel_arrival_outcomes",
@@ -87,7 +87,7 @@ const CASE_FLOORS := {
 	"keyboard_shortcuts": 21,
 	"buy_sell_round_trip": 18,
 	"click_rebuilds_table": 11,
-	"travel_advances_day": 11,
+	"travel_advances_day": 12,
 	"persistence_round_trip": 16,
 	"finances": 7,
 	"typed_quantity": 21,
@@ -97,7 +97,7 @@ const CASE_FLOORS := {
 	"linux_display_driver": 1,
 	"window_pinned": 5,
 	"capture_states": 17,
-	"tables_fit_twelve_drugs": 4,
+	"tables_fit_all_drugs": 4,
 	"chase_and_doctor": 12,
 	"dealer_dialogs": 14,
 	"travel_arrival_outcomes": 12,
@@ -141,8 +141,8 @@ func _run() -> void:
 	_test_window_pinned()
 	_case("capture_states")
 	await _test_capture_states()
-	_case("tables_fit_twelve_drugs")
-	await _test_tables_fit_twelve_drugs()
+	_case("tables_fit_all_drugs")
+	await _test_tables_fit_all_drugs()
 	_case("chase_and_doctor")
 	await _test_chase_and_doctor()
 	_case("dealer_dialogs")
@@ -458,6 +458,11 @@ func _test_travel_advances_day() -> void:
 		]:
 			with_glyph += 1
 	_assert(with_glyph == traded.size(), "every day-2 price should carry a trend glyph")
+	var glyph_matches := 0
+	for slot in traded:
+		if hud.market_table().trend_text(int(slot["drug_index"])) == Copy.trend(int(slot["direction"])):
+			glyph_matches += 1
+	_assert(glyph_matches == traded.size(), "each trend glyph should follow the core's price direction")
 
 	# The arrival sequence: price-event toasts, at most one arrival event, then
 	# at most one dealer per roll. Confirming each dialog drains it.
@@ -974,7 +979,7 @@ func _test_win98_chrome() -> void:
 
 # The window is one fixed size on both axes: the Win98 chrome is fixed-width so
 # widening would only stretch it, and nothing needs extra height (see
-# _test_tables_fit_twelve_drugs). Resizing is also visibly broken on macOS --
+# _test_tables_fit_all_drugs). Resizing is also visibly broken on macOS --
 # Godot renders into an unflipped view's CAMetalLayer, so a height change shows
 # one frame of displaced content -- which is why this is pinned rather than
 # merely bounded. See TASK-005.
@@ -1042,10 +1047,10 @@ func _test_capture_states() -> void:
 
 
 # The reason the window needs no resizing: every borough can trade all
-# DW_NUM_DRUGS at once (each drug is absent only 1 time in 8), and the coat holds one row per drug, so twelve
-# rows is the largest either table ever renders. Asserting it fits without
+# DW_NUM_DRUGS at once (each drug is absent only 1 time in 8), and the coat holds one row per drug, so
+# DW_NUM_DRUGS rows is the largest either table ever renders. Asserting it fits without
 # scrolling is what keeps the pinned height honest if a row's height changes.
-func _test_tables_fit_twelve_drugs() -> void:
+func _test_tables_fit_all_drugs() -> void:
 	var seed_with_full_market := 0
 	for candidate in range(1, 400):
 		_main.start_new_game(candidate)
@@ -1067,7 +1072,7 @@ func _test_tables_fit_twelve_drugs() -> void:
 	var area := tree.get_item_area_rect(last)
 	_assert(
 		area.position.y + area.size.y <= tree.size.y,
-		"twelve market rows should fit the table without scrolling: last row ends at %d, table is %d tall" % [area.position.y + area.size.y, tree.size.y]
+		"all market rows should fit the table without scrolling: last row ends at %d, table is %d tall" % [area.position.y + area.size.y, tree.size.y]
 	)
 	_assert(tree.get_scroll().y == 0.0, "a full twelve-drug market should not scroll, got scroll y=%d" % tree.get_scroll().y)
 

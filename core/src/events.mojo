@@ -81,7 +81,7 @@ def _pick_drug_from_left_market(mut game: world.World) raises -> Int:
 # Random(12) over Beermat's slots until the drug is held. Needs something held.
 def _pick_held_drug(mut game: world.World) raises -> Int:
     while True:
-        var slot = rng_mod.rand_int(game.rng, 0, Int64(rules.NUM_DRUGS - 1))
+        var slot = rng_mod.rand_int(game.rng, 0, Int64(rules.HELD_DRUG_SLOTS - 1))
         var drug_index = rules.beermat_slot_drug_index(Int(slot))
         if game.has_inventory(drug_index):
             return drug_index

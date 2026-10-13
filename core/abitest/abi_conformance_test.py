@@ -55,7 +55,7 @@ DW_ERR_SCORE_TOO_LOW = 14
 
 # Dimensional constants (include/dopewars.h:66-68).
 DW_NUM_LOCATIONS = 6
-DW_NUM_DRUGS = 12
+DW_NUM_DRUGS = 13
 DW_MAX_HIGHSCORES = 10
 
 # The rulebook the conformance suite pins. These are contract values: a rule
@@ -249,13 +249,14 @@ def test_dump_len_is_a_fixed_positive_size(abi: Abi, report: Report) -> None:
     events: seed/rng/day/num_days (24B), cash/debt/bank/start_cash as exact
     float decompositions (4x17B), health/coat/guns/location (4x8B), two flags,
     then each order list as count+DW_NUM_DRUGS slots (3x16B), the price/prev/inv
-    dense slots (12x10B, 12x9B, 12x26B), and 8 price-event slots (4+8x16B) =
-    846. core/src/serialize.mojo pins the same number as DUMP_LEN and asserts
+    dense slots (13x10B, 13x9B, 13x26B), 13 price-event slots (4+13x16B), and
+    the roll history (13x8B last price, 13B last event, 13x8B seen price, 13B
+    direction) = 1208. core/src/serialize.mojo pins the same number as DUMP_LEN and asserts
     it at runtime, so the format and this test move together or not at all.
     """
     got = abi.call("dw_world_dump_len")
     report.expect("dw_world_dump_len() >= 396", got >= 396, f"got {got}")
-    report.expect("dw_world_dump_len() == 846", got == 846, f"got {got}")
+    report.expect("dw_world_dump_len() == 1208", got == 1208, f"got {got}")
 
 
 def test_world_align_is_a_power_of_two(abi: Abi, report: Report) -> None:

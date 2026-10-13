@@ -135,6 +135,7 @@ void DopeWarsWorld::_bind_methods() {
 	BIND_CONSTANT(DW_PRICE_EVENT_CHEAP);
 	BIND_CONSTANT(DW_PRICE_EVENT_EXPENSIVE);
 	BIND_CONSTANT(DW_PRICE_EVENT_BUST);
+	BIND_CONSTANT(DW_PRICE_EVENT_VET);
 
 	BIND_CONSTANT(DW_FINANCES_DEPOSIT);
 	BIND_CONSTANT(DW_FINANCES_WITHDRAW);
@@ -240,6 +241,7 @@ Array DopeWarsWorld::prices_copy() {
 		entry["drug_index"] = slots[i].drug_index;
 		entry["price"] = slots[i].price;
 		entry["was_event"] = slots[i].was_event;
+		entry["direction"] = slots[i].direction;
 		out.push_back(entry);
 	}
 	return out;
@@ -263,6 +265,7 @@ Array DopeWarsWorld::prev_prices_copy() {
 		entry["drug_index"] = slots[i].drug_index;
 		entry["price"] = slots[i].price;
 		entry["was_event"] = slots[i].was_event;
+		entry["direction"] = slots[i].direction;
 		out.push_back(entry);
 	}
 	return out;

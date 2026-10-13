@@ -298,7 +298,8 @@ def replay_fixture(fixture: String) raises:
     var game = world.new_game(
         UInt32(first.args.int_at("seed")), 31, -1
     )
-    harness.assert_state_matches(game, first.state)
+    # The newGame roster is the 1.2 price roll, which 2.1 replaced (N-35); later steps install their own prices with setPrices.
+    harness.assert_state_matches(game, first.state, with_prices=False)
     for i in range(1, len(records)):
         try:
             run_step(game, records[i])

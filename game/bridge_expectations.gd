@@ -35,7 +35,7 @@ const ABI = {
 	"rules_cheap_divide": {"value": 10, "c_type": "uint32_t", "width": "uint32"},
 	"rules_expensive_multiply": {"value": 5, "c_type": "uint32_t", "width": "uint32"},
 	"rules_locations_len": {"value": 6, "c_type": "uint32_t", "width": "uint32"},
-	"rules_drugs_len": {"value": 12, "c_type": "uint32_t", "width": "uint32"},
+	"rules_drugs_len": {"value": 13, "c_type": "uint32_t", "width": "uint32"},
 	"world_size": {"c_type": "size_t", "width": "size"},
 	"world_align": {"c_type": "size_t", "width": "size"},
 	"world_dump_len": {"c_type": "size_t", "width": "size"},

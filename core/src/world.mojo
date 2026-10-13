@@ -31,11 +31,12 @@ import rules
 import rng as rng_mod
 
 
-comptime MAX_PRICE_EVENTS = 8
+# Six spike drugs and five crash drugs can all fire in one roll.
+comptime MAX_PRICE_EVENTS = 13
 
 
 struct PriceEvent(Copyable, Movable):
-    # kind is one of PRICE_EVENT_CHEAP (crash) / PRICE_EVENT_EXPENSIVE (spike, addicts text) / PRICE_EVENT_BUST (spike, cops text). The JS event
+    # kind is one of PRICE_EVENT_CHEAP (crash) / PRICE_EVENT_EXPENSIVE (spike, addicts text) / PRICE_EVENT_BUST (spike, cops text) / PRICE_EVENT_VET (Special K spike). The JS event
     # also carries a presentation `message`, which core deliberately drops.
     var kind: Int
     var drug_index: Int
@@ -48,6 +49,7 @@ struct PriceEvent(Copyable, Movable):
 comptime PRICE_EVENT_CHEAP = 0
 comptime PRICE_EVENT_EXPENSIVE = 1
 comptime PRICE_EVENT_BUST = 2
+comptime PRICE_EVENT_VET = 3
 
 
 struct World:
@@ -81,6 +83,17 @@ struct World:
     var prev_price_present: Array[UInt8, rules.NUM_DRUGS]
     var prev_price_order: Array[UInt8, rules.NUM_DRUGS]
     var prev_price_order_len: Int
+
+    # What the last roll recorded for every drug, available or not: the price the
+    # keep-one-day-in-five rule reuses and the event flag (0 none, 1 spike, 2 crash)
+    # that blocks both the keep and a repeat event. last_price is 0 before a roll.
+    var last_price: Array[Int64, rules.NUM_DRUGS]
+    var last_event: Array[UInt8, rules.NUM_DRUGS]
+    # The price on the most recent day each drug was available, 0 if never; the
+    # direction arrow compares against it.
+    var seen_price: Array[Int64, rules.NUM_DRUGS]
+    # Price direction against seen_price: -1 down, 0 flat or not comparable, 1 up.
+    var price_direction: Array[Int8, rules.NUM_DRUGS]
 
     # Inventory, keyed by drug index.
     var inv_qty: Array[Int64, rules.NUM_DRUGS]
@@ -120,6 +133,11 @@ struct World:
         self.prev_price_present = Array[UInt8, rules.NUM_DRUGS]()
         self.prev_price_order = Array[UInt8, rules.NUM_DRUGS]()
         self.prev_price_order_len = 0
+
+        self.last_price = Array[Int64, rules.NUM_DRUGS]()
+        self.last_event = Array[UInt8, rules.NUM_DRUGS]()
+        self.seen_price = Array[Int64, rules.NUM_DRUGS]()
+        self.price_direction = Array[Int8, rules.NUM_DRUGS]()
 
         self.inv_qty = Array[Int64, rules.NUM_DRUGS]()
         self.inv_avg_price = Array[Float64, rules.NUM_DRUGS]()

@@ -37,8 +37,8 @@ const EXPECTED_ASSERTIONS := {
 	"partial_sell": 6,
 	"serialize_round_trip": 16,
 	"determinism": 5,
-	"rules_surface": 7,
-	"prev_prices": 6,
+	"rules_surface": 9,
+	"prev_prices": 8,
 	"dealer_visits": 14,
 	"chase_resolution": 7,
 }
@@ -300,12 +300,14 @@ func _test_rules_surface() -> void:
 	_assert(locations[0]["id"] == "bronx", "the first location should be the Bronx")
 
 	var drugs: Array = world.rules_drugs()
-	_assert(drugs.size() == SimWorld.NUM_DRUGS, "there should be 12 drugs")
+	_assert(drugs.size() == SimWorld.NUM_DRUGS, "there should be %d drugs" % SimWorld.NUM_DRUGS)
 	_assert(drugs[0]["id"] == "acid", "the first drug should be acid")
 
 	var found: Dictionary = world.find_drug_index("weed")
 	_assert(found["result"] == SimWorld.OK, "weed should be a known drug")
 	_assert(found["index"] == 11, "weed should be drug index 11")
+	_assert(SimWorld.NUM_DRUGS == 13, "Beermat 2.1 trades 13 drugs")
+	_assert(drugs[12]["id"] == "specialk", "the 13th drug should be Special K")
 	_assert(
 		world.find_drug_index("nope")["result"] == SimWorld.ERR_UNKNOWN_DRUG,
 		"an unknown drug should be rejected",
@@ -361,6 +363,18 @@ func _test_prev_prices() -> void:
 				carried_verbatim = carried_verbatim and original["price"] == prior["price"]
 				break
 	_assert(carried_verbatim, "a previous price should equal the day-one price for the same drug")
+
+	# The price arrow is the core's: none on day 1, -1/0/1 afterwards.
+	var day_one_flat := true
+	for slot in day_one:
+		day_one_flat = day_one_flat and int(slot["direction"]) == 0
+	_assert(day_one_flat, "day-one prices should have no direction")
+	var moved := 0
+	var in_range := true
+	for slot in world.prices_copy():
+		in_range = in_range and absi(int(slot["direction"])) <= 1
+		moved += 1 if int(slot["direction"]) != 0 else 0
+	_assert(in_range and moved > 0, "after a travel the directions should be -1, 0 or 1, with some movement")
 
 
 ## The dealer rolls consume RNG, so the properties worth pinning are that the

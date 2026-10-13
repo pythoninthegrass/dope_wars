@@ -119,7 +119,8 @@ struct PriceSlot(Copyable, Movable):
     var drug_index: UInt32
     var price: Int32
     var was_event: UInt8
-    var _pad0: Array[UInt8, 3]
+    var direction: Int8
+    var _pad0: Array[UInt8, 2]
 
 
 @fieldwise_init
@@ -624,7 +625,8 @@ def dw_prices_copy(
             UInt32(drug_index),
             Int32(game.price_value[drug_index]),
             UInt8(1) if game.price_was_event[drug_index] != 0 else UInt8(0),
-            Array[UInt8, 3](fill=0),
+            game.price_direction[drug_index],
+            Array[UInt8, 2](fill=0),
         )
     return DW_OK
 
@@ -655,7 +657,8 @@ def dw_prev_prices_copy(
             UInt32(drug_index),
             Int32(game.prev_price_value[drug_index]),
             UInt8(0),
-            Array[UInt8, 3](fill=0),
+            Int8(0),
+            Array[UInt8, 2](fill=0),
         )
     return DW_OK
 
