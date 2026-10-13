@@ -1,7 +1,7 @@
 ---
 id: TASK-013.02.18
 title: Classify the parity fixtures against the 2.1 rules (read-only table)
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-10-13 04:32'
 labels:
@@ -29,7 +29,7 @@ First half of the old TASK-013.02.01 scope. Produce docs/parity-fixture-classifi
 
 ## Implementation Notes
 
-Produced `docs/parity-fixture-classification.md`: one row per fixture group (01-12) naming the M-rule(s) it pins, the 2.1 verdict with N-xx where one exists, and a keep/retire/split/needs-human-decision outcome. 6 keep, 4 retire, 2 split, 2 needs-human-decision (08 serialize-roundtrip and 09 full-run are scope questions the 2.1 doc does not settle).
+The gnhf run produced a first table that failed review: 02 and 11 were marked keep although the 2.1 doc does not settle them (11's payLoan is replaced by per-loan repayment), row 05's split reason was wrong, the split rows had no step numbers, and the notes tally did not match the table. The table was corrected by hand against each fixture's .jsonl. Final verdicts: retire 04, 06, 12; split 01, 03, 05, 07, 10, 11 with step numbers; needs human decision 02, 08, 09, plus a cross-cutting decision on full-state deep equality, which makes every group's state snapshot change shape under 2.1 (guns, single debt). No group is plain keep. TASK-013.02.01 consumes this table.
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
