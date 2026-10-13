@@ -3,8 +3,9 @@
 Behavioral differences between the Godot port (`core/` + `extension/` +
 `game/`) and the JS prototype (`index.html`), approved by Lance. This is not
 a list of bugs — every fixture in `tests/fixtures/*.jsonl` replays
-byte-identically against the compiled Mojo core (`task core:test`, AC#1), so
-every *simulation* rule is exact parity, seed for seed. What's below is where
+against the compiled Mojo core (`task core:test`, AC#1), so every *simulation*
+rule a fixture pins is exact parity with the prototype, seed for seed. The
+fixtures hold only rules Beermat 2.1 keeps (section 8). What's below is where
 the port's behavior is deliberately not a literal copy of the prototype's,
 because the prototype's choice was an artifact of running in a browser tab
 rather than a game rule.
@@ -68,8 +69,8 @@ second, independently-maintained serialization.
 one value on a miss and two on a visit, and only on a non-chase arrival.
 The offer price is drawn when the dealer is presented, the cosmetic gun name
 only when the offer is made, and the coat pocket count only when the player
-accepts (pinned by `tests/fixtures/12-dealer-visits.jsonl` and
-`05-dealers.jsonl`). Listed here only because it is the kind of thing that
+accepts (pinned by `tests/fixtures/05-dealers.jsonl`; the combined visit draw
+itself was pinned by `12-dealer-visits.jsonl`, retired in section 8). Listed here only because it is the kind of thing that
 looks like a plausible optimization (draw everything up front) that would in
 fact desync the RNG stream for the rest of the run; it is not an approved
 deviation, it is a documented non-deviation.
@@ -114,3 +115,13 @@ additive.
 **Approved because:** the prototype's silence was a scoping choice for `index.html` specifically, not a rule the Godot port needs to preserve — nothing in `docs/gameplay.md` ties sound to a game rule, and the fidelity target here is Beermat's cue table, which the prototype was never meant to match.
 
 **Approved because:** Lance prefers being able to start a new game at any time rather than reproducing Beermat's restart lockout. This is a deliberate divergence, not an unported rule — `docs/beermat-re.md` M-11 stays recorded as the Beermat behavior for reference, but the port will not gate New Game to match it.
+
+## 8. The fidelity target is Beermat 2.1, and `index.html` is frozen at 1.2
+
+**Before:** the prototype's 1.2 rules were the parity target, and every fixture recorded from `index.html` gated the Mojo core.
+
+**Now:** Beermat 2.1.0.0 (2001) is the target (`docs/beermat-2.1-re.md`), and 2.1 wins wherever it differs from 1.2. Development is Mojo-first: rule changes are written test-first in `core/`, `index.html` stays frozen at 1.2 and is not extended, and so the JS oracle can only vouch for rules 2.1 keeps. `docs/parity-fixture-classification.md` records the outcome per fixture: 02, 05, 07 and 11 keep their unchanged steps, 03 and 10 keep a few, and 01, 04, 06, 08, 09 and 12 are retired. Kept fixtures compare only the state fields they exercise (`stateFields` in each `.meta.json`), so a state-shape change in a field they do not exercise does not fail them. A rule 2.1 replaces is pinned by a Mojo-native test; one the core has not implemented yet is a skipped test in `tests/mojo/pending_2_1_test.mojo` that the implementing slice un-skips.
+
+**Skipped by decision:** airport flights and multi-city travel (section 5 stands), registration and license keys, online scores and cartels, the update check, proxy settings, the city editor, skins, LCD font and layout polish, and anti-cheat. The 2.2 changelog items are tracked separately under TASK-013.03 because the binary has no evidence for them.
+
+**Approved because:** Lance decided that 2.1 replaces 1.2 as the fidelity target (TASK-013), and a gate that fails on a correct 2.1 rule would block the work it exists to protect.

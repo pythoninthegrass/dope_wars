@@ -40,8 +40,8 @@ release; each file's `main()` calls
 
 `parity_test.mojo` is also Tier 5 (the JS-oracle replay) — it is listed again
 below because it is the tier that actually answers AC#1 of TASK-001.07.
-Narrow it with a fixture-name substring: `task core:test -- 04 05` runs only
-the fixtures whose filename contains `04` or `05`.
+Narrow it with a fixture-name substring: `task core:test -- 02 05` runs only
+the fixtures whose filename contains `02` or `05`.
 
 ## Tier 2 — ABI static gates
 
@@ -107,11 +107,17 @@ node tests/fixtures/run.mjs            # replays the same fixtures against the J
 ```
 
 `tests/fixtures/*.jsonl` are seed-stable traces recorded from
-`<script id="engine">` in `index.html` (see `tests/fixtures/README.md` for the
-format and the coverage table). `task core:test` is the actual differential
-test: it replays every fixture step against the compiled Mojo core and
-deep-compares both the return value and the full state snapshot. Regenerating
-the fixtures after an *intentional* engine change:
+`<script id="engine">` in `index.html`, which is frozen at the 1.2 rules (see
+`tests/fixtures/README.md` for the format and the coverage table). Only rules
+Beermat 2.1 keeps are fixtures; `docs/parity-fixture-classification.md` records
+what was retired. `task core:test` is the actual differential test: it replays
+every fixture step against the compiled Mojo core and deep-compares the return
+value and the state fields the fixture's `stateFields` list names (all fields
+when it has none). The Mojo-native tests next to it pin the rules 2.1 replaced,
+and `pending_2_1_test.mojo` holds 2.1 rules the core does not implement yet as
+skipped tests; the slice that implements a rule removes its skip.
+Regenerating the fixtures after an *intentional* engine change (the generator
+does not delete a retired fixture's files; `git rm` them):
 
 ```sh
 node tests/fixtures/generate.mjs

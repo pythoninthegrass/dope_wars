@@ -1,46 +1,24 @@
 # tests/mojo/world_test.mojo — slice 3 parity: world construction and coat usage.
 #
-# newGame is checked field by field against fixture 01 step 0 (seed 7), which is
-# the oracle's own record of what a fresh game looks like. Prices are asserted in
-# slice 4, once generatePrices exists; this test covers identity, config and the
-# coat accounting that buy/sell and the dealers all depend on.
+# newGame's start state, plus the coat accounting that buy/sell and the dealers
+# all depend on. The seeded price roster is not pinned: it is a 1.2 stream.
 
-import fixtures
-import lexeme
-import record
 import rules
 import world
 from std.testing import assert_equal, assert_true, assert_false, TestSuite
 
 
-def _fixture_step(name: String, index: Int) raises -> record.Record:
-    var remaining = index
-    for line in fixtures.mjo_steps():
-        var parsed = record.parse_record(String(line))
-        if parsed.call == name:
-            if remaining == 0:
-                return parsed^
-            remaining -= 1
-    raise Error("no step " + name + "[" + String(index) + "] in the corpus")
-
-
-def test_new_game_identity_matches_oracle() raises:
-    var expected = _fixture_step("newGame", 0)
-    ref state = expected.state
+# The start state Beermat 2.1 shares with 1.2 (docs/beermat-2.1-re.md, "Start state").
+def test_new_game_identity() raises:
     var game = world.new_game(UInt32(7), 0, -1)
-    assert_equal(Int64(game.seed), state.int_at("seed"))
-    assert_equal(game.day, state.int_at("day"))
-    assert_equal(game.num_days, state.int_at("numDays"))
-    assert_equal(game.cash, state.float_at("cash"))
-    assert_equal(game.debt, state.float_at("debt"))
-    assert_equal(game.bank, state.float_at("bank"))
-    assert_equal(game.health, state.int_at("health"))
-    assert_equal(game.coat_capacity, state.int_at("coatCapacity"))
-    assert_equal(game.guns, state.int_at("guns"))
-    assert_equal(game.dead, state.bool_at("dead"))
-    assert_equal(game.last_day_warned, state.bool_at("lastDayWarned"))
-    assert_equal(game.location_index, rules.find_location_index(state.string_at("location")))
-    assert_equal(Int64(game.rng.get_state()), state.int_at("rngState"))
+    assert_equal(Int64(game.seed), 7)
+    assert_equal(game.day, 1)
+    assert_equal(game.cash, Float64(2000))
+    assert_equal(game.bank, Float64(0))
+    assert_equal(game.health, 100)
+    assert_equal(game.coat_capacity, 100)
+    assert_equal(game.dead, False)
+    assert_equal(game.last_day_warned, False)
 
 
 def test_new_game_starts_with_a_price_roster() raises:

@@ -1,5 +1,10 @@
 {
   "seed": 1,
-  "description": "coat + gun dealer acceptance",
-  "mechanic": "cash only, pockets drawn on acceptance, no bank fallback, a gun uses no coat space"
+  "description": "coat dealer acceptance",
+  "mechanic": "cash only, pockets drawn on acceptance, no bank fallback",
+  "stateFields": [
+    "cash",
+    "bank",
+    "coatCapacity"
+  ]
 }

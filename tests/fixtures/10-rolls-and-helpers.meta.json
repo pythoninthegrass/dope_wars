@@ -1,5 +1,10 @@
 {
   "seed": 1,
-  "description": "RNG-driven rolls and pure helpers",
-  "mechanic": "shouldStartChase flat 1 in 6, coat/gun dealer offers, applyDamage"
+  "description": "coat dealer offer and damage helpers",
+  "mechanic": "coat dealer offer price range and the price < cash rule, applyDamage health floor",
+  "stateFields": [
+    "cash",
+    "health",
+    "dead"
+  ]
 }

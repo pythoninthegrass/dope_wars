@@ -4,6 +4,8 @@
 
 A Godot reference implementation of Dope Wars — a Mojo simulation core behind a frozen C ABI, a C++ GDExtension shim, and a GDScript presentation layer — ported from and verified against a **playable web prototype** (`index.html`). See `docs/architecture.md` for the four-layer structure and data flow, `docs/build-and-test.md` for the full build/test runbook, and `docs/parity-deltas.md` for the approved behavioral differences from the prototype.
 
+**The fidelity target is Beermat 2.1.0.0 (2001), not 1.2.** `docs/beermat-2.1-re.md` records the 2.1 rules and `docs/beermat-re.md` the 1.2 rules they are compared against; where the two conflict, 2.1 wins. Development is Mojo-first: new and changed rules are written test-first in `core/` and `index.html` is not extended. Airport flights and multi-city travel are skipped (`docs/parity-deltas.md`, section 5 stands), and so is the rest of TASK-013's out-of-scope list: registration and license keys, online scores and cartels, the update check, proxy settings, the city editor, skins, LCD font and layout polish, and anti-cheat. The parity gate (`task core:test`) replays only fixtures for rules 2.1 keeps; rules 2.1 replaces are pinned by Mojo-native tests (`tests/mojo/`), and 2.1 rules not yet implemented are skipped tests in `tests/mojo/pending_2_1_test.mojo`. `docs/parity-fixture-classification.md` records which fixtures were kept, split or retired and why.
+
 `CLAUDE.md` is a symlink to this file (`AGENTS.md`); edit `AGENTS.md`, not `CLAUDE.md`.
 
 ## Playable prototype — `index.html`
@@ -12,7 +14,7 @@ Single-file, no-build-step, no-dependency game. Open directly in a browser (`ope
 
 **Two `<script>` blocks, each with a distinct role:**
 
-- `<script id="engine">` — pure simulation, zero DOM access, exposed as `window.DopeWarsEngine`. Every function that needs randomness accepts an explicit `rng` argument (mulberry32 PRNG) so an entire run is deterministic from a seed. This maps directly onto the eventual GDScript port. Ruleset: Keymash/Beermat "Dope Wars for Windows" 1.2.0.0 (1999) as primary, falling back to `docs/gameplay.md` for anything Keymash never revealed.
+- `<script id="engine">` — pure simulation, zero DOM access, exposed as `window.DopeWarsEngine`. Every function that needs randomness accepts an explicit `rng` argument (mulberry32 PRNG) so an entire run is deterministic from a seed. This maps directly onto the eventual GDScript port. Ruleset: Keymash/Beermat "Dope Wars for Windows" 1.2.0.0 (1999) as primary, falling back to `docs/gameplay.md` for anything Keymash never revealed. It is frozen at 1.2: it is the JS oracle for the rules 2.1 keeps, it is not extended to 2.1, and nothing replaced by 2.1 is gated on it.
 - `<script id="ui">` — rendering and input only. Maintains two selection variables (`selectedBuyDrug`, `selectedSellDrug`) that stay in sync bidirectionally when the user clicks either table. Coat rows whose drug is absent from the current market get a `selected-unavailable` (dark-red) CSS class; the Sell button stays disabled in that state.
 
 **Key engine exports:** `newGame`, `generatePrices`, `buy`, `sell`, `travel`, `finances`, `rollArrivalEvent`, `shouldStartChase`, `startChase`, `runFromChase`, `fight`, `finish`, `rollDealerVisit`, `rollCoatDealerOffer`, `acceptCoatOffer`, `rollGunDealerOffer`, `acceptGunOffer`, `serializeState`, `deserializeState`.
@@ -72,7 +74,7 @@ Mojo LOC target at parity: `>=43%` of non-vendor non-generated LOC, matching the
 - `task dev` — watch `core/src`, `include/`, `extension/src`, and `game/` and rerun `task run` (rebuild + relaunch) on every change, via `watchexec`. Godot has no hot reload outside the editor, so this is a restart loop, not HMR: state is lost on every relaunch, though `user://dopewars.save` survives it.
 - `task build` — build only, no smoke test.
 - `task core:build` — build `core/build-output/lib/libdopewars.a` from `core/src/abi.mojo`, the only file declaring `@export` symbols.
-- `task core:test` — replay `tests/fixtures/*.jsonl` against the Mojo core. This is the parity gate for the simulation; pass fixture-name substrings to narrow it (`task core:test -- 04 05`).
+- `task core:test` — replay `tests/fixtures/*.jsonl` against the Mojo core. This is the parity gate for the simulation; pass fixture-name substrings to narrow it (`task core:test -- 02 05`).
 - `task extension:build` — build the GDExtension shim (`game/bin/libdopewars.*`).
 - `task game:ui-test` — the presentation-layer regression suite (`game/godot_tests/ui_flow_test.tscn`): drives the real `Main` scene through the same entry points the keyboard and the buttons use, and asserts on rendered widget state — boot and price rendering, a buy/sell round trip, travel with the arrival sequence draining, a mid-game save round-tripping through a cold start, the finances dialog, the new-game form, the keyboard shortcut table, and that every `tr()` key resolves.
 - `task game:boundary-check` — the `DopeWarsWorld` boundary plus its own self-test.

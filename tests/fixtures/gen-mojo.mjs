@@ -10,6 +10,11 @@
 //
 //   call | rng lexemes | arg pairs | return pairs | state pairs
 //
+// A fixture's .meta.json may list `stateFields`. The state pairs are then cut to
+// those top-level fields, so a kept fixture stays a gate when 2.1 changes the
+// state shape (weapons for guns, loans for debt) in fields it does not exercise.
+// Without the list every state field is emitted and compared.
+//
 // Pairs keep document order, which is load-bearing: the JS engine's
 // `state.prices` and `state.inventory` are insertion-ordered objects, and
 // Object.keys() order drives randomTradeableDrug() and the dogChase branch.
@@ -179,7 +184,7 @@ function flatten(prefix, value) {
 
 let fixtureName = ''
 let record = null
-function group(prefix, value) {
+function group(prefix, value, fields = null) {
   pairs.length = 0
   // A bare scalar return (shouldStartChase -> bool, applyDamage -> health) has
   // no field name to hang a path on, so it lands under `<group>.value`.
@@ -188,10 +193,15 @@ function group(prefix, value) {
     return pairs.join(';')
   }
   flatten(prefix, value)
+  // A projection keeps only the pairs whose top-level field is listed.
+  if (fields) {
+    const keep = pairs.filter((p) => fields.includes(p.slice(prefix.length + 1).split(/[.=]/)[0]))
+    return keep.join(';')
+  }
   return pairs.join(';')
 }
 
-function encodeStep(fx, rec) {
+function encodeStep(fx, rec, stateFields) {
   fixtureName = fx
   record = rec
   const call = rec.call
@@ -202,7 +212,7 @@ function encodeStep(fx, rec) {
   const rng = rec.rng === undefined ? '-' : rec.rng.map(lexeme).join(',')
   const args = group('args', rec.args ?? {})
   const ret = group('ret', rec.expect.return)
-  const state = group('state', rec.expect.state ?? {})
+  const state = group('state', rec.expect.state ?? {}, stateFields)
   // The fixture basename leads so a harness can replay one fixture at a time.
   return `${fx.replace(/\.jsonl$/, '')}|${call}|${rng}|${args}|${ret}|${state}`
 }
@@ -212,8 +222,10 @@ function main() {
   const lines = []
   for (const file of files) {
     const raw = readFileSync(path.join(FIXTURES, file), 'utf8').trim()
+    const metaPath = path.join(FIXTURES, file.replace(/\.jsonl$/, '.meta.json'))
+    const stateFields = JSON.parse(readFileSync(metaPath, 'utf8')).stateFields ?? null
     for (const l of raw.split('\n').filter((x) => x.length > 0)) {
-      lines.push(encodeStep(file, JSON.parse(l)))
+      lines.push(encodeStep(file, JSON.parse(l), stateFields))
     }
   }
 

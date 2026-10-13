@@ -1,5 +1,9 @@
 {
   "seed": 1,
-  "description": "deposit / withdraw / payLoan",
-  "mechanic": "clamping to available cash/bank/debt, amount floor, unknown action"
+  "description": "deposit / withdraw",
+  "mechanic": "clamping to available cash and bank, amount floor, unknown action",
+  "stateFields": [
+    "cash",
+    "bank"
+  ]
 }

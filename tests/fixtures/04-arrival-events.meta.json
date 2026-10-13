@@ -1,5 +1,0 @@
-{
-  "seed": 1,
-  "description": "every rollArrivalEvent branch via scripted RNG",
-  "mechanic": "Random(14) chance, wealth-cap mugging, Random(4) outcome: found/mugged/friend/police dogs"
-}

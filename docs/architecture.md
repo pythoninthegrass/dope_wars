@@ -14,6 +14,20 @@ layer *is* and how a call travels through the stack. `docs/abi-contract.md`
 covers the header's own conventions (opaque handle, two-call length-then-fill,
 versioning).
 
+## Fidelity target and the oracle
+
+The rules the core implements are Beermat "Dope Wars for Windows" 2.1.0.0
+(2001), recorded in `docs/beermat-2.1-re.md`; 2.1 wins wherever it differs from
+1.2 (`docs/beermat-re.md`). Development is Mojo-first: rule changes are written
+test-first in `core/`. `index.html` is frozen at the 1.2 rules and is not
+extended, so the JS fixtures in `tests/fixtures/` gate only rules 2.1 keeps.
+Rules 2.1 replaces are pinned by Mojo-native tests in `tests/mojo/`, and 2.1
+rules not yet implemented are skipped tests in
+`tests/mojo/pending_2_1_test.mojo`. Airport flights and multi-city travel are
+skipped, along with the rest of the out-of-scope list in
+`docs/parity-deltas.md` section 8. `docs/parity-fixture-classification.md`
+records which fixtures were kept, split or retired.
+
 ## The four layers
 
 - **`core/` — Mojo simulation.** The whole rulebook: RNG, pricing, trading,

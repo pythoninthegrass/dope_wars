@@ -1,5 +1,0 @@
-{
-  "seed": 1,
-  "description": "chase + combat branches",
-  "mechanic": "startChase, runFromChase, stayInChase, fight kill/miss/win reward, acceptDoctorOffer"
-}
