@@ -166,20 +166,24 @@ The tip texts are assembled from a prefix and the drug name and are not exact st
 
 ## Chase
 
-`0x004bd758` starts it: `deputies = Random(0x4bda1c) + 2` (2-8), shows "Officer Hardass and N of his deputies are chasing you !" (`0x004bdc30`). `TCopChaseDlg.FormShow` (`0x004a3c34`) sets `DAT_004d398c = 0` and opens the dialog. `0x004a4c7c` is the cop-chase timer; `0x004a3f30` plays the next event. There is a single cop tier (Officer Hardass); the deputy count is not scaled by day or location. Dying (health 0) ends the game: "They wasted you man. What a drag!" (`0x004ddf20`), plays `DWDead`, records the score.
+`0x004bd758` starts it: `deputies = Random(7) + 2` (2-8, 1.2 was 2-11), shows "Officer Hardass and N of his deputies are chasing you!" and runs the modal `TCopChaseDlg`. There is a single cop tier; the deputy count is not scaled by day or location. The dialog is a real-time timer (`0x004a4c7c`): Run (`0x004a528c`), Stay (`0x004a5308`), Fight (`0x004a5860`) and Dump (`0x004a5748`) each queue an event in `DAT_004d3998` and the timer plays them in order through `0x004a3f30`. Buttons do nothing while the timer is busy.
 
-The cop-chase dialog is a real-time timer, not a turn menu: the deputy count is `DAT_004d398c` with a max of `0x004a5278` = 11 (a form placeholder; the runtime draw is 2-8), and `DAT_004d3998` is the event queue. Run (`0x004a528c`), Stay (`0x004a5308`), Fight (`0x004a5860`) and Dump (`0x004a5748`) each append an event to the queue; the timer (`0x004a4c7c`) drains it and plays the matching message/sound. Fight draws the weapon hit against `Random(100)` (`0x004a5860` line 33); run draws `Random(0x004a5300 = 10)` then `Random(3)`.
+When the dialog returns anything but death and the arrest flag `DAT_004e2148` is set, `0x004bd758` calls `RemoveDrugs`, `RemoveWeapons` and `LoseDay` (the night in the slammer costs a day with a full price, interest and day-end pass), clears the flag, and with `Random(2) == 0` picks a spike drug (`Random(13)` redrawn until one has the spike mark) as the tip drug, with the jail tip text from "Event text". Death from the chase calls `EndGame(4)`.
 
 | Rule | VA | Beermat | Engine | Class |
 | --- | --- | --- | --- | --- |
 | Deputy count | `0x004bd758` | `Random(7) + 2`, 2-8 | `randInt(2, 11)` | mismatch, N-23 |
-| Run | `0x004a528c` | `Random(10) < 2`: escape (event 7), else `Random(3)`: 0 = fire (event 1), else fire (event 2) | `randInt` | mismatch, N-24 |
-| Fight | `0x004a5860` | weapon hit vs `Random(100)`: hit on `Random(100) <= weapon`; kill (event 4) or wound (event 3) | `fight` | mismatch, N-25 |
-| Stay | `0x004a5308` | cops fire; arrest on a failed run; "Officer Hardass pats you down for assault" | `stayInChase` | mismatch, N-26 |
-| Dump drugs | `0x004a5748` | "Are you sure you want to dump all your drugs?" clears held drugs and weapons | none | new, N-06 |
-| Chase win reward | `0x004bd758` | free drugs: `Random(0x4bda54 = 13)` drugs, quantity up to `Random(0x4bda48 = 2)`, min 1 | `fight` | mismatch, N-27 |
+| Run | `0x004a528c` | `Random(10) < 2` (20%) escapes (event 7, "You lost them in the alleys." / "You escaped from them all!"); otherwise `Random(3)`: 0 queues event 1 (cop "fired and missed you!"), 1 or 2 queues event 2 ("shot you!") | `Random(6) < 3` escapes | mismatch, N-24 |
+| Cop hit damage | `0x004a5190` | `Random(11) + 5` (5-15), health floored at 0 | same | match |
+| Fight | `0x004a5860` | sets the assault flag, counts a weapon use, hits when `Random(100) + 1 <= weapon accuracy` (record field +0x18): event 4 (hit) else event 3 (miss, "You're `<attacking>`. You missed `<n>` ...") | `Random(2)` kill | mismatch, N-25 |
+| Return fire | `0x004a4c7c` | after event 3 or 4: if the deputy counter is below 0 the chase is won (event 8), else `Random(2)` queues event 5 or 6 (cops fire back) | `Random(2)` return fire | mismatch, N-25 |
+| Stay | `0x004a5308` | no draw. Arrest ("Officer Hardass pats you down and finds your stash! You're under arrest! You get to spend the night in the slammer. Officer Hardass confiscates your drugs", plays `DWJail`, possession arrest counted) when drugs or weapons are held and no fight started; always arrest after a fight ("You're under arrest for assaulting Police Officers! ...", assault arrest counted); otherwise "Officer Hardass pats you down, but finds nothing of interest. He mumbles something about getting you next time, but lets you go." | cops fire, 5-15 damage | mismatch, N-26 |
+| Dump drugs | `0x004a5748` | "Are you sure you want to dump all your drugs?"; Yes clears the held count and average cost of all 13 drugs (weapons are kept) | none | new, N-05 |
+| Chase win reward | `0x004a4c7c` event 8 | cash: `base = min(cash + bank, 1,000,000) div 10`, reward `base + Random(base) + Random(base)`; "As Officer Hardass beats a hasty retreat, he drops `$X` in cash." | gun and 1000-3499 cash | mismatch, N-27 |
 
-The win reward is a mismatch: 2.1 gives free drugs (constants `0x4bda34 = 1000` is a flag, `0x4bda48 = 2` is the max quantity draw, `0x4bda54 = 13` is the drug count pool, `0x4bda64 = 10` is a minimum quantity), where the engine gives a gun and cash. This is a new difference N-27.
+The win reward is cash, not drugs. Fight messages use "You scared Officer Hardass off. He ran away!" when the last deputy goes and "You scared `<n>` away!" for the others, because the joke weapons scare cops off instead of killing them.
+
+Fight hit damage in deputies (how many a hit scares away, `0x004a3f30` case 4, a `Random(100 div accuracy) + 1` capped at the deputies left) is read from the decompile but the weapon-field mapping is not decoded, so the exact count is unresolved; TASK-013.02.09 should confirm it against the Windows reference before porting.
 
 ## Loan sharks
 
