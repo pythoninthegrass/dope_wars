@@ -9,7 +9,7 @@ vars:
   GHIDRA_BUILD: "20260921"
   GHIDRA_SHA256: "ddac49f903da9d5bac833e5cc79395098b9c33cfd3279be5f31bd00387d2d4db"
   GHIDRA_JAVA: "temurin-21"
-  GHIDRA_ROOT: '{{.HOME}}/.local/opt/ghidra/ghidra_{{.GHIDRA_VERSION}}_PUBLIC'
+  GHIDRA_ROOT: '$HOME/.local/opt/ghidra/ghidra_{{.GHIDRA_VERSION}}_PUBLIC'
   GHIDRA_HEADLESS: '{{if eq OS "darwin"}}/opt/homebrew/opt/ghidra/libexec/support/analyzeHeadless{{else}}{{.GHIDRA_ROOT}}/support/analyzeHeadless{{end}}'
   GHIDRA_RUN: "mise exec java@{{.GHIDRA_JAVA}} --"
 

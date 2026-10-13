@@ -3,6 +3,8 @@ CLAUDE.md
 CLAUDE.local.md
 screenshots/*
 vendor/dopewars-1999/
+vendor/dopewars-2001/
+home/
 .task/
 .venv/
 core/build-output/
