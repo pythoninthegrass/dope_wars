@@ -183,7 +183,7 @@ When the dialog returns anything but death and the arrest flag `DAT_004e2148` is
 
 The win reward is cash, not drugs. Fight messages use "You scared Officer Hardass off. He ran away!" when the last deputy goes and "You scared `<n>` away!" for the others, because the joke weapons scare cops off instead of killing them.
 
-Fight hit damage in deputies (how many a hit scares away, `0x004a3f30` case 4, a `Random(100 div accuracy) + 1` capped at the deputies left) is read from the decompile but the weapon-field mapping is not decoded, so the exact count is unresolved; TASK-013.02.09 should confirm it against the Windows reference before porting.
+How many deputies a hit scares away (`0x004a3f30` case 4, from `0x004a43bf`) is only partly decoded: a weapon accuracy of 100 or less scares one away, and above 100 the count is drawn with `Random(accuracy div 100) + 1`, capped at the deputies left, with a further test against `DAT_004d236c` (the deputy counter) that was not traced. The joke weapon table passed to `FUN_004bbd34` (`0x004b7fe0`) has accuracy-like values up to 450,000. This is listed as unresolved; TASK-013.02.09 needs the Windows reference to fix the exact count.
 
 ## Loan sharks
 
