@@ -307,7 +307,7 @@ How kidneys are removed is the unresolved part of the nasty doctor (see "Hospita
 
 ## Score and high scores
 
-`0x004c3230` (`AddHighScore`) computes `cash + bank - debt` and records it if above 0. The list size is `0x004c3520` = 30 (1.2 had 10). The score table has three pages: 15, 30, 60, 90 day games (`0x004c2a0c`, `0x004c2a28`, `0x004c2a44`, `0x004c3520`, `0x004c3530`, `0x004c3540`).
+`0x004c3230` (`AddHighScore`) computes `cash + bank - debt` and records it if above 0. The list size is `0x004c3520` = 30 (1.2 had 10). The score table has four pages: 15, 30, 60 and 90 day games (`0x004c2a0c`, `0x004c2a28`, `0x004c2a44`, `0x004c3520`, `0x004c3530`, `0x004c3540`).
 
 | Rule | VA | Beermat | Engine | Class |
 | --- | --- | --- | --- | --- |
@@ -338,9 +338,9 @@ The 2.1 sound table is not in the exe as 1.2's records are. The image holds only
 Everything below is reproducible from `vendor/dopewars-2001/dw21.exe` and a 32-bit Windows XP bottle in CrossOver (or any Wine that runs a 32-bit prefix). The installer is never run, and the Gator stub is never extracted.
 
 1. Run `task re:unwise`. It writes `DopeWars.exe`, `cities.txt`, `oldlady.txt`, `Olchk32.dll`, the wavs and `appevents.tsv` (38 event, wav and label rows read from the Wise script) into gitignored `vendor/dopewars-2001/game/`.
-2. Copy those files into a directory in the bottle (for example `C:\dopewars`). `Olchk32.dll` is PC Guard's runtime check library, and the installer puts it in the system directory. Without it the game stops with "DLL loading error: OLCHK32.DLL".
+2. Copy those files into a directory in the bottle. `Olchk32.dll` is PC Guard's runtime check library, and the installer puts it in the system directory. Without it the game stops with "DLL loading error: OLCHK32.DLL".
 3. Seed the settings the installer would have written, under `HKCU\Software\Beermat Software\DopeWars\2.0\Settings`. The Wise script holds 33 values as key, data and name triples. Numbers must be `REG_DWORD`, and names, dates, the proxy values and `License` are strings, with `Name` and `License` left empty. Delphi's errors tell the cases apart: "Failed to get data for X" means the value is missing, and "Invalid data type for X" means the wrong type. One more value, `Registered` (`REG_DWORD`, 0), is not in the script, and the game fails with "Failed to get data for registered" without it once a key has been entered.
-4. Start the game with the bottle's `wine` from the install directory, for example `wine --bottle <name> --workdir 'C:\dopewars' 'C:\dopewars\DopeWars.exe'`. PC Guard unpacks for about 45 to 60 seconds at roughly 100% CPU, and then the process idles. The disclaimer dialog appears first.
+4. Start the game with the bottle's `wine` from a working directory that holds the copied files. PC Guard unpacks for about 45 to 60 seconds at roughly 100% CPU, and then the process idles. The disclaimer dialog appears first.
 5. Enter the license key in the registration dialog. The game then lists the registered features (15, 60 and 90 day games, Price History, direction indicators, extra weapons, Top 20 scores, the Elite league) and shows itself as registered. The key never goes into the repo or this document.
 6. Dump the running process with `pe-sieve32.exe /pid <windows pid> /imp 3 /dmode 3 /dir <dump dir>` (hasherezade's pe-sieve, v0.4.1.1). Take the Windows pid from `wine tasklist`. Copy the `400000.DopeWars.exe` file to gitignored `vendor/dopewars-2001/dump/DopeWars.dump.exe`.
    - `/dmode 3` (realigned) is required. The default virtual layout leaves the section headers inconsistent with the file, and pefile then reads none of the form resources.
@@ -363,43 +363,83 @@ Handling notes for the bottle:
 
 - Shut the bottle down with `WINEPREFIX=<bottle> wineserver -k` followed by `wineserver -w`. A kill -9 of the wineserver loses unflushed registry writes, and every wine command needs an explicit `WINEPREFIX` or it can act on another bottle's server.
 - Do not trace. `WINEDEBUG=+reg` made PC Guard hit a privileged instruction and crash under winedbg. Leftover wine processes from a previous run caused the same crash once, so clean up first.
-- Fallbacks if pe-sieve fails, in order: a `winedbg` minidump, then the Windows oracle described in `CLAUDE.local.md`. Neither was needed.
+- Fallbacks if pe-sieve fails, in order: a `winedbg` minidump, then a Windows reference machine. Neither was needed.
+
+## 1.2 findings re-checked against 2.1
+
+Every 1.2 rule M-01 to M-13 from `docs/beermat-re.md`, with its 2.1 address and verdict:
+
+| 1.2 ID | Rule | 2.1 VA | Verdict | New ID |
+| --- | --- | --- | --- | --- |
+| M-01 | Drug table, ranges and flags | `0x004b7fe0`, `0x004bbc04` | changed: 13 drugs, Smack to MDA, Shrooms to Mushrooms, Special K added, Crack gained the crash flag and MDA the spike flag; every shared range is unchanged | N-34 |
+| M-02 | Price spike and crash | `0x004bbfc4` | changed: 1 in 40 not 1 in 20, needs no event the previous day, Special K has its own spike text, a tip forces a spike; the x5 and div 10 effects and the `Random(2)` bust or Addicts pick are unchanged | N-35 |
+| M-03 | Availability | `0x004bbfc4` | unchanged: `Random(8) == 0` absent, location independent; drawn after the price instead of before the spike, and a tip drug stays available | none |
+| M-04 | Chase start chance | `0x004bc9d4` | changed: `Random(8) == 0` (1 in 8), and no chase on the last two days | N-22 |
+| M-05 | Dealers, coat and gun prices | `0x004be728`, `0x004bee64` | changed: coat price 201-350 and pockets 11-20 unchanged, but a separate 1 in 15 trigger limited to capacity below `day + 150`; the gun dealer is removed | N-28 |
+| M-06 | Arrival event table | `0x004be728` | changed: gate `Random(13)` not `Random(14)`, five outcomes with different weights, drug pool is 13 not 11, mugging costs health, brownies added, wealth cap removed; found, friend and police-dog draws are otherwise unchanged | N-29 |
+| M-07 | Run, stay and cop damage | `0x004a528c`, `0x004a5308`, `0x004a5190` | changed for run (`Random(10) < 2`) and stay (arrest, no draw); cop hit damage `Random(11) + 5` is unchanged | N-24, N-26 |
+| M-08 | Fight resolution and win condition | `0x004a5860`, `0x004a4c7c` | changed: weapon accuracy against `Random(100) + 1`, a hit scares deputies away, win when the counter drops below 0 is kept | N-25 |
+| M-09 | Chase win reward and doctor | `0x004a4c7c` | changed: cash only, no gun and no doctor offer | N-27 |
+| M-10 | Interest rounding | `0x004c0358`, `0x004c0420` | changed: bank 5% via `Round(bank * 0.05)`, debt per loan at shark rates | N-33, N-06 |
+| M-11 | New Game gate | `0x004bc9d4` | unchanged in kind, usable from day 5 where 1.2 was day 6 (intentional delta kept) | none |
+| M-12 | Average cost integer division | `0x004bf134`, `0x004bf680`, `0x004bf8b4` | unchanged: the same integer dilution on find and friend, and the same rescale on drops | none |
+| M-13 | Score above 0 to record | `0x004c3230` | unchanged | none |
+
+No 1.2 rule is removed outright, though the 1.2 gun dealer and the cash-plus-bank mugging cap lose their 2.1 counterparts, which is recorded under M-05 and M-06. Buying and selling are not re-read in this pass.
 
 ## Open questions
 
-- The loan shark rate/duration/amount per shark and the jail-release order are not yet decoded from the builder; the bottle confirms them.
-- The exact per-drug spike message pairing is not yet decoded from the builder.
-- The bank interest rate constant at `0x004bfffc` is in BSS and not decoded; the changelog implies 5%.
-- The arrival-event split between "dealer visit" and "arrival event" is not yet separated in the decompile; the bottle confirms it.
+All four questions from the first pass are answered from the decompile:
+
+- Loan shark rate, duration and amount per shark, and the jail-release order: answered in "Loan sharks" (rates 15/10/20/30/25 per day, durations 10/15/7/1/5 days, amounts 10x/20x/30x/50x/100x of cash plus bank, release by `Random(7) < 3` and a uniform pick among those still in jail).
+- Per-drug spike message pairing: answered in "Price roll". The pairing is not per drug: `Random(2)` picks bust or Addicts for every spike drug except Special K, which has its own text.
+- Bank interest: answered in "Interest". `0x004bfffc` is a display format cell, and the real handler `0x004c0358` uses 5%.
+- Arrival-event split: answered in "Arrival events". The dealer and the event are separate rolls of 1 in 15 and 1 in 13.
+
+Still unresolved, each with the reason:
+
+- How many deputies a Fight hit scares away (`0x004a3f30` case 4): the weapon field mapping is read from the builder arguments only, and the compare against `DAT_004d236c` was not traced.
+- The outcomes of the nasty doctor beyond the 1-in-5 gate and the drug removal (`0x004c402c`): the texts at `_DAT_004ddf40`-`_DAT_004ddf4c` and the cash and kidney effects are not decoded.
+- The exact joining words of the Old Lady and post-arrest tip texts: they are assembled at run time from a prefix, the drug name and a suffix.
+- The meaning of the weapon record field at +0x10: no reader was traced.
+- What `DAT_004e2160` (the Old Lady phrase count) and `oldlady.txt` contain beyond the 13 phrases noted from `0x004bed1c`.
+- The effect of changing any of the above on 2.2: this document is 2.1 only.
+
+The rows above the unresolved items were read from decompiled code and cross-checked against the form captions; none was run against a live game in this pass.
 
 ## New difference index
 
 | ID | Rule | Section | Subtask |
 | --- | --- | --- | --- |
 | N-01 | Game length 15/30/60/90 days | Travel | TASK-013.02.02 |
-| N-02 | Run resolution (Random(10), Random(3)) | Chase | TASK-013.02.09 |
-| N-03 | Fight resolution (weapon hit vs Random(100)) | Chase | TASK-013.02.09 |
-| N-04 | Stay resolution (cops fire, arrest) | Chase | TASK-013.02.09 |
 | N-05 | Dump drugs in a chase | Chase | TASK-013.02.09 |
-| N-06 | Loan sharks replace single debt | Money | TASK-013.02.04 |
-| N-07 | Max total debt 1,000,000 | Money | TASK-013.02.04 |
-| N-08 | Loan visits and jail on non-payment | Money | TASK-013.02.05 |
-| N-09 | Jail release in random order | Money | TASK-013.02.05 |
-| N-10 | Hospital 300 per health point | Health | TASK-013.02.07 |
-| N-11 | Super Store replaces gun dealer | Store | TASK-013.02.08 |
-| N-12 | Joke weapon set (6 weapons) | Store | TASK-013.02.08 |
+| N-06 | Loan sharks replace single debt; shark table; starter loan; per-loan daily compounding | Loan sharks | TASK-013.02.04 |
+| N-07 | Max total debt 1,000,000 and the borrow cap | Loan sharks | TASK-013.02.04 |
+| N-08 | Loan visits, warning levels and beatings | Loan sharks | TASK-013.02.05 |
+| N-09 | Sharks released from jail in random order | Loan sharks | TASK-013.02.05 |
+| N-10 | Hospital price `(Random(9) + 1) * 50` per point | Hospital | TASK-013.02.07 |
+| N-11 | Super Store replaces gun dealer | Super Store | TASK-013.02.08 |
+| N-12 | Joke weapon set (6 weapons) | Super Store | TASK-013.02.08 |
 | N-13 | Dialysis machine 100,000 | Health | TASK-013.02.13 |
-| N-14 | Infection death (below 80% for 5 days) | Health | TASK-013.02.10 |
-| N-15 | Kidney death | Health | TASK-013.02.10 |
-| N-16 | Old Lady phrases | Arrival | TASK-013.02.11 |
-| N-17 | Old Lady mute | Arrival | TASK-013.02.11 |
+| N-14 | Infection (below 80 for 5 days, 10 a day) | Health | TASK-013.02.14 |
+| N-15 | Kidney damage and death | Health | TASK-013.02.10 |
+| N-16 | Old Lady phrases and tips | Old Lady | TASK-013.02.11 |
+| N-17 | Old Lady mute | Old Lady | TASK-013.02.11 |
 | N-18 | Deposit All But withhold | Finances | TASK-013.02.06 |
-| N-19 | Score list 30 entries | Score | TASK-013.02 |
-| N-20 | Score pages 15/30/60/90 | Score | TASK-013.02 |
-| N-21 | Doctor event (health deduction + kidney risk) | Health | TASK-013.02.10 |
-| N-22 | Chase start chance 1 in 8 (Random(8)) | Travel | TASK-013.02.04 |
-| N-23 | Deputy count 2-8 (Random(7)+2) | Chase | TASK-013.02.09 |
-| N-24 | Run resolution Random(10) escape threshold | Chase | TASK-013.02.09 |
-| N-25 | Fight resolution weapon hit vs Random(100) | Chase | TASK-013.02.09 |
-| N-26 | Stay resolution cops fire, arrest | Chase | TASK-013.02.09 |
-| N-27 | Chase win reward free drugs | Chase | TASK-013.02.09 |
+| N-19 | Score list 30 entries | Score | TASK-013.02 (no dedicated slice) |
+| N-20 | Score pages 15/30/60/90 | Score | TASK-013.02 (no dedicated slice) |
+| N-21 | Mugging costs health | Arrival | TASK-013.02.10 |
+| N-22 | Chase start chance 1 in 8, none on the last two days | Travel | TASK-013.02.09 |
+| N-23 | Deputy count 2-8 (`Random(7) + 2`) | Chase | TASK-013.02.09 |
+| N-24 | Run: `Random(10) < 2` escape, then `Random(3)` | Chase | TASK-013.02.09 |
+| N-25 | Fight: weapon accuracy against `Random(100) + 1`, return fire | Chase | TASK-013.02.09 |
+| N-26 | Stay is an arrest check, no cop fire | Chase | TASK-013.02.12 |
+| N-27 | Chase win reward is cash | Chase | TASK-013.02.09 |
+| N-28 | Coat dealer 1 in 15 with a capacity gate; gun dealer removed | Arrival | TASK-013.02.10 (no dedicated slice) |
+| N-29 | Event gate 1 in 13 and five-outcome table | Arrival | TASK-013.02.10 (no dedicated slice) |
+| N-30 | Early payoff: balance plus 30% of the remaining interest | Loan sharks | TASK-013.02.04 |
+| N-31 | Nasty doctor (partly decoded) | Hospital | TASK-013.02.10 |
+| N-32 | Old Lady tip forces a spike | Old Lady | TASK-013.02.11 |
+| N-33 | Bank interest 5% with the 2.1 rounding | Interest | TASK-013.02.04 |
+| N-34 | 13-drug table and flags | Drug table | TASK-013.02.03 |
+| N-35 | Flat price model, 1 in 40 spike and crash, Special K text | Price roll | TASK-013.02.03 |
