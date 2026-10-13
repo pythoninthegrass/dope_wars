@@ -1,7 +1,7 @@
 ---
 id: TASK-013.01.04
 title: Document Beermat 2.1's rules and re-check the 1.2 findings against it
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-11 04:02'
@@ -27,11 +27,11 @@ With the decompiled dump from TASK-013.01.03, replace the "unverified" table in 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Every 1.2 rule M-01 to M-13 is classified unchanged, changed or removed, with a 2.1 virtual address
-- [ ] #2 Every feature listed in this description has its constants, draw order and text documented with a virtual address
-- [ ] #3 Open questions are either answered with evidence or listed as unresolved with the reason
-- [ ] #4 Each new or changed rule has an N-xx ID and a mapping to the TASK-013.02 slice that implements it
-- [ ] #5 markdownlint passes and no key, bottle path or CLAUDE.local.md infra appears
+- [x] #1 Every 1.2 rule M-01 to M-13 is classified unchanged, changed or removed, with a 2.1 virtual address
+- [x] #2 Every feature listed in this description has its constants, draw order and text documented with a virtual address
+- [x] #3 Open questions are either answered with evidence or listed as unresolved with the reason
+- [x] #4 Each new or changed rule has an N-xx ID and a mapping to the TASK-013.02 slice that implements it
+- [x] #5 markdownlint passes and no key, bottle path or CLAUDE.local.md infra appears
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -49,5 +49,9 @@ With the decompiled dump from TASK-013.01.03, replace the "unverified" table in 
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
-Progress: rewrote docs/beermat-2.1-re.md in beermat-re.md style, replacing the resource-only table with process-dump findings at 2.1 VAs. Confirmed Random (0x00402b7c) and Randomize (0x00402958, wall-clock). Drug table decoded from 0x004b7fe0 via FUN_004bbc04: 13 drugs, price = min + Random(spread+1); MDA replaces Smack, Mushrooms replaces Shrooms, Special K new. Crash flags = byte at record +0x18 (11=crash, 10=spike): Acid, Hashish, Ecstasy, Crack, Weed crash with messages; Peyote and Mushrooms crash silently (only 5 crash strings exist). Spike drugs: Cocaine, Heroin, Opium, Speed, MDA, Special K. Travel loop 0x004bc9d4, price gen 0x004bbfc4, interest 0x004bfbe0, chase 0x004a528c/0x004a5308/0x004a5860/0x004a5748, loans 0x004bcfe8, store 0x004b0288, hospital 0x004b3198 (300/health point), dialysis 0x004befd8 (100000), Old Lady 0x004beae0, AddHighScore 0x004c3230 (score list 30, pages 15/30/60/90). Resolved open question: shipped build uses 6 joke weapons (Handbag, Pea Shooter, Water Pistol, Monkey, Catapult, Rubber Chicken Launcher) via FUN_004bbd34; real weapons are form placeholders only. Assigned N-01..N-20 mapped to TASK-013.02 slices. markdownlint passes. Open: loan shark rate/duration/amount and jail-release order not yet decoded from builder; arrival-event split not yet separated; bank interest constant in BSS (changelog implies 3%).
+Reread docs/beermat-2.1-re.md against decompiled_k and corrected it section by section. Corrections to the first pass: Randomize runs at startup and new game only; coat capacity starts at 100; 0x004e20f8 is kidneys and 0x004e20dc is health; drug records are 860 bytes; crash drugs are Acid, Hashish, Ecstasy, Crack, Weed (Peyote and Mushrooms are unflagged); 0x004bfbe0 is the status refresh, bank interest is 0x004c0358 at 5% per day, loan interest is 0x004c0420; Stay is an arrest check with no draw; the chase win reward is cash; 0x004bf420 is a mugging that costs health, not a doctor; the hospital price is (Random(9)+1)*50, the $300 is a form caption.
+
+Open questions: (1) loan sharks answered: rates 15/10/20/30/25 percent per day, durations 10/15/7/1/5 days, amounts 10/20/30/50/100 times cash plus bank, bruisers 1/1/2/3/4, jail release is Random(7) < 3 per day then a uniform pick among sharks still in jail (0x004be728); (2) spike messages answered, Random(2) per spike drug, Special K has its own text; (3) bank interest answered, 5%; (4) arrival split answered, coat dealer 1 in 15 gated on capacity, event gate 1 in 13, dialysis 1 in 3, Old Lady 1 in 5, shark release 3 in 7.
+
+Unresolved and listed in the doc with reasons: fight scare count, nasty doctor outcomes 3 and 4 and the kidney removal text, tip text joining words, weapon field +0x10, Old Lady phrase file contents. Nothing in this pass was confirmed on a running game; the bottle and Binary Ninja were not used. The 2.1 bank rounding (ties round up) is derived from the x87 code and needs a live check before TASK-013.02.04 relies on it. Subtask mapping: N-28 and N-29 (arrival event table) and N-19 and N-20 (score) have no dedicated TASK-013.02 slice and are mapped to the closest one.
 <!-- SECTION:NOTES:END -->
