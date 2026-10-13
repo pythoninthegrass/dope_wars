@@ -42,8 +42,10 @@ comptime GUN_MAX_PRICE = 550
 # Cosmetic gun names (Baretta, .38 Special, Ruger, Saturday Night Special); the core only picks the index.
 comptime GUN_NAME_COUNT = 4
 
-# One combined dealer visit per non-chase arrival happens on Random(DEALER_ODDS) == 0.
-comptime DEALER_ODDS = 14
+# One dealer visit per non-chase arrival happens on Random(DEALER_ODDS) == 0 (2.1, N-28).
+comptime DEALER_ODDS = 15
+# The coat dealer offers only while the coat is below day + COAT_DAY_OFFSET (2.1, N-28).
+comptime COAT_DAY_OFFSET = 150
 
 comptime NUM_LOCATIONS = 6
 comptime NUM_DRUGS = 12

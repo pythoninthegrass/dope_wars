@@ -30,13 +30,18 @@ def test_pending_n33_bank_interest_ties_round_up() raises:
     assert_equal(interest.bank_after_interest(70), 74)
 
 
-# N-22: a chase starts on Random(8) == 0, not Random(6) == 0.
+# N-22: a chase starts on Random(8) == 0, not Random(6) == 0, and not on the
+# last two days.
 def test_pending_n22_chase_starts_one_in_eight() raises:
     var game = world.new_game(UInt32(1), 0, -1)
     game.rng.set_script([rnd(0, 8)])
     assert_true(combat.should_start_chase(game))
     game.rng.set_script([0.15])
     assert_true(not combat.should_start_chase(game))
+    # A hit on the last two days still starts no chase (day >= limit - 1).
+    var late = world.new_game(UInt32(1), 2, -1)
+    late.rng.set_script([rnd(0, 8)])
+    assert_true(not combat.should_start_chase(late))
 
 
 # N-23: deputies are Random(7) + 2, so 2 to 8.
@@ -57,12 +62,21 @@ def test_pending_n24_run_escapes_two_in_ten() raises:
     assert_true(not combat.run_from_chase(game).escaped)
 
 
-# N-28: the coat dealer is one draw, Random(15) == 0, with no gun-dealer split.
+# N-28: the coat dealer is one draw, Random(15) == 0, with no gun-dealer split,
+# and only while the coat is below day + 150.
 def test_pending_n28_coat_dealer_one_in_fifteen() raises:
     var game = world.new_game(UInt32(1), 0, -1)
     game.rng.set_script([rnd(0, 15)])
     assert_equal(dealers.roll_dealer_visit(game), dealers.DEALER_COAT)
     game.rng.set_script([0.07])
+    assert_equal(dealers.roll_dealer_visit(game), dealers.DEALER_NONE)
+    # The coat offers while capacity is below day + 150.
+    game.rng.set_script([rnd(0, 15)])
+    game.coat_capacity = game.day
+    assert_equal(dealers.roll_dealer_visit(game), dealers.DEALER_COAT)
+    # At day + 150 the coat is full for the day, so no visit.
+    game.rng.set_script([rnd(0, 15)])
+    game.coat_capacity = game.day + 150
     assert_equal(dealers.roll_dealer_visit(game), dealers.DEALER_NONE)
 
 
@@ -103,10 +117,8 @@ def test_pending_n34_thirteen_drug_roster() raises:
 
 def main() raises:
     var suite = TestSuite.discover_tests[__functions_in_module()]()
-    suite.skip[test_pending_n22_chase_starts_one_in_eight]()
     suite.skip[test_pending_n23_deputies_range_two_to_eight]()
     suite.skip[test_pending_n24_run_escapes_two_in_ten]()
-    suite.skip[test_pending_n28_coat_dealer_one_in_fifteen]()
     suite.skip[test_pending_wealth_cap_removed]()
     suite.skip[test_pending_n21_mugging_costs_health]()
     suite.skip[test_pending_n19_high_score_list_holds_thirty]()

@@ -1,8 +1,10 @@
-# core/src/dealers.mojo — the coat and gun dealers.
+# core/src/dealers.mojo — the coat dealer and the gun offer.
 #
-# One combined visit chance per non-chase arrival, then an even coat/gun split.
-# Both dealers are paid from cash only, and only when the rolled price is
-# strictly below cash. See docs/beermat-re.md, "Arrival events and dealers".
+# One visit chance per non-chase arrival (2.1: a single Random(15), N-28), and
+# only the coat dealer shows -- the gun dealer is gone and the Super Store
+# replaces it. The coat offer and the standalone gun offer are paid from cash
+# only, and only when the rolled price is strictly below cash. See
+# docs/beermat-2.1-re.md, "Arrival events and dealers".
 
 import result
 import rules
@@ -43,13 +45,13 @@ struct PurchaseResult(Copyable, Movable):
         self.pockets = pockets
 
 
-# Random(14) == 0 is a visit; Random(4) of 0 or 2 is the coat dealer, 1 or 3 the gun dealer.
+# Random(15) == 0 is a visit, and only the coat dealer shows while capacity is below day + 150 (2.1, N-28).
 def roll_dealer_visit(mut game: world.World) raises -> Int:
     if rng_mod.rand_int(game.rng, 0, rules.DEALER_ODDS - 1) != 0:
         return DEALER_NONE
-    if rng_mod.rand_int(game.rng, 0, 3) % 2 == 0:
-        return DEALER_COAT
-    return DEALER_GUN
+    if game.coat_capacity >= game.day + rules.COAT_DAY_OFFSET:
+        return DEALER_NONE
+    return DEALER_COAT
 
 
 def roll_coat_dealer_offer(mut game: world.World) raises -> CoatOffer:

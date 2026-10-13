@@ -70,6 +70,7 @@ const CASES := [
 	"tables_fit_twelve_drugs",
 	"chase_and_doctor",
 	"dealer_dialogs",
+	"travel_arrival_outcomes",
 	"sound_cues",
 	"allow_sound_toggle",
 ]
@@ -98,7 +99,8 @@ const CASE_FLOORS := {
 	"capture_states": 17,
 	"tables_fit_twelve_drugs": 4,
 	"chase_and_doctor": 12,
-	"dealer_dialogs": 30,
+	"dealer_dialogs": 14,
+	"travel_arrival_outcomes": 12,
 	"sound_cues": 7,
 	"allow_sound_toggle": 8,
 }
@@ -145,6 +147,8 @@ func _run() -> void:
 	await _test_chase_and_doctor()
 	_case("dealer_dialogs")
 	await _test_dealer_dialogs()
+	_case("travel_arrival_outcomes")
+	await _test_travel_arrival_outcomes()
 	_case("sound_cues")
 	await _test_sound_cues()
 	_case("allow_sound_toggle")
@@ -1227,52 +1231,151 @@ func _test_chase_and_doctor() -> void:
 # searching for a seed whose first travel rolls that dealer; the searching asserts
 # nothing, so the assertion count does not depend on which seed is found.
 func _test_dealer_dialogs() -> void:
-	for is_gun in [false, true]:
-		var kind := "gun" if is_gun else "coat"
-		for buy in [true, false]:
-			var found: Dictionary = await _open_dealer(is_gun)
-			_assert(not found.is_empty(), "some seed should reach a %s dealer" % kind)
-			if found.is_empty():
-				continue
-			var world: SimWorld = found["world"]
-			var dialog: DealerDialog = found["dialog"]
-			var price := dialog.price()
-			var before := world.state_get()
-			var text := _copy_text(dialog)
-			_assert(price < int(before["cash"]), "the %s dealer should only offer what cash covers, %d of %d" % [kind, price, int(before["cash"])])
-			_assert(text.contains("$%d" % price), "the %s offer should name its price, got '%s'" % [kind, text])
-			if is_gun:
-				_assert(text.contains(tr(Copy.GUN_NAME_KEYS[dialog.name_index()])), "the gun offer should name the gun, got '%s'" % text)
-			else:
-				_assert(text.contains("trenchcoat"), "the coat offer should mention the trenchcoat, got '%s'" % text)
+	# 2.1 has only the coat dealer on arrival (N-28); the gun dealer is gone and
+	# the Super Store replaces it. The coat offer names its price and the
+	# trenchcoat, buys for its price and grants pockets, and declines unchanged.
+	for buy in [true, false]:
+		var found: Dictionary = await _open_dealer()
+		_assert(not found.is_empty(), "some seed should reach the coat dealer")
+		if found.is_empty():
+			continue
+		var world: SimWorld = found["world"]
+		var dialog: DealerDialog = found["dialog"]
+		var price := dialog.price()
+		var before := world.state_get()
+		var text := _copy_text(dialog)
+		_assert(price < int(before["cash"]), "the coat dealer should only offer what cash covers, %d of %d" % [price, int(before["cash"])])
+		_assert(text.contains("$%d" % price), "the coat offer should name its price, got '%s'" % text)
+		_assert(text.contains("trenchcoat"), "the coat offer should mention the trenchcoat, got '%s'" % text)
 
-			if buy:
-				(_find_named(dialog, "dealerBuy") as Button).pressed.emit()
-			elif is_gun:
-				(_find_named(dialog, "dealerDecline") as Button).pressed.emit()
-			else:
-				dialog.cancel()
+		if buy:
+			(_find_named(dialog, "dealerBuy") as Button).pressed.emit()
+		else:
+			dialog.cancel()
+		await _idle()
+		# An arrival event may roll after the dealer and take cash, so cash is only bounded then.
+		var event_open := _main.dialogs().current() is AlertDialog
+		var after := world.state_get()
+		var expected_cash := int(before["cash"]) - (price if buy else 0)
+		_assert(
+			int(after["cash"]) <= expected_cash if event_open else int(after["cash"]) == expected_cash,
+			"coat %s should leave cash at %d, got %d" % ["buy" if buy else "decline", expected_cash, int(after["cash"])]
+		)
+		if buy:
+			var pockets := int(after["coat_capacity"]) - int(before["coat_capacity"])
+			_assert(pockets >= 11 and pockets <= 20, "buying the coat should grant 11-20 pockets, got %d" % pockets)
+		else:
+			_assert(int(after["coat_capacity"]) == int(before["coat_capacity"]), "declining the coat should not change the capacity")
+		await _drain()
+		_assert(not _main.dialogs().is_open(), "answering the coat dealer should let the arrival finish")
+
+
+## A travel reaches each 2.1 arrival outcome: a chase, a coat dealer offer, or neither.
+func _test_travel_arrival_outcomes() -> void:
+	# A chase: the first travel starts one, and nothing else runs. Arm a gun so
+	# the chase can be fought to a win, which is how it drains.
+	var chase_world: SimWorld = null
+	var chase_day := 0
+	for seed_value in range(1, 400):
+		_main.dialogs().close()
+		var world := _fresh(seed_value)
+		world.accept_gun_offer(0, 0)
+		chase_day = int(world.state_get()["day"])
+		_main.hud().borough_pressed(1)
+		await _idle()
+		var guard := 0
+		while _main.dialogs().is_open() and guard < 20:
+			guard += 1
+			if _main.dialogs().current() is ChaseDialog:
+				chase_world = world
+				break
+			_main.dialogs().confirm()
 			await _idle()
-			# An arrival event may roll after the dealer and take cash, so cash is only bounded then.
-			var event_open := _main.dialogs().current() is AlertDialog
-			var after := world.state_get()
-			var expected_cash := int(before["cash"]) - (price if buy else 0)
-			_assert(
-				int(after["cash"]) <= expected_cash if event_open else int(after["cash"]) == expected_cash,
-				"%s %s should leave cash at %d, got %d" % [kind, "buy" if buy else "decline", expected_cash, int(after["cash"])]
-			)
-			if is_gun:
-				var guns_gained := int(after["guns"]) - int(before["guns"])
-				_assert(guns_gained == (1 if buy else 0), "gun %s should change guns by %d, got %d" % ["buy" if buy else "decline", 1 if buy else 0, guns_gained])
-				_assert(int(after["coat_capacity"]) == int(before["coat_capacity"]), "a gun takes no coat space and adds none")
-			else:
-				var pockets := int(after["coat_capacity"]) - int(before["coat_capacity"])
-				_assert(
-					pockets >= 11 and pockets <= 20 if buy else pockets == 0,
-					"coat %s should change the capacity by %s, got %d" % ["buy" if buy else "decline", "11-20" if buy else "0", pockets]
-				)
-			await _drain()
-			_assert(not _main.dialogs().is_open(), "answering the %s dealer should let the arrival finish" % kind)
+		if chase_world != null:
+			break
+	for _step in range(200):
+		if not _main.dialogs().is_open():
+			break
+		var current := _main.dialogs().current()
+		if current is ChaseDialog:
+			(_find_named(current, "chaseFight") as Button).pressed.emit()
+		elif current is AlertDialog or current is DoctorDialog:
+			_main.dialogs().confirm()
+		else:
+			break
+		await _idle()
+	_assert(chase_world != null, "some seed should start a chase on the first travel")
+	if chase_world == null:
+		return
+	_assert(not _main.dialogs().is_open(), "a chase should drain with no dialog left open")
+	_assert(not _main.arrival().is_active(), "a chase should leave the arrival flow finished")
+	_assert(
+		int(chase_world.state_get()["day"]) == chase_day + 1,
+		"the chase travel should still advance the day, got %d" % int(chase_world.state_get()["day"])
+	)
+
+	# A coat dealer offer: the first travel rolls the coat dealer, and the offer
+	# names a price the cash covers and the trenchcoat.
+	var coat_found := false
+	for seed_value in range(1000, 1400):
+		_main.dialogs().close()
+		var world := _fresh(seed_value)
+		_main.hud().borough_pressed(1)
+		await _idle()
+		var guard := 0
+		while _main.dialogs().is_open() and guard < 20:
+			guard += 1
+			var current := _main.dialogs().current()
+			if current is DealerDialog:
+				coat_found = true
+				var text := _copy_text(current)
+				var price := (current as DealerDialog).price()
+				var before := world.state_get()
+				_assert(price < int(before["cash"]), "the coat offer should name a price cash covers, %d of %d" % [price, int(before["cash"])])
+				_assert(text.contains("$%d" % price), "the coat offer should name its price, got '%s'" % text)
+				_assert(text.contains("trenchcoat"), "the coat offer should mention the trenchcoat, got '%s'" % text)
+				break
+			if current is ChaseDialog:
+				break
+			_main.dialogs().confirm()
+			await _idle()
+		if coat_found:
+			break
+	_assert(coat_found, "some seed should roll the coat dealer on the first travel")
+	if not coat_found:
+		return
+	await _drain()
+	_assert(not _main.dialogs().is_open(), "answering the coat offer should let the arrival finish")
+
+	# Neither: a travel that starts no chase and rolls no coat dealer still lands
+	# on the new day with no dialog left open.
+	var none_found := false
+	var none_world: SimWorld = null
+	var none_day_before := 0
+	for seed_value in range(2000, 2400):
+		_main.dialogs().close()
+		var world := _fresh(seed_value)
+		var day_before := int(world.state_get()["day"])
+		_main.hud().borough_pressed(1)
+		await _idle()
+		var guard := 0
+		while _main.dialogs().is_open() and guard < 20:
+			guard += 1
+			var current := _main.dialogs().current()
+			if current is ChaseDialog or current is DealerDialog:
+				break
+			_main.dialogs().confirm()
+			await _idle()
+		if not _main.dialogs().is_open():
+			none_found = true
+			none_world = world
+			none_day_before = day_before
+			break
+	_assert(none_found, "some seed should roll no chase and no coat dealer on the first travel")
+	if not none_found:
+		return
+	_assert(not _main.arrival().is_active(), "a neither travel should leave the arrival flow finished")
+	_assert(int(none_world.state_get()["day"]) == none_day_before + 1, "a neither travel should still advance the day")
 
 
 ## TASK-010.03. docs/beermat-re.md's "Sounds" table, asserted through an
@@ -1474,7 +1577,7 @@ func _test_allow_sound_toggle() -> void:
 ## wanted kind is on screen, returning {world, dialog}; an empty dictionary when
 ## no seed in range reaches one. Seeds are never reused across calls, so each
 ## case gets a different game.
-func _open_dealer(is_gun: bool) -> Dictionary:
+func _open_dealer() -> Dictionary:
 	while _next_dealer_seed < 2000:
 		var seed_value := _next_dealer_seed
 		_next_dealer_seed += 1
@@ -1489,9 +1592,7 @@ func _open_dealer(is_gun: bool) -> Dictionary:
 			if current is ChaseDialog:
 				break
 			if current is DealerDialog:
-				if _copy_text(current).contains("trenchcoat") != is_gun:
-					return {"world": world, "dialog": current}
-				break
+				return {"world": world, "dialog": current}
 			current.confirm()
 			await _idle()
 	return {}

@@ -597,9 +597,10 @@ dw_result dw_finances(dw_world *world, dw_finances_action action, int64_t amount
  * the arrival sequence), because Beermat rolls prices after the event. */
 dw_result dw_roll_arrival_event(dw_world *world, dw_arrival_event *out_event);
 
-/* Roll whether a dealer visits on this non-chase arrival: Random(14) == 0,
- * then Random(4) picks the coat dealer (0, 2) or the gun dealer (1, 3).
- * Draws one value on a miss and two on a visit. Not called by dw_travel;
+/* Roll whether a dealer visits on this non-chase arrival: 2.1's Random(15) == 0
+ * (docs/beermat-2.1-re.md, N-28), and only the coat dealer shows -- the gun
+ * dealer is gone (the Super Store replaces it). The coat offers only while the
+ * coat capacity is below day + 150. Draws one value. Not called by dw_travel;
  * the caller decides arrival sequencing, since no dealer shows up when
  * dw_should_start_chase fired first. */
 dw_result dw_roll_dealer_visit(dw_world *world, dw_dealer_kind *out_kind);
@@ -626,8 +627,9 @@ dw_result dw_accept_gun_offer(dw_world *world, const dw_gun_offer *offer);
 /* Chase / combat                                                          */
 /* ---------------------------------------------------------------------- */
 
-/* Roll whether a cop chase starts on arrival at the new location, per
- * `index.html:971-975`. */
+/* Roll whether a cop chase starts on arrival, per `docs/beermat-2.1-re.md`
+ * (N-22): Random(8) == 0 (1 in 8), but not on the last two days (day >= limit -
+ * 1). Draws one value. */
 dw_result dw_should_start_chase(dw_world *world, uint8_t *out_should_start);
 
 /* Populate *out_chase for a chase that dw_should_start_chase just
