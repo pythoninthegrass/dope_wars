@@ -222,7 +222,7 @@ Before the day advances, every loan with days left of 0 or below opens the shark
 | 3 | `DWSharkSecondWarning` | same, "`<shark>` says that you had better pay your loan, like you agreed, or it could spell trouble for you." |
 | 4 and up | beating | Pay Now and Pay Later are disabled |
 
-At level 4 and up the dialog applies the beating in `FormShow`: damage `Random(16) + 15` (15-30), capped at the player's health, subtracted from health. The text is picked by `Random(3) + 1`, or message 1 with no draw when the damage equals the remaining health: 1 "As a little lesson, `<shark>` and `<HIS|HER>` boys tossed you through the nearest window." (`DWSharkWindow`), 2 "To serve as a reminder, `<shark>` and `<HIS|HER>` boys threw you down a flight of stairs." (`DWSharkStairs`), 3 "Your memory seems to be lacking. To help you remember, `<shark>` and `<HIS|HER>` boys introduce you to their favourite chainsaw." (`DWSharkChainSaw`). The pronoun follows the shark's sex. Paying now needs cash of at least the balance ("You do not have enough cash to pay off this loan!" otherwise). Paying removes the balance from cash and debt and removes the loan; refusing leaves it, and if health is 0 after the visit the game ends with `EndGame(3, shark)`.
+At level 4 and up the dialog applies the beating in `FormShow`: damage `Random(16) + 15` (15-30), capped at the player's health, subtracted from health. The text is picked by `Random(3) + 1`, or message 1 with no draw when the damage equals the remaining health: 1 "As a little lesson, `<shark>` and `<HIS|HER>` boys tossed you through the nearest window." (`DWSharkWindow`), 2 "To serve as a reminder, `<shark>` and `<HIS|HER>` boys threw you down a flight of stairs." (`DWSharkStairs`), 3 "Your memory seems to be lacking. To help you remember, `<shark>` and `<HIS|HER>` boys introduce you to their favourite chainsaw." (`DWSharkChainsaw`). The pronoun follows the shark's sex. Paying now needs cash of at least the balance ("You do not have enough cash to pay off this loan!" otherwise). Paying removes the balance from cash and debt and removes the loan; refusing leaves it, and if health is 0 after the visit the game ends with `EndGame(3, shark)`.
 
 ### Jail release order
 
@@ -329,9 +329,68 @@ Debt interest is per loan (see "Loan sharks"): `0x004c0420` compounds each loan 
 | Bank interest | `0x004c0358` | 5% per day, `Round(bank * 0.05)`, only above 0 | 5%, `bank * 1.05` ties-to-even | changed, N-33 |
 | Debt interest | `0x004c0420` | per loan, daily compounding at the shark's rate | 10% on one debt | changed, N-06 |
 
+## Statistics counters
+
+`0x004b25a4` (`StatsForm_FormShow`) fills the "Dope Wars 2.1 Statistics" window from counters kept in the game state. The captions come from `forms/StatsForm.dfm`; the counters whose increment site was traced are listed with it, the rest are unresolved.
+
+| Counter | Increment site |
+| --- | --- |
+| Chases | `0x004bd758`, `+1` per chase (`DAT_004e1eb0`) |
+| Cops faced | `0x004bd758` writes `DAT_004e1ebc` from the deputy draw (the exact formula was not traced) |
+| Possession arrests | `0x004a5308`, `+1` on a drugs or weapons arrest (stats block `+4`) |
+| Assault arrests | `0x004a5308`, `+1` on an arrest after a fight (stats block `+8`) |
+| Cops scared | per-weapon hit counter, `0x004a5860` (+0x28 of the weapon record), shown with the per-weapon "hits/uses" and a hit percentage |
+| Weapon uses | `0x004a5860`, `+1` per Fight (+0x24 of the weapon record) |
+| Loans | `0x0047e558`, `+1` per borrow (stats block `+0x14`) |
+| Total borrowed | `0x0047e558`, `+= amount` (stats block `+0x18`), plus the 5500 starter loan in `DAT_004e1ec8` |
+| Total repaid, total interest, total owed | not traced (unresolved, cosmetic) |
+
 ## Sounds
 
-The 2.1 sound table is not in the exe as 1.2's records are. The image holds only the `DW*` event names, and the wav paths live in the registry entries the installer writes, which the Wise script lists. The extractor joins `appevents.tsv` (event to wav and label, from the Wise script) with the event names in the dump, matching case-insensitively. The six `DW<Weapon>Hit` events have no string of their own, because the game builds them at run time from the weapon event name and the three-character suffix. All 38 events resolve to handlers.
+The 2.1 sound table is not in the exe as 1.2's records are. The image holds only the `DW*` event names, and the wav paths live in the registry entries the installer writes, which the Wise script lists. The extractor joins `appevents.tsv` (event to wav and label, from the Wise script) with the event names in the dump, matching case-insensitively. The six `DW<Weapon>Hit` events have no string of their own, because the game builds them at run time from the weapon event name and the three-character suffix. All 38 events resolve to the handlers below (from `sound_handlers.tsv`):
+
+| Event | Wav | Handler |
+| --- | --- | --- |
+| `DWBlanks` | `blank.wav` | `0x004a4a80` TCopChaseDlg_PlayWeaponSound |
+| `DWGoodEvent` | `Charge.wav` | `0x004bf134` FUN_004bf134, `0x004bf680` FUN_004bf680 |
+| `DWDump` | `dump.wav` | `0x004a5748` TCopChaseDlg_SkinDumpBtnClick, `0x004c3bf8` TDWForm_SkinDumpBtnClick |
+| `DWRegistered` | `cheer.wav` | `0x004c3754` FUN_004c3754 |
+| `DWAirport` | `airport.wav` | `0x004c3a60` TDWForm_AirportBtnClick |
+| `DWLastDay` | `lastday.wav` | `0x004bce80` TDWForm_SetLastDay |
+| `DWDead` | `dead.wav` | `0x004bdc34` TDWForm_EndGame |
+| `DWMugged` | `mugged.wav` | `0x004bf420` FUN_004bf420 |
+| `DWCashReg` | `cashreg.wav` | `0x0047ba64` TBuyDlg_OKBtnClick |
+| `DWPoliceDog` | `policedog.wav` | `0x004bf8b4` FUN_004bf8b4 |
+| `DWCopChase` | `copchase.wav` | `0x004a3c34` TCopChaseDlg_FormShow |
+| `DWYouHitByGun` | `youhit.wav` | `0x004a3f30` TCopChaseDlg_PlayNextEvent |
+| `DWCopGunShot` | `copmiss.wav` | `0x004a3f30` TCopChaseDlg_PlayNextEvent |
+| `DWHeadlines` | `headlines.wav` | `0x004bc708` TDWForm_DisplayNews |
+| `DWHospital` | `hospital.wav` | `0x004c402c` TDWForm_SkinHospitalBtnClick |
+| `DWJail` | `jaildoor.wav` | `0x004a5308` TCopChaseDlg_SkinStayBtnClick |
+| `DWStore` | `store.wav` | `0x004c3b18` TDWForm_SkinStoreBtnClick |
+| `DWLeaveStore` | `thankyou.wav` | `0x004b05b4` TStoreDlg_SkinOKBtnClick |
+| `DWEscape` | `whew.wav` | `0x004a3f30` TCopChaseDlg_PlayNextEvent |
+| `DWSharkChainsaw` | `chainsaw.wav` | `0x0047c3a4` TLoanSharkDlg_FormShow |
+| `DWSharkFirstWarning` | `firstwarn.wav` | `0x004bcfe8` TDWForm_ProcessLoanSharks |
+| `DWSharkSecondWarning` | `secwarn.wav` | `0x004bcfe8` TDWForm_ProcessLoanSharks |
+| `DWSharkStairs` | `stairs.wav` | `0x0047c3a4` TLoanSharkDlg_FormShow |
+| `DWSharkWantMoney` | `money.wav` | `0x0047e85c` TFinanceDlg_SkinRepayBtnClick, `0x004bcfe8` TDWForm_ProcessLoanSharks |
+| `DWBorrow` | `borrow.wav` | `0x0047e558` TFinanceDlg_SkinBorrowBtnClick |
+| `DWHandBag` | `handbag.wav` | `0x004a4a80` TCopChaseDlg_PlayWeaponSound |
+| `DWHandBagHit` | `handbaghit.wav` | `0x004a4a80` TCopChaseDlg_PlayWeaponSound |
+| `DWMonkey` | `monkey.wav` | `0x004a4a80` TCopChaseDlg_PlayWeaponSound |
+| `DWMonkeyHit` | `monkeyhit.wav` | `0x004a4a80` TCopChaseDlg_PlayWeaponSound |
+| `DWPeaShooter` | `peashoot.wav` | `0x004a4a80` TCopChaseDlg_PlayWeaponSound |
+| `DWPeaShooterHit` | `peashoothit.wav` | `0x004a4a80` TCopChaseDlg_PlayWeaponSound |
+| `DWWaterPistol` | `pistol.wav` | `0x004a4a80` TCopChaseDlg_PlayWeaponSound |
+| `DWWaterPistolHit` | `pistolhit.wav` | `0x004a4a80` TCopChaseDlg_PlayWeaponSound |
+| `DWCatapult` | `catapult.wav` | `0x004a4a80` TCopChaseDlg_PlayWeaponSound |
+| `DWCatapultHit` | `catapulthit.wav` | `0x004a4a80` TCopChaseDlg_PlayWeaponSound |
+| `DWRubberChicken` | `chicken.wav` | `0x004a4a80` TCopChaseDlg_PlayWeaponSound |
+| `DWRubberChickenHit` | `chickenhit.wav` | `0x004a4a80` TCopChaseDlg_PlayWeaponSound |
+| `DWSharkWindow` | `window.wav` | `0x0047c3a4` TLoanSharkDlg_FormShow |
+
+New in 2.1 relative to 1.2's ten events: the loan shark events (`DWBorrow`, `DWSharkWantMoney`, `DWSharkFirstWarning`, `DWSharkSecondWarning`, `DWSharkWindow`, `DWSharkStairs`, `DWSharkChainsaw`), the store and hospital events, `DWJail`, `DWDump`, `DWEscape`, `DWBlanks`, `DWGoodEvent`, `DWHeadlines`, `DWAirport`, `DWRegistered` and the six weapon pairs. Slice TASK-013.02.17 carries them. The sound player's `AllowSound` gate is not re-read in this pass.
 
 ## Unpack approach
 
