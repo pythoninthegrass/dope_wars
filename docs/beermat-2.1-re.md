@@ -44,9 +44,9 @@ Classifications compare each rule with the engine (`index.html`, `<script id="en
 
 ## Drug table and price generation
 
-`0x004b7fe0` builds the game's tables at new game. It calls `FUN_004bbc04` 13 times (drug indices 0-12), `FUN_004bbe4c` 5 times (loan-shark names), and `FUN_004bbd34` 6 times (joke weapons). Each drug record is 0xd7 (215) bytes at `DAT_004de45c + index*0xd7`; the fields the price code reads are the name pointer at +0, the plural name at +4, the singular name at +8, the min price at +0xc, and the spread at +0x10. The price is `min + Random(spread + 1)`, re-rolled for all 13 drugs on every arrival and at new game.
+`0x004b7fe0` builds the game's tables at new game. It calls `FUN_004bbc04` 13 times (drug indices 0-12), `FUN_004bbe4c` 5 times (loan sharks) and `FUN_004bbd34` 6 times (joke weapons). Each drug record is 0xd7 (215) bytes at `DAT_004de45c + index*0xd7`. `FUN_004bbc04(Self, index, name, crashMark, spikeMark, spread, min, ...)` stores the name at +0, the plural at +4, the singular at +8, min at +0xc, spread at +0x10, the price at +0x14, the availability byte at +0x28, the spike mark at +0x20 and the crash mark at +0x24. The per-day price history is at +0x28 + day*4 and the per-day event flag (0 none, 1 spike, 2 crash) at +0x1f0 + day*4.
 
-The record builder `FUN_004bbc04` is called as `FUN_004bbc04(Self, index, namePtr, fieldA, fieldB, maxPtr, minPtr, singular, plural)`. Mapping the arguments for each drug gives min and spread:
+A drug is a spike drug when its spike mark is 10 and a crash drug when its crash mark is 30; 11 means "not flagged". The marks come straight from the builder calls at `0x004b7fe0`:
 
 | Index | Drug | min | spread | max | Crash (div 10) | Spike (x5) | Notes |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -55,16 +55,32 @@ The record builder `FUN_004bbc04` is called as `FUN_004bbc04(Self, index, namePt
 | 2 | Hashish | 450 | 900 | 1350 | yes | no | matches 1.2 |
 | 3 | Heroin | 5000 | 9000 | 14000 | no | yes | matches 1.2 |
 | 4 | Ecstasy | 10 | 50 | 60 | yes | no | matches 1.2 |
-| 5 | MDA | 1500 | 3000 | 4500 | no | yes | replaces Smack; same range |
+| 5 | MDA | 1500 | 3000 | 4500 | no | yes | replaces Smack; same range; gained the spike flag |
 | 6 | Opium | 500 | 800 | 1300 | no | yes | matches 1.2 |
-| 7 | Crack | 1000 | 2500 | 3500 | yes | no | gained crash flag in 2.1 |
-| 8 | Peyote | 200 | 500 | 700 | yes | no | gained crash flag in 2.1 |
-| 9 | Mushrooms | 600 | 750 | 1350 | yes | no | replaces Shrooms; same max; gained crash flag in 2.1 |
+| 7 | Crack | 1000 | 2500 | 3500 | yes | no | gained the crash flag |
+| 8 | Peyote | 200 | 500 | 700 | no | no | unflagged, as in 1.2 |
+| 9 | Mushrooms | 600 | 750 | 1350 | no | no | replaces Shrooms; unflagged |
 | 10 | Speed | 70 | 180 | 250 | no | yes | matches 1.2 |
 | 11 | Weed | 300 | 600 | 900 | yes | no | matches 1.2 |
 | 12 | Special K | 450 | 1000 | 1450 | no | yes | new in 2.1 |
 
-The crash flag is the byte at record offset +0x18 (the `param_4` argument to the builder): `2000` means crash, `11` means spike. The crash messages, indexed by the drug-record position at `0x004b7fe0` (acid 0, hashish 2, ecstasy 4, crack 7, weed 11); the other drugs have no crash flag. Peyote (8) and Mushrooms (9) are crash-flagged but have no crash message, so they crash silently:
+Names are the strings at `0x004b88f0`-`0x004b8c30`. The five crash drugs are Acid, Hashish, Ecstasy, Crack and Weed; the six spike drugs are Cocaine, Heroin, MDA, Opium, Speed and Special K.
+
+### Price roll (`0x004bbfc4`)
+
+It runs after the day advance, interest and the arrival events (see "Travel"), so the events read the previous day's prices and availability exactly as in 1.2. Draw order:
+
+1. `Random(9) + 1` is stored in `DAT_004e2118` (the hospital multiplier, see "Hospital").
+2. For each of the 13 drugs in index order:
+   1. Price. On day 1 the price is a fresh roll `min + Random(spread + 1)`. On later days `Random(5) == 0` (1 in 5) keeps yesterday's price when yesterday's event flag for the drug is 0; any other result, or a flagged yesterday, rolls fresh. The 1.2 model rolled fresh every arrival; this is the "flatter" pricing in the 2.0 changelog.
+   2. Availability. `Random(8) == 0` (1 in 8, as in 1.2) clears the available byte and the day's event flag, unless the drug is the current tip drug (`DAT_004e2130`), which stays available. Otherwise the drug is available and the flag is 0.
+   3. Spike drugs. `Random(40) == 0` (1 in 40; 1.2 was 1 in 20) spikes the drug only if it is available and yesterday's event flag is 0. A tip drug spikes without needing the roll to hit. The price is multiplied by 5 and the flag becomes 1. A hit on Special K shows the fixed news item below and draws nothing more. Any other spike draws `Random(2)`: 0, or the drug being the tip drug, gives the "bust" text, and 1 gives the "Addicts" text. The tip is cleared (`DAT_004e2130 = 1000`) afterwards.
+   4. Crash drugs. `Random(40) == 0` under the same availability and flag conditions divides the price by 10 (integer division), sets the flag to 2 and shows the drug's fixed text. The roll is drawn for every crash drug whether or not it can apply.
+   5. The day's price and flag are copied into the history arrays.
+
+Peyote and Mushrooms therefore never spike or crash. Spike drugs are drawn `Random(40)` once; crash drugs once; an unflagged drug draws only the price and availability rolls.
+
+Spike news, all via `TDWForm_AddNews`: "Cops made a big `<drug>` bust! Prices are outrageous!" (`0x004bc2cb`), "Addicts are buying `<drug>` at outrageous prices!" (`0x004bc317`) and, for Special K only, "Cops put the local vet out of business! The price of `<drug>` is astronomical!" (`0x004bc247`). This answers the per-drug pairing question: the pairing is not per drug. The bust/Addicts choice is `Random(2)` for every spike drug except Special K, which always shows the vet text.
 
 | Drug | Crash message |
 | --- | --- |
@@ -73,10 +89,6 @@ The crash flag is the byte at record offset +0x18 (the `param_4` argument to the
 | Ecstasy | "Rival dealers raided a pharmacy and are selling cheap ecstasy!" |
 | Crack | "Criminals have raided police stores and stolen tons of crack!" |
 | Weed | "Columbian ship dusted by Coast Guard! Weed prices have bottomed out!" |
-
-The spike messages are built at run time from two halves: a prefix (`"Cops made a big"`, `"Addicts are buying"`, `"The market has been flooded with cheap home-made"`, `"Rival dealers raided a pharmacy and are selling cheap"`) and a suffix (`"<drug> bust! Prices are outrageous!"`, `"<drug> at outrageous prices!"`). The exact per-drug pairing is not yet decoded from the builder; the crash messages are the strings at `0x004b7030`-`0x004b7204`.
-
-Names are the strings at `0x004b88f0`-`0x004b8c30`. Two drugs were renamed between 1.2 and 2.1: Smack (1500-4500) became MDA (same range, index 5) and Shrooms (600-1350) became Mushrooms (same max, index 9). Special K (index 12) is new. Crack, Peyote, Mushrooms and Weed gained crash flags in 2.1; the four spike drugs (Cocaine, Heroin, Opium, Speed) keep theirs.
 
 ## Travel, chase start and the day loop
 
