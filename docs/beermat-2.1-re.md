@@ -187,16 +187,55 @@ How many deputies a hit scares away (`0x004a3f30` case 4, from `0x004a43bf`) is 
 
 ## Loan sharks
 
-`0x004bcfe8` (`ProcessLoanSharks`) processes due loans. `0x0047d720` (`FinanceDlg_DrawOfferings`) shows the offer; `0x0047d02c` (`LoanSharkDlg_SkinPayNowBtn1Click`) and `0x0047d0cc` (`LoanSharkDlg_SkinPayLaterBtnClick`) handle repayment. The loan-shark names are built at `0x004b7fe0` via `FUN_004bbe4c`: Honest Harry, Sandy Schwing, Tank NoNeck, Bulbous Bertha, Midget Mickey. The max total debt is `0x0047d8bc` = 1,000,000.
+Loan sharks replace 1.2's single debt. The finance dialog (`0x0047d680`) lists the sharks that are released from jail and not currently owed money (`0x0047d720`, `DrawOfferings`) with the columns Name, % Rate, Duration and Amount; the note under the list reads "Note: Your maximum TOTAL debt cannot exceed 1,000,000" (`0x0047d8bc`, `K(1000000)`).
 
-Loan sharks in 2.1 replace 1.2's single compounding debt. Each shark has a rate, a duration and an amount; borrowing raises the total debt, and a loan past due triggers a visit that can send the player to jail. The loan record is built by `0x004bbe4c` (called 5 times from `0x004b7fe0`, indices 0-4). It stores the name pointer at `0x004d27f8 + i*0x20`, the amount at `0x004d260c + i*0x20`, and the duration at `0x004d2720 + i*0x10`. The borrow handler `0x0047e558` reads the selected shark's amount, adds it to debt (`DAT_004e20c8`), bank (`DAT_004e20b8`), and the loan record, then increments the loan counter. The visit handler `0x004bcfe8` (`ProcessLoanSharks`) iterates the 5 loan slots, and for each due loan shows a visit dialog (`0x0047cf44` `DrawShark`) and, on non-payment, sends the player to jail (`0x004bdc34` `EndGame` with the jail outcome). The exact per-shark rate/duration/amount values are stored in the record fields at `0x004d27f8/0x004d260c/0x004d2720` and the jail-release order is not yet decoded from the builder and needs the bottle.
+### Shark records (`0x004bbe4c`, built by `0x004b7fe0`)
+
+`FUN_004bbe4c(Self, index, name, amount, bruisers, duration, rate, sex)` stores the record at `DAT_004e1250 + index*0x20`: name +0, sex +4 (`M` or `F`), rate +8, duration +0xc, bruisers +0x10, amount +0x14, a "currently borrowed" byte +0x18 and a "released from jail" byte +0x19. `DrawOfferings` prints +8, +0xc and +0x14 under the Rate, Duration and Amount columns, so the argument mapping is read off the dialog, not inferred.
+
+| Index | Shark | Rate (% per day) | Duration (days) | Amount (multiple of cash + bank) | Bruisers | Sex |
+| --- | --- | --- | --- | --- | --- | --- |
+| 0 | Honest Harry | 15 | 10 | 10x | 1 | M |
+| 1 | Sandy Schwing | 10 | 15 | 20x | 1 | F |
+| 2 | Tank NoNeck | 20 | 7 | 30x | 2 | M |
+| 3 | Bulbous Bertha | 30 | 1 | 50x | 3 | F |
+| 4 | Midget Mickey | 25 | 5 | 100x | 4 | M |
+
+The Amount column is a multiplier: the offering text appends an `x` (`0x0047d918`). When a shark is selected (`0x0047ec50`) the borrow box is limited to `multiplier * (cash + bank)` (the two pointer cells `PTR_DAT_004d260c` and `PTR_DAT_004d25d8`, read as cash and bank from how the chase reward uses them), further capped at `1,000,000 - total debt`; with nothing left the box is disabled. Borrowing (`0x0047e558`) needs an amount above 0, adds it to cash and total debt, marks the shark borrowed, appends a loan record (shark, amount, rate, a value copied from `PTR_DAT_004d28f0`, duration) and increments the loan count. 2.2 later limits this to one loan per day (changelog); 2.1 has no such check.
+
+The starter debt is a real loan: new game (`0x004b9ac0`) writes loan 0 as shark 0 (Honest Harry), amount 5500, rate 15, that field 1, duration 10, marks Harry borrowed and released, and sets the released count and loan count to 1.
+
+### Daily interest and early payoff
+
+`0x004c0420` rebuilds `DAT_004e20c8` each day: total debt is reset to 0, then every loan is compounded, `amount = Round(amount * (rate / 100.0) + amount)` (single-precision constant `100.0` at `0x004c055c`, x87 `Round`), added to the total, and its days-left counter is decremented. Compounding is per day at the shark's percentage, so Harry's 5500 becomes 6325 after one day. The rate is not the old fixed 10%.
+
+Paying early (days left above 0, `0x0047c3a4`): the loan is projected forward by days-left compoundings, the interest remaining is the projection minus today's balance, and the payoff is `balance + Round(remaining * 30 / 100.0)`, so the player pays 30% of the remaining interest. The dialog says "Because you are paying early, `<shark>` is adding 30% of the interest remaining."
+
+### Visits (`0x004bcfe8`, `0x0047c3a4`)
+
+Before the day advances, every loan with days left of 0 or below opens the shark dialog. Warning level is `|days left| + bruisers - 1`, clamped at 0. Text and sound by level:
+
+| Level | Sound | Dialog |
+| --- | --- | --- |
+| 0 or 1 | `DWSharkWantMoney` | "Your loan is due today." / "was due yesterday" / "N days past due"; "You owe `$X` to `<shark>`. Pay now, or suffer the consequences." |
+| 2 | `DWSharkFirstWarning` | same, with the warning sound |
+| 3 | `DWSharkSecondWarning` | same, "`<shark>` says that you had better pay your loan, like you agreed, or it could spell trouble for you." |
+| 4 and up | beating | Pay Now and Pay Later are disabled |
+
+At level 4 and up the dialog applies the beating in `FormShow`: damage `Random(16) + 15` (15-30), capped at the player's health, subtracted from health. The text is picked by `Random(3) + 1`, or message 1 with no draw when the damage equals the remaining health: 1 "As a little lesson, `<shark>` and `<HIS|HER>` boys tossed you through the nearest window." (`DWSharkWindow`), 2 "To serve as a reminder, `<shark>` and `<HIS|HER>` boys threw you down a flight of stairs." (`DWSharkStairs`), 3 "Your memory seems to be lacking. To help you remember, `<shark>` and `<HIS|HER>` boys introduce you to their favourite chainsaw." (`DWSharkChainSaw`). The pronoun follows the shark's sex. Paying now needs cash of at least the balance ("You do not have enough cash to pay off this loan!" otherwise). Paying removes the balance from cash and debt and removes the loan; refusing leaves it, and if health is 0 after the visit the game ends with `EndGame(3, shark)`.
+
+### Jail release order
+
+The sharks start in jail except Harry. Each travel, `0x004be728` rolls `Random(7) < 3` while fewer than 5 sharks are released; on a hit it draws `Random(5)` repeatedly until it lands on a shark whose released byte is 0, sets it, increments `DAT_004e211c` and queues "`<shark>` was released from jail today!". That is the "released from jail in random order" line of the 2.1 changelog: a uniform random pick among the sharks still in jail, no fixed order, at 3 chances in 7 per day. Players are never jailed by sharks; the arrest in a chase (`DWJail`) is a different mechanism (see "Chase").
 
 | Rule | VA | Beermat | Engine | Class |
 | --- | --- | --- | --- | --- |
-| Single debt at 10% | 1.2 `0x0045e3d4` | replaced by loan sharks | none | changed, N-06 |
+| Single debt at 10% | 1.2 `0x0045e3d4` | replaced by up to 5 loans, daily compounding at 10-30% per shark | none | changed, N-06 |
+| Shark table | `0x004b7fe0` | rates 15/10/20/30/25, durations 10/15/7/1/5, multipliers 10/20/30/50/100x | none | new, N-06 |
 | Max debt | `0x0047d8bc` | 1,000,000 | none | new, N-07 |
-| Loan visits | `0x004bcfe8` | due loans trigger visits, jail on non-payment | none | new, N-08 |
-| Jail release order | 2.1 changelog | released in random order | none | new, N-09 |
+| Early payoff | `0x0047c3a4` | balance plus 30% of the remaining interest | none | new, N-30 |
+| Loan visits | `0x004bcfe8` | overdue loans open the dialog; level 4 and up beats the player (15-30 health) | none | new, N-08 |
+| Jail release order | `0x004be728` | `Random(7) < 3` per day, uniform among sharks still in jail | none | new, N-09 |
 
 ## Hospital
 
