@@ -11,22 +11,36 @@ Classifications compare each rule with the engine (`index.html`, `<script id="en
 ## How to read the decompile
 
 - Delphi uses the register calling convention: `EAX` is `Self`, `EDX` and `ECX` are the next two arguments, the rest go on the stack. Ghidra names these `param_1`, `param_2`, ...
-- `FUN_00402b7c` (`0x00402b7c`) is `System.Random(n)`: `seed = seed * 0x8088405 + 1; return (n * seed) >> 32`, so it returns a uniform integer in `[0, n)`. `FUN_00402958` (`0x00402958`) is `Randomize`: the seed becomes milliseconds since midnight from `GetSystemTime`. It runs at startup and again at the start of every post-travel event roll, so Beermat's randomness is wall-clock seeded and not reproducible.
-- `0x004c2c90` is `TComponent.FindComponent` / string compare helper used throughout as the field reader; in the decompile it appears as `FUN_004c2c90(param, address)` and reads the 32-bit value stored at `address`.
-- Game state lives in globals. The Pascal pointer cells in `.data` (for example `PTR_DAT_004d2608`) point at objects; their fields are at fixed offsets (for example `+0x2d0` is the cop-chase deputy count, `+0x38` is the "fighting" flag).
+- `FUN_00402b7c` (`0x00402b7c`) is `System.Random(n)`: `seed = seed * 0x8088405 + 1; return (n * seed) >> 32`, so it returns a uniform integer in `[0, n)`. `FUN_00402958` (`0x00402958`) is `Randomize`: the seed becomes milliseconds since midnight from `GetSystemTime`. It runs at startup (`0x00490508`) and at new game (`0x004b9ac0`). Unlike 1.2 it does not run before each arrival-event roll, so after new game the stream is one wall-clock-seeded LCG sequence and is not reproducible across runs.
+- Numeric rules never appear as literals. `K(n)` and `S(n)` in the decompile are the constant decoder (`FUN_004c2c90` on an obfuscated string, see `tools/re/decode_constants.py`); `K(5)` means the value 5. A game number is stored as an obfuscated string and read back through the same decoder, which is why most globals below show as `FUN_004c2c90(param_1, DAT_...)`.
+- `FUN_004c2c90(Self, value)` decodes a stored value and `FUN_004c2a88` stores one back; `FUN_004ba97c(Self, a, op, &out, b, bHigh)` is the arithmetic helper with `op` `'+'` (0x2b) or `'-'` (0x2d).
+- Game state lives in globals. The Pascal pointer cells in `.data` (for example `PTR_DAT_004d2608`) point at the form object; their fields are at fixed offsets (for example `+0x2d0` is the cop-chase timer and `+0x38` its "busy" flag).
 
 | Global | Meaning | Evidence |
 | --- | --- | --- |
 | `DAT_004d3044` | RNG seed | written by `Randomize` (`0x00402958`), consumed by `Random` (`0x00402b7c`) |
-| `DAT_004e20b8` | cash | `AddHighScore` (`0x004c3230`) reads it for the score |
-| `DAT_004e20c4` | bank | compounds daily |
-| `DAT_004e20c8` | debt | compounds daily |
-| `DAT_004e20e0` | day, 1-based | incremented in `LoseDay` (`0x004bdb8c`) |
-| `DAT_004e20e4` | coat capacity | new game sets 200 |
-| `DAT_004e20e8` | coat used (sum of drug units) | recomputed by price gen |
+| `DAT_004e20b8` | cash, new game sets 2000 | `0x004b9ac0`; `AddHighScore` (`0x004c3230`) reads it |
+| `DAT_004e20c4` | bank, new game sets 0 | compounds daily at `0x004c0358` |
+| `DAT_004e20c8` | total debt, rebuilt daily as the sum of the loan balances | `0x004c0420` |
+| `DAT_004e20dc` | health, new game sets 100; 0 ends the game | mugging `0x004bf420`, day-end `0x004bc790` |
+| `DAT_004e20e0` | day, 1-based | incremented at `0x004bc9d4`; `LoseDay` (`0x004bdb8c`) also advances it |
+| `DAT_004e20e4` | coat capacity, new game sets 100 | `0x004b9ac0`; coat dealer adds 11-20 |
+| `DAT_004e20e8` | coat used (sum of drug units) | recomputed after each buy, sell or event |
 | `DAT_004e20f0` | day limit (15/30/60/90) | new game sets it |
-| `DAT_004e20f8` | health | 0 ends the game |
-| `DAT_004de45c` | drug records, 13 x 0xd7 bytes | built by `0x004b7fe0` |
+| `DAT_004e20f8` | kidneys, new game sets 2 | day-end `0x004bc790`, dialysis roll `0x004be728` |
+| `DAT_004e2110` | days spent below 80 health (infection counter) | `0x004bc790` |
+| `DAT_004e2145` | infection warning shown | `0x004bc790` |
+| `DAT_004e2147` | owns a dialysis machine | `0x004befd8` |
+| `DAT_004e210c` | loan count | new game sets 1 |
+| `DAT_004e211c` | sharks released from jail so far, new game sets 1 | `0x004be728` |
+| `DAT_004e212c` / `DAT_004e2130` | tip drug index (1000 means none) set by the Old Lady or after an arrest, copied to `2130` on the next travel and consumed by the price roll | `0x004bc9d4`, `0x004bbfc4` |
+| `DAT_004e2118` | hospital price multiplier, `Random(9) + 1`, rolled with the prices | `0x004bbfc4`, `0x004c402c` |
+| `DAT_004e2148` | player was arrested in a chase | `0x004bd758` |
+| `DAT_004e214c` | travelling by air (new city) flag | text choice at `0x004bf420` |
+| `DAT_004e2143` | Old Lady muted | `0x004be728` |
+| `DAT_004de45c` | drug records, 13 x 0xd7 bytes | built by `0x004bbc04` from `0x004b7fe0` |
+| `DAT_004e1250` | loan shark records, 5 x 0x20 bytes | built by `0x004bbe4c` |
+| `DAT_004e11ec` | loan records, 5 x 0x14 bytes | `0x004b9ac0`, `0x004c0420` |
 
 ## Drug table and price generation
 
