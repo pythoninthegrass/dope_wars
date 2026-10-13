@@ -1,9 +1,10 @@
 ---
 id: TASK-013.01
 title: Recover Beermat 2.1's rules from a decrypted process dump
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-10-11 04:01'
+updated_date: '2026-10-13 04:30'
 labels:
   - beermat-2.1
   - reverse-engineering
@@ -24,6 +25,6 @@ Group task for the 2.1 reverse engineering. `dw21.exe` is a Wise installer; the 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Subtasks .01 to .04 are Done
-- [ ] #2 docs/beermat-2.1-re.md states, for every 1.2 rule in docs/beermat-re.md (M-01 to M-13), whether it is unchanged, changed or removed in 2.1, with 2.1 virtual addresses
+- [x] #1 Subtasks .01 to .04 are Done
+- [x] #2 docs/beermat-2.1-re.md states, for every 1.2 rule in docs/beermat-re.md (M-01 to M-13), whether it is unchanged, changed or removed in 2.1, with 2.1 virtual addresses
 <!-- AC:END -->
