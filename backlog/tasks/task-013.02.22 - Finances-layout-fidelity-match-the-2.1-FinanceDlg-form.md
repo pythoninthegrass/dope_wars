@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@Claude'
 created_date: '2026-10-14 05:18'
-updated_date: '2026-10-14 07:02'
+updated_date: '2026-10-14 07:28'
 labels:
   - beermat-2.1
 milestone: m-4
@@ -71,6 +71,10 @@ The new keys only render once `task game:import` recompiles `strings.en.translat
 `Copy.loan_days()` is now unused by the game -- the Days Left column is a bare count -- but is left in place with its own assertions rather than deleted.
 
 Follow-up at Lance's call: the Deposit All But.. hint reads "Deposit all your cash" rather than reproducing the form's own "all you cash" typo, and the code the rebuild stranded is gone -- `Copy.loan_days()` with its five `MSG_LOAN_*` keys, and `FIN_DEBT`, which the LED strip never used. The `units_at` doc comment that had drifted above `loan_days` moved back onto `units_at`.
+
+Checked against the live 2.1 container over noVNC (screenshot of the open Finances window): its lists are white-bodied with a header strip whose titles follow each column's own alignment, the read-only boxes print black and unprefixed ('1,000'), the labels read 'Cash:' and 'Bank:', and the group captions, those labels and the shark name are all Delphi Font.Height = -19 against an 11px body. The port now matches: the lists wear the market table's TableFrame chrome, and Win98Theme.FONT_DIALOG_HEADING (24) keeps the oracle's 1.7x heading ratio against the port's 14px body.
+
+The larger type pushed the dialog past the 704x620 window, so the lists are 90 tall rather than 112, the group padding is 6, and the right column is 170 rather than the form's 200 -- that column is sized around the portrait the port does not draw, and the left column needs the width for the debt cap note to read on one line as the oracle's does. A ui-test assertion now measures the laid-out dialog against the window so this cannot regress unseen.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
@@ -89,4 +93,6 @@ Rebuilt the Finances dialog against the oracle's extracted form (`vendor/dopewar
 **Note** - the Deposit All But.. tooltip reproduces the form's own typo ("Deposit all you cash"), as a fidelity target.
 
 **Follow-up** - the Deposit All But.. hint corrects the form's "all you cash" typo to "all your cash". `Copy.loan_days()` and its five `MSG_LOAN_*` keys, stranded by the bare Days Left column, are removed along with the long-unused `FIN_DEBT` key; `game:ui-test` passes at 820 assertions.
+
+**Oracle pass** - compared against the live 2.1 window over noVNC. The lists now wear the main window's table chrome (white inset frame, header strip, titles aligned with their cells), the read-only boxes print black, left-aligned and unprefixed under 'Cash:' / 'Bank:' labels, and the group captions, those labels and the shark name use a new `Win98Theme.FONT_DIALOG_HEADING` that keeps the form's heading-to-body ratio. The dialog was re-fitted to the 704x620 window (shorter lists, tighter group padding, a narrower right column) and a test now measures it against the window.
 <!-- SECTION:FINAL_SUMMARY:END -->
