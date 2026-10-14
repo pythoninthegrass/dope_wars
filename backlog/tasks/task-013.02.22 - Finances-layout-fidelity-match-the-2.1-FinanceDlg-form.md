@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@Claude'
 created_date: '2026-10-14 05:18'
-updated_date: '2026-10-14 05:46'
+updated_date: '2026-10-14 07:02'
 labels:
   - beermat-2.1
 milestone: m-4
@@ -69,6 +69,8 @@ Delphi's `TListView` column widths are carried over as `LOAN_COLUMNS` / `OFFER_C
 The new keys only render once `task game:import` recompiles `strings.en.translation`; the stale import is what produced the untranslated `FIN_*` keys noted in the description. The generated file is gitignored, so it had to be deleted to defeat the import task's `status:` check.
 
 `Copy.loan_days()` is now unused by the game -- the Days Left column is a bare count -- but is left in place with its own assertions rather than deleted.
+
+Follow-up at Lance's call: the Deposit All But.. hint reads "Deposit all your cash" rather than reproducing the form's own "all you cash" typo, and the code the rebuild stranded is gone -- `Copy.loan_days()` with its five `MSG_LOAN_*` keys, and `FIN_DEBT`, which the LED strip never used. The `units_at` doc comment that had drifted above `loan_days` moved back onto `units_at`.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
@@ -85,4 +87,6 @@ Rebuilt the Finances dialog against the oracle's extracted form (`vendor/dopewar
 **Tests** - a new `finances_layout` ui-test case (48 assertions) covers the group-box structure, the shark-name label's two states, the double-click paths, the tooltips, the bare Days Left formatting and that no column title is clipped. `task game:ui-test` passes at 834 assertions; `game:boundary-check` and `game:smoke-test` pass.
 
 **Note** - the Deposit All But.. tooltip reproduces the form's own typo ("Deposit all you cash"), as a fidelity target.
+
+**Follow-up** - the Deposit All But.. hint corrects the form's "all you cash" typo to "all your cash". `Copy.loan_days()` and its five `MSG_LOAN_*` keys, stranded by the bare Days Left column, are removed along with the long-unused `FIN_DEBT` key; `game:ui-test` passes at 820 assertions.
 <!-- SECTION:FINAL_SUMMARY:END -->
