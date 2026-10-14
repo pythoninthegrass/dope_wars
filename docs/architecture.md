@@ -169,8 +169,10 @@ direction.
   `dw_state_view.debt` is their total, the dump gains the loans block
   (1208 -> 1285 bytes), and `dw_borrow`, `dw_repay`, `dw_loans_copy`,
   `dw_offers_copy`, `dw_rules_sharks_copy` and `dw_roll_shark_release` are
-  new while `DW_FINANCES_PAY_LOAN` and `dw_rules_debt_interest_bp` go.
-  Details in `docs/abi-contract.md`, "Loan sharks".
+  new while `DW_FINANCES_PAY_LOAN` and `dw_rules_debt_interest_bp` go;
+  TASK-013.02.05 adds `dw_visits_copy` and `dw_shark_visit` for overdue
+  visits, with `dw_visit_view`, `dw_visit_kind` and `dw_visit_message`, and no
+  world-state change. Details in `docs/abi-contract.md`, "Loan sharks".
 
 ## Mojo LOC share
 

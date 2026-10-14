@@ -87,6 +87,22 @@ MSG_LOAN_DUE_TODAY,Due today
 MSG_LOAN_DAYS_PAST_DUE,{0} days past due
 MSG_LOAN_ONE_DAY_PAST_DUE,1 day past due
 MSG_SHARK_RELEASED,{0} was released from jail today!
+DLG_LOAN_SHARK,Loan Shark
+BTN_PAY_NOW,Pay Now
+BTN_PAY_LATER,Pay Later
+MSG_VISIT_DUE_TODAY,Your loan is due today.
+MSG_VISIT_DUE_YESTERDAY,Your loan was due yesterday.
+MSG_VISIT_DAYS_PAST_DUE,Your loan is {0} days past due.
+MSG_VISIT_OWE,"You owe ${0} to {1}. Pay now, or suffer the consequences."
+MSG_VISIT_WARNING,"{0} says that you had better pay your loan, like you agreed, or it could spell trouble for you."
+MSG_VISIT_WINDOW,"As a little lesson, {0} and {1} boys tossed you through the nearest window."
+MSG_VISIT_STAIRS,"To serve as a reminder, {0} and {1} boys threw you down a flight of stairs."
+MSG_VISIT_CHAINSAW,"Your memory seems to be lacking. To help you remember, {0} and {1} boys introduce you to their favourite chainsaw."
+MSG_VISIT_OF,Visit {0} of {1}
+MSG_VISIT_TOMORROW,{0} will be visiting you tomorrow. Better get some cash from the bank!
+MSG_PAY_OFF_SHORT,You do not have enough cash to pay off this loan!
+PRONOUN_HIS,his
+PRONOUN_HER,her
 MSG_PRICE_BUST,Cops made a big {0} bust!  Prices are outrageous!
 MSG_PRICE_CRASH_ACID,The market has been flooded with cheap home-made acid!
 MSG_PRICE_CRASH_HASHISH,The Marrakesh Express has arrived!

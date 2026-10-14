@@ -69,6 +69,8 @@ public:
 	int borrow(int shark_index, int64_t amount);
 	Dictionary repay(int shark_index);
 	Dictionary roll_shark_release();
+	Array visits_copy(int kind);
+	Dictionary shark_visit(int shark_index);
 
 	// Arrival / dealer events
 	Dictionary roll_arrival_event();

@@ -103,6 +103,7 @@ const CASE_FLOORS := {
 	"dealer_dialogs": 14,
 	"travel_arrival_outcomes": 12,
 	"loan_sharks": 26,
+	"loan_shark_visits": 79,
 	"sound_cues": 7,
 	"allow_sound_toggle": 8,
 }
@@ -153,6 +154,8 @@ func _run() -> void:
 	await _test_travel_arrival_outcomes()
 	_case("loan_sharks")
 	await _test_loan_sharks()
+	_case("loan_shark_visits")
+	await _test_loan_shark_visits()
 	_case("sound_cues")
 	await _test_sound_cues()
 	_case("allow_sound_toggle")
@@ -1374,6 +1377,164 @@ func _test_loan_sharks() -> void:
 			break
 	_assert(announced, "some seed should release a shark on the first arrival and announce it")
 	_main.dialogs().close()
+
+
+## Overdue loan shark visits run before the day advances, one dialog per loan.
+func _test_loan_shark_visits() -> void:
+	# Due today: a plain demand, Pay Later leaves the loan and the travel goes on.
+	var world := _fresh(SEED)
+	_travel_core(world, 10)
+	var day := int(world.state_get()["day"])
+	_main.hud().borough_pressed(_other_borough(world))
+	await _idle()
+	var visit := _main.dialogs().current() as LoanSharkDialog
+	_assert(visit != null, "a loan due today should open the loan shark dialog before the travel")
+	if visit == null:
+		return
+	_assert(int(world.state_get()["day"]) == day, "the visit comes before the day advances")
+	var text := _copy_text(visit)
+	_assert(text.contains("Your loan is due today."), "the visit should say the loan is due today, got '%s'" % text)
+	_assert(text.contains("You owe $22,250 to Honest Harry. Pay now, or suffer the consequences."), "the visit should name the amount and the shark, got '%s'" % text)
+	_assert(text.contains("Visit 1 of 1"), "a single visit should read Visit 1 of 1, got '%s'" % text)
+	_assert(int(world.state_get()["health"]) == 100, "a plain demand costs no health")
+	_assert(not (_find_named(visit, "loanPayNow") as Button).disabled and not (_find_named(visit, "loanPayLater") as Button).disabled, "Pay Now and Pay Later should be offered below level 4")
+	(_find_named(visit, "loanPayLater") as Button).pressed.emit()
+	await _idle()
+	_assert(int(world.state_get()["day"]) == day + 1, "Pay Later should let the travel go on")
+	_assert(world.loans_copy().size() == 1, "Pay Later should leave the loan owed")
+	await _drain_non_visit()
+	_assert(not (_main.dialogs().current() is LoanSharkDialog), "Pay Later should not re-open the visit")
+
+	# Pay Now without the cash is refused and the visit stays; with it the loan is gone.
+	world = _fresh(SEED)
+	_travel_core(world, 10)
+	_main.hud().borough_pressed(_other_borough(world))
+	await _idle()
+	visit = _main.dialogs().current() as LoanSharkDialog
+	(_find_named(visit, "loanPayNow") as Button).pressed.emit()
+	await _idle()
+	_assert(_copy_text(_main.dialogs().current()).contains("You do not have enough cash to pay off this loan!"), "Pay Now without the cash should say so")
+	_main.dialogs().confirm()
+	await _idle()
+	visit = _main.dialogs().current() as LoanSharkDialog
+	_assert(visit != null and world.loans_copy().size() == 1, "a refused Pay Now should bring the same visit back with the loan intact")
+	_main.dialogs().close()
+
+	world = _fresh(SEED)
+	_release_all_sharks(world)
+	_assert(world.borrow(1, 40000) == SimWorld.OK, "Sandy should lend 40000 against 2000 cash")
+	_travel_core(world, 10)
+	var cash := int(world.state_get()["cash"])
+	_main.hud().borough_pressed(_other_borough(world))
+	await _idle()
+	visit = _main.dialogs().current() as LoanSharkDialog
+	(_find_named(visit, "loanPayNow") as Button).pressed.emit()
+	await _idle()
+	_assert(int(world.state_get()["cash"]) == cash - 22250, "Pay Now should take the balance out of cash")
+	_assert(world.loans_copy().size() == 1 and int(world.loans_copy()[0]["shark_index"]) == 1, "Pay Now should remove only the paid loan")
+	await _drain_non_visit()
+
+	# Two overdue loans: Bertha is three days late with three bruisers, so her
+	# visit is a beating; Tank is due today and gets Visit 2 of 2.
+	world = _fresh(SEED)
+	_release_all_sharks(world)
+	_assert(world.borrow(3, 1000) == SimWorld.OK and world.borrow(2, 1000) == SimWorld.OK, "Bertha and Tank should lend 1000")
+	_travel_core(world, 7)
+	_main.hud().borough_pressed(_other_borough(world))
+	await _idle()
+	visit = _main.dialogs().current() as LoanSharkDialog
+	_assert(visit != null and visit.level >= 4, "a loan six days past due from Bertha should be a beating")
+	if visit == null:
+		return
+	text = _copy_text(visit)
+	_assert(text.contains("Your loan is 6 days past due.") and text.contains("Visit 1 of 2"), "the first visit should be Bertha's, six days late, got '%s'" % text)
+	_assert(text.contains("Bulbous Bertha and her boys"), "the beating text should use her pronoun, got '%s'" % text)
+	_assert((_find_named(visit, "loanPayNow") as Button).disabled and (_find_named(visit, "loanPayLater") as Button).disabled, "Pay Now and Pay Later should be disabled from level 4")
+	var health := int(world.state_get()["health"])
+	_assert(health <= 85 and health >= 70, "the beating should take 15 to 30 health, health is %d" % health)
+	_main.dialogs().confirm()
+	await _idle()
+	visit = _main.dialogs().current() as LoanSharkDialog
+	_assert(visit != null, "the second overdue loan should open its own visit")
+	if visit == null:
+		return
+	text = _copy_text(visit)
+	_assert(text.contains("Visit 2 of 2") and text.contains("Tank NoNeck"), "the second visit should be Tank's, got '%s'" % text)
+	_assert(visit.level == 1, "Tank due today with two bruisers is level 1, got %d" % visit.level)
+	(_find_named(visit, "loanPayLater") as Button).pressed.emit()
+	await _idle()
+	_assert(int(world.state_get()["health"]) == health, "Pay Later below level 4 should cost nothing more")
+	await _drain_non_visit()
+
+	# Death by loan shark ends the game before the day advances.
+	world = _fresh(SEED)
+	_release_all_sharks(world)
+	_assert(world.borrow(3, 1000) == SimWorld.OK, "Bertha should lend 1000")
+	_travel_core(world, 3)
+	_assert(world.apply_damage(95)["result"] == SimWorld.OK, "the player should be down to 5 health")
+	day = int(world.state_get()["day"])
+	_main.hud().borough_pressed(_other_borough(world))
+	await _idle()
+	visit = _main.dialogs().current() as LoanSharkDialog
+	_assert(visit != null and bool(world.state_get()["dead"]), "a beating at 5 health should kill")
+	_main.dialogs().confirm()
+	await _idle()
+	_assert(int(world.state_get()["day"]) == day, "death by loan shark should end the game before the day advances")
+	_assert(_main.dialogs().current() is HighscoreDialog, "death should go to the score dialog")
+	_main.dialogs().close()
+
+	# The warning the day before a visit.
+	var warned := false
+	for seed_value in range(1, 200):
+		_main.dialogs().close()
+		world = _fresh(seed_value)
+		_travel_core(world, 8)
+		_main.hud().borough_pressed(_other_borough(world))
+		await _idle()
+		var guard := 0
+		while _main.dialogs().is_open() and guard < 20:
+			guard += 1
+			var current := _main.dialogs().current()
+			if current is ChaseDialog:
+				break
+			if current is AlertDialog and _copy_text(current).contains("Honest Harry will be visiting you tomorrow. Better get some cash from the bank!"):
+				warned = true
+				break
+			_main.dialogs().confirm()
+			await _idle()
+		if warned:
+			break
+	_assert(warned, "a loan with one day left should announce a visit tomorrow")
+	_main.dialogs().close()
+
+
+## Advances the core directly, skipping the arrival flow.
+func _travel_core(world: SimWorld, days: int) -> void:
+	for _day in range(days):
+		_assert(world.travel(_other_borough(world)) == SimWorld.OK, "the core should travel")
+
+
+func _other_borough(world: SimWorld) -> int:
+	return 2 if int(world.state_get()["location_index"]) == 1 else 1
+
+
+func _release_all_sharks(world: SimWorld) -> void:
+	var guard := 0
+	while world.offers_copy().size() < 4 and guard < 500:
+		guard += 1
+		world.roll_shark_release()
+
+
+## Confirms the arrival dialogs that follow a visit without answering another visit.
+func _drain_non_visit() -> void:
+	var guard := 0
+	while _main.dialogs().is_open() and not (_main.dialogs().current() is LoanSharkDialog) and guard < 20:
+		guard += 1
+		if _main.dialogs().current() is ChaseDialog:
+			_main.dialogs().close()
+			return
+		_main.dialogs().confirm()
+		await _idle()
 
 
 func _test_travel_arrival_outcomes() -> void:

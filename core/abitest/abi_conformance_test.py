@@ -312,6 +312,7 @@ def test_header_struct_sizes_are_sane(abi: Abi, report: Report) -> None:
         "dw_shark_view",
         "dw_stay_result",
         "dw_state_view",
+        "dw_visit_view",
     }
     report.expect(
         "every ABI struct carries a DW_STATIC_ASSERT",

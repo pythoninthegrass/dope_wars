@@ -267,5 +267,126 @@ def test_release_roll_is_deterministic_for_a_seed() raises:
     assert_equal(a.rng.get_state(), b.rng.get_state())
 
 
+def test_visit_level_is_days_past_due_plus_bruisers_minus_one() raises:
+    assert_equal(loans.visit_level(0, 1), 0)
+    assert_equal(loans.visit_level(-1, 1), 1)
+    assert_equal(loans.visit_level(-3, 1), 3)
+    assert_equal(loans.visit_level(-4, 1), 4)
+    assert_equal(loans.visit_level(0, 4), 3)
+    assert_equal(loans.visit_level(-1, 4), 4)
+
+
+def test_visit_level_never_goes_below_zero() raises:
+    assert_equal(loans.visit_level(0, 0), 0)
+    assert_equal(loans.visit_level(5, 1), 5)
+
+
+def test_only_loans_at_or_past_their_due_day_get_a_visit() raises:
+    var game = _new_game()
+    _release_all(game)
+    game.add_loan(2, 1000, 3)
+    game.add_loan(3, 2000, 0)
+    game.add_loan(4, 3000, -2)
+    game.loan_days_left[0] = 1
+    var due = loans.overdue_sharks(game)
+    assert_equal(len(due), 2)
+    assert_equal(due[0], 3)
+    assert_equal(due[1], 4)
+
+
+def test_loans_with_one_day_left_are_announced_for_tomorrow() raises:
+    var game = _new_game()
+    _release_all(game)
+    game.add_loan(2, 1000, 1)
+    game.add_loan(3, 2000, 0)
+    game.loan_days_left[0] = 1
+    var soon = loans.due_tomorrow_sharks(game)
+    assert_equal(len(soon), 2)
+    assert_equal(soon[0], 0)
+    assert_equal(soon[1], 2)
+
+
+def test_a_visit_below_level_four_draws_nothing_and_costs_nothing() raises:
+    var game = _new_game()
+    game.loan_days_left[0] = -3
+    game.rng.set_script([])
+    var before = game.rng.get_state()
+    var outcome = loans.visit(game, 0)
+    assert_equal(outcome.level, 3)
+    assert_equal(outcome.damage, 0)
+    assert_equal(outcome.message, 0)
+    assert_equal(outcome.owed, 5500)
+    assert_equal(game.health, 100)
+    assert_equal(game.rng.get_state(), before)
+
+
+def test_a_level_four_visit_beats_for_fifteen_to_thirty_then_picks_a_message() raises:
+    var game = _new_game()
+    game.loan_days_left[0] = -4
+    game.rng.set_script([rnd(6, 16), rnd(2, 3)])
+    var outcome = loans.visit(game, 0)
+    assert_equal(outcome.level, 4)
+    assert_equal(outcome.damage, 21)
+    assert_equal(outcome.message, 3)
+    assert_equal(game.health, 79)
+    assert_true(not outcome.dead)
+    assert_true(not game.dead)
+
+
+def test_the_beating_range_runs_from_fifteen_to_thirty() raises:
+    var low = _new_game()
+    low.loan_days_left[0] = -4
+    low.rng.set_script([rnd(0, 16), rnd(0, 3)])
+    assert_equal(loans.visit(low, 0).damage, 15)
+    var high = _new_game()
+    high.loan_days_left[0] = -4
+    high.rng.set_script([rnd(15, 16), rnd(1, 3)])
+    var outcome = loans.visit(high, 0)
+    assert_equal(outcome.damage, 30)
+    assert_equal(outcome.message, 2)
+
+
+def test_a_killing_beating_caps_at_health_and_skips_the_message_draw() raises:
+    var game = _new_game()
+    game.health = 20
+    game.loan_days_left[0] = -4
+    game.rng.set_script([rnd(10, 16)])
+    var outcome = loans.visit(game, 0)
+    assert_equal(outcome.damage, 20)
+    assert_equal(outcome.message, 1)
+    assert_equal(game.health, 0)
+    assert_true(outcome.dead)
+    assert_true(game.dead)
+
+
+def test_a_damage_roll_equal_to_remaining_health_also_kills_without_a_message_draw() raises:
+    var game = _new_game()
+    game.health = 25
+    game.loan_days_left[0] = -4
+    game.rng.set_script([rnd(10, 16)])
+    var outcome = loans.visit(game, 0)
+    assert_equal(outcome.damage, 25)
+    assert_equal(outcome.message, 1)
+    assert_true(game.dead)
+
+
+def test_a_bruiser_heavy_shark_beats_from_the_first_day_past_due() raises:
+    var game = _new_game()
+    _release_all(game)
+    game.add_loan(4, 5000, -1)
+    game.rng.set_script([rnd(0, 16), rnd(1, 3)])
+    var outcome = loans.visit(game, 4)
+    assert_equal(outcome.level, 4)
+    assert_equal(outcome.damage, 15)
+    assert_equal(outcome.message, 2)
+
+
+def test_visiting_a_shark_that_is_owed_nothing_is_refused() raises:
+    var game = _new_game()
+    var outcome = loans.visit(game, 3)
+    assert_equal(outcome.level, -1)
+    assert_equal(game.health, 100)
+
+
 def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()

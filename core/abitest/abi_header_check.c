@@ -57,6 +57,10 @@ DW_STATIC_ASSERT(sizeof(dw_arrival_event_kind) == 1, "arrival kind must stay uin
 DW_STATIC_ASSERT(sizeof(dw_price_event_kind) == 1, "price event kind must stay uint8_t");
 DW_STATIC_ASSERT(sizeof(dw_finances_action) == 1, "finances action must stay uint8_t");
 DW_STATIC_ASSERT(sizeof(dw_dealer_kind) == 1, "dealer kind must stay uint8_t");
+DW_STATIC_ASSERT(sizeof(dw_visit_kind) == 1, "visit kind must stay uint8_t");
+DW_STATIC_ASSERT(sizeof(dw_visit_message) == 1, "visit message must stay uint8_t");
+DW_STATIC_ASSERT(DW_VISITS_TOMORROW == 1, "visit kind renumbered");
+DW_STATIC_ASSERT(DW_VISIT_CHAINSAW == 3, "visit message renumbered");
 
 /* dw_world stays opaque: callers hold a pointer only. Assert the contract's
  * shape rather than its size, which must remain unknown here. */

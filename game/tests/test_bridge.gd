@@ -80,6 +80,7 @@ func _initialize() -> void:
 	_test_dealer_visits()
 	_case("loan_sharks")
 	_test_loan_sharks()
+	_test_loan_shark_visits()
 	_case("chase_resolution")
 	_test_chase_resolution()
 	_finish()
@@ -248,6 +249,34 @@ func _test_loan_sharks() -> void:
 	var repaid: Dictionary = world.repay(1)
 	_assert(repaid["result"] == SimWorld.OK and repaid["paid"] > 1000, "repaying early should cost more than the balance")
 	_assert(world.loans_copy().size() == 1 and world.offers_copy().size() == 4, "a repaid loan leaves the list and the shark offers again")
+
+
+## Overdue visits end to end: the tomorrow warning on day 9, the demand on the due
+## day, and the first beating four days past due.
+func _test_loan_shark_visits() -> void:
+	var world := _new_world()
+	_assert(world.visits_copy(SimWorld.VISITS_OVERDUE).is_empty(), "nothing is overdue at the start")
+	_assert(world.visits_copy(SimWorld.VISITS_TOMORROW).is_empty(), "nothing is due tomorrow at the start")
+	_assert(world.shark_visit(1)["result"] == SimWorld.ERR_NO_SUCH_LOAN, "a shark owed nothing cannot visit")
+	_travel_days(world, 9)
+	_assert(world.visits_copy(SimWorld.VISITS_TOMORROW) == [0], "Harry warns of a visit with one day left")
+	_travel_days(world, 1)
+	_assert(world.visits_copy(SimWorld.VISITS_OVERDUE) == [0], "Harry visits once the loan is due")
+	var due: Dictionary = world.shark_visit(0)
+	_assert(due["result"] == SimWorld.OK and due["level"] == 0 and due["damage"] == 0 and due["message"] == SimWorld.VISIT_NO_BEATING, "the due-day visit is a plain demand")
+	_assert(world.state_get()["health"] == 100, "a plain demand costs no health")
+	_travel_days(world, 4)
+	var beating: Dictionary = world.shark_visit(0)
+	_assert(beating["level"] == 4 and beating["days_left"] == -4, "four days past due reaches level 4")
+	_assert(int(beating["damage"]) >= 15 and int(beating["damage"]) <= 30, "the beating takes 15 to 30")
+	_assert(int(beating["message"]) >= SimWorld.VISIT_WINDOW and int(beating["message"]) <= SimWorld.VISIT_CHAINSAW, "the beating carries a text")
+	_assert(world.state_get()["health"] == 100 - int(beating["damage"]), "the beating comes off health")
+
+
+func _travel_days(world: SimWorld, days: int) -> void:
+	for _day in range(days):
+		var dest := 2 if int(world.state_get()["location_index"]) == 1 else 1
+		_assert(world.travel(dest) == SimWorld.OK, "travel should succeed")
 
 
 ## A partial sell. Every other sell in this suite sold the whole holding,

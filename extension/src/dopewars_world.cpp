@@ -65,6 +65,8 @@ void DopeWarsWorld::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("borrow", "shark_index", "amount"), &DopeWarsWorld::borrow);
 	ClassDB::bind_method(D_METHOD("repay", "shark_index"), &DopeWarsWorld::repay);
 	ClassDB::bind_method(D_METHOD("roll_shark_release"), &DopeWarsWorld::roll_shark_release);
+	ClassDB::bind_method(D_METHOD("visits_copy", "kind"), &DopeWarsWorld::visits_copy);
+	ClassDB::bind_method(D_METHOD("shark_visit", "shark_index"), &DopeWarsWorld::shark_visit);
 
 	ClassDB::bind_method(D_METHOD("roll_arrival_event"), &DopeWarsWorld::roll_arrival_event);
 	ClassDB::bind_method(D_METHOD("roll_dealer_visit"), &DopeWarsWorld::roll_dealer_visit);
@@ -146,6 +148,14 @@ void DopeWarsWorld::_bind_methods() {
 
 	BIND_CONSTANT(DW_FINANCES_DEPOSIT);
 	BIND_CONSTANT(DW_FINANCES_WITHDRAW);
+
+	BIND_CONSTANT(DW_VISITS_OVERDUE);
+	BIND_CONSTANT(DW_VISITS_TOMORROW);
+
+	BIND_CONSTANT(DW_VISIT_NO_BEATING);
+	BIND_CONSTANT(DW_VISIT_WINDOW);
+	BIND_CONSTANT(DW_VISIT_STAIRS);
+	BIND_CONSTANT(DW_VISIT_CHAINSAW);
 }
 
 // ---------------------------------------------------------------------------
@@ -467,6 +477,46 @@ Dictionary DopeWarsWorld::roll_shark_release() {
 	dw_result result = dw_roll_shark_release(world_, &shark);
 	out["result"] = result;
 	out["shark_index"] = shark;
+	return out;
+}
+
+Array DopeWarsWorld::visits_copy(int kind) {
+	Array out;
+	if (!is_ready() || kind < 0) {
+		return out;
+	}
+	size_t required = 0;
+	dw_visits_copy(world_, static_cast<dw_visit_kind>(kind), nullptr, 0, &required);
+	std::vector<uint32_t> sharks(required);
+	size_t actual = 0;
+	dw_result result = dw_visits_copy(world_, static_cast<dw_visit_kind>(kind), sharks.data(), sharks.size(), &actual);
+	if (result != DW_OK) {
+		return out;
+	}
+	for (size_t i = 0; i < actual; i++) {
+		out.push_back(static_cast<int64_t>(sharks[i]));
+	}
+	return out;
+}
+
+Dictionary DopeWarsWorld::shark_visit(int shark_index) {
+	Dictionary out;
+	if (!is_ready() || shark_index < 0) {
+		out["result"] = DW_ERR_INVALID_ARGUMENT;
+		return out;
+	}
+	dw_visit_view visit = {};
+	dw_result result = dw_shark_visit(world_, static_cast<uint32_t>(shark_index), &visit);
+	out["result"] = result;
+	if (result != DW_OK) {
+		return out;
+	}
+	out["owed"] = visit.owed;
+	out["days_left"] = visit.days_left;
+	out["level"] = visit.level;
+	out["damage"] = visit.damage;
+	out["message"] = visit.message;
+	out["dead"] = visit.dead != 0;
 	return out;
 }
 

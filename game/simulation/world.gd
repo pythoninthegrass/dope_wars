@@ -51,6 +51,14 @@ const PRICE_EVENT_VET := DopeWarsWorld.DW_PRICE_EVENT_VET
 const FINANCES_DEPOSIT := DopeWarsWorld.DW_FINANCES_DEPOSIT
 const FINANCES_WITHDRAW := DopeWarsWorld.DW_FINANCES_WITHDRAW
 
+const VISITS_OVERDUE := DopeWarsWorld.DW_VISITS_OVERDUE
+const VISITS_TOMORROW := DopeWarsWorld.DW_VISITS_TOMORROW
+
+const VISIT_NO_BEATING := DopeWarsWorld.DW_VISIT_NO_BEATING
+const VISIT_WINDOW := DopeWarsWorld.DW_VISIT_WINDOW
+const VISIT_STAIRS := DopeWarsWorld.DW_VISIT_STAIRS
+const VISIT_CHAINSAW := DopeWarsWorld.DW_VISIT_CHAINSAW
+
 const NUM_LOCATIONS := DopeWarsWorld.DW_NUM_LOCATIONS
 const NUM_DRUGS := DopeWarsWorld.DW_NUM_DRUGS
 const MAX_HIGHSCORES := DopeWarsWorld.DW_MAX_HIGHSCORES
@@ -176,6 +184,19 @@ func repay(shark_index: int) -> Dictionary:
 ## shark_index}; shark_index is -1 when nobody was released.
 func roll_shark_release() -> Dictionary:
 	return _world.roll_shark_release()
+
+
+## Shark indexes in loan order for one visit list: VISITS_OVERDUE (they visit
+## before the day advances) or VISITS_TOMORROW (the news warns of them).
+func visits_copy(kind: int) -> Array:
+	return _world.visits_copy(kind)
+
+
+## Opens one shark's visit and applies the beating at level 4 and up. Returns
+## {result, owed, days_left, level, damage, message, dead}; the fields past
+## `result` are only present on OK.
+func shark_visit(shark_index: int) -> Dictionary:
+	return _world.shark_visit(shark_index)
 
 
 # --- arrival / dealer events ------------------------------------------------

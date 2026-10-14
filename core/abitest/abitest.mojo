@@ -57,6 +57,17 @@ struct DrugView(Copyable, Movable):
 
 
 @fieldwise_init
+struct VisitView(Copyable, Movable):
+    var owed: Int64
+    var days_left: Int32
+    var level: Int32
+    var damage: Int32
+    var message: UInt8
+    var dead: UInt8
+    var _pad0: Array[UInt8, 2]
+
+
+@fieldwise_init
 struct StateView(Copyable, Movable):
     var day: UInt32
     var num_days: UInt32
@@ -925,6 +936,73 @@ def test_loans_borrow_and_repay() raises:
     assert_equal(paid, owed[1].payoff)
     assert_equal(len(_loans(ptr)), 1)
     assert_equal(len(_offers(ptr)), 4)
+
+
+def _visit_sharks(ptr: Pointer[UInt8, origin=MutUntrackedOrigin], kind: UInt8) raises -> List[UInt32]:
+    var required: UInt = 0
+    var dummy: UInt32 = 0
+    assert_equal(external_call["dw_visits_copy", Int32](ptr, kind, Pointer(to=dummy), UInt(0), Pointer(to=required)), DW_OK)
+    var out = List[UInt32]()
+    for _ in range(Int(required)):
+        out.append(UInt32(0))
+    var actual: UInt = 0
+    if required > 0:
+        assert_equal(external_call["dw_visits_copy", Int32](ptr, kind, out.unsafe_ptr(), required, Pointer(to=actual)), DW_OK)
+        assert_equal(actual, required)
+    return out^
+
+
+def _empty_visit() -> VisitView:
+    return VisitView(Int64(0), Int32(0), Int32(0), Int32(0), UInt8(0), UInt8(0), Array[UInt8, 2](fill=0))
+
+
+def _travel_days(ptr: Pointer[UInt8, origin=MutUntrackedOrigin], days: Int) raises:
+    for _ in range(days):
+        var dest = UInt32(1)
+        if _state(ptr).location_index == 1:
+            dest = UInt32(2)
+        assert_equal(external_call["dw_travel", Int32](ptr, dest), DW_OK)
+
+
+def test_loan_shark_visits() raises:
+    var ptr = _world()
+    assert_equal(_init(ptr, UInt32(7)), DW_OK)
+    assert_equal(len(_visit_sharks(ptr, UInt8(0))), 0)
+    assert_equal(len(_visit_sharks(ptr, UInt8(1))), 0)
+    var unknown_kind: UInt32 = 0
+    var required: UInt = 0
+    assert_equal(external_call["dw_visits_copy", Int32](ptr, UInt8(2), Pointer(to=unknown_kind), UInt(1), Pointer(to=required)), DW_ERR_INVALID_ARGUMENT)
+
+    _travel_days(ptr, 9)
+    var soon = _visit_sharks(ptr, UInt8(1))
+    assert_equal(len(soon), 1)
+    assert_equal(soon[0], UInt32(0))
+    assert_equal(len(_visit_sharks(ptr, UInt8(0))), 0)
+
+    _travel_days(ptr, 1)
+    var due = _visit_sharks(ptr, UInt8(0))
+    assert_equal(len(due), 1)
+    assert_equal(due[0], UInt32(0))
+    var visit = _empty_visit()
+    assert_equal(external_call["dw_shark_visit", Int32](ptr, UInt32(1), Pointer(to=visit)), DW_ERR_NO_SUCH_LOAN)
+    assert_equal(external_call["dw_shark_visit", Int32](ptr, UInt32(9), Pointer(to=visit)), DW_ERR_INVALID_ARGUMENT)
+    assert_equal(external_call["dw_shark_visit", Int32](ptr, UInt32(0), Pointer(to=visit)), DW_OK)
+    assert_equal(visit.level, Int32(0))
+    assert_equal(visit.days_left, Int32(0))
+    assert_equal(visit.damage, Int32(0))
+    assert_equal(visit.message, UInt8(0))
+    assert_equal(visit.owed, _loans(ptr)[0].balance)
+    assert_equal(_state(ptr).health, Int32(100))
+
+    # Four days past due Honest Harry's boys beat the player for 15 to 30.
+    _travel_days(ptr, 4)
+    assert_equal(external_call["dw_shark_visit", Int32](ptr, UInt32(0), Pointer(to=visit)), DW_OK)
+    assert_equal(visit.level, Int32(4))
+    assert_equal(visit.days_left, Int32(-4))
+    assert_true(visit.damage >= 15 and visit.damage <= 30)
+    assert_true(visit.message >= 1 and visit.message <= 3)
+    assert_equal(visit.dead, UInt8(0))
+    assert_equal(_state(ptr).health, Int32(100) - visit.damage)
 
 
 def test_dealer_offers_and_purchases() raises:

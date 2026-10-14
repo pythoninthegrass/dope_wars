@@ -59,6 +59,9 @@ comptime DW_ERR_NO_SUCH_LOAN = Int32(16)
 comptime DW_FINANCES_DEPOSIT = UInt8(0)
 comptime DW_FINANCES_WITHDRAW = UInt8(1)
 
+comptime DW_VISITS_OVERDUE = UInt8(0)
+comptime DW_VISITS_TOMORROW = UInt8(1)
+
 comptime DW_MAX_HIGHSCORES = 10
 
 
@@ -99,6 +102,17 @@ struct LoanView(Copyable, Movable):
     var payoff: Int64
     var days_left: Int32
     var shark_index: UInt32
+
+
+@fieldwise_init
+struct VisitView(Copyable, Movable):
+    var owed: Int64
+    var days_left: Int32
+    var level: Int32
+    var damage: Int32
+    var message: UInt8
+    var dead: UInt8
+    var _pad0: Array[UInt8, 2]
 
 
 @fieldwise_init
@@ -252,6 +266,7 @@ def _assert_layouts():
     comptime assert size_of[SharkView]() == 52, "dw_shark_view layout changed"
     comptime assert size_of[LoanView]() == 24, "dw_loan_view layout changed"
     comptime assert size_of[OfferView]() == 16, "dw_offer_view layout changed"
+    comptime assert size_of[VisitView]() == 24, "dw_visit_view layout changed"
     comptime assert size_of[StateView]() == 56, "dw_state_view layout changed"
     comptime assert size_of[InventorySlot]() == 16, "dw_inventory_slot layout changed"
     comptime assert size_of[PriceSlot]() == 12, "dw_price_slot layout changed"
@@ -991,6 +1006,62 @@ def dw_repay(
     if outcome.ok():
         out_paid.value()[] = outcome.amount
     return _map_loan_code(outcome.code)
+
+
+@export("dw_visits_copy")
+def dw_visits_copy(
+    world: OptionalPointer[world_mod.World, origin=ImmUntrackedOrigin],
+    kind: UInt8,
+    out_sharks: OptionalPointer[UInt32, origin=MutUntrackedOrigin],
+    out_capacity: UInt,
+    out_required: OptionalPointer[UInt, origin=MutUntrackedOrigin],
+) abi("C") -> Int32:
+    if not world or not out_required:
+        return DW_ERR_INVALID_ARGUMENT
+    var queue: List[Int]
+    if kind == DW_VISITS_OVERDUE:
+        queue = loans.overdue_sharks(world.value()[])
+    elif kind == DW_VISITS_TOMORROW:
+        queue = loans.due_tomorrow_sharks(world.value()[])
+    else:
+        return DW_ERR_INVALID_ARGUMENT
+    var required = UInt(len(queue))
+    out_required.value()[] = required
+    if not out_sharks or out_capacity == 0:
+        return DW_OK
+    if out_capacity < required:
+        return DW_ERR_BUFFER_TOO_SMALL
+    for i in range(len(queue)):
+        out_sharks.value()[unsafe_offset=i] = UInt32(queue[i])
+    return DW_OK
+
+
+@export("dw_shark_visit")
+def dw_shark_visit(
+    world: OptionalPointer[world_mod.World, origin=MutUntrackedOrigin],
+    shark_index: UInt32,
+    out_visit: OptionalPointer[VisitView, origin=MutUntrackedOrigin],
+) abi("C") -> Int32:
+    if not world or not out_visit:
+        return DW_ERR_INVALID_ARGUMENT
+    if Int(shark_index) >= sharks.NUM_SHARKS:
+        return DW_ERR_INVALID_ARGUMENT
+    try:
+        var outcome = loans.visit(world.value()[], Int(shark_index))
+        if outcome.level < 0:
+            return DW_ERR_NO_SUCH_LOAN
+        out_visit.value()[] = VisitView(
+            outcome.owed,
+            Int32(outcome.days_left),
+            Int32(outcome.level),
+            Int32(outcome.damage),
+            UInt8(outcome.message),
+            UInt8(1) if outcome.dead else UInt8(0),
+            Array[UInt8, 2](fill=0),
+        )
+        return DW_OK
+    except:
+        return DW_ERR_INVALID_ARGUMENT
 
 
 @export("dw_roll_shark_release")

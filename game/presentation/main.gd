@@ -384,16 +384,17 @@ static func _finances_title(action: int) -> String:
 # --- travel -----------------------------------------------------------------
 
 
-## index.html:1369-1376. A refused travel (already here, dead, or past the
-## last day) just re-renders; a successful one clears both selections before
-## the arrival sequence runs, because the new location has a different market.
+## index.html:1369-1376. Overdue loan shark visits run first, before the day
+## advances; a refused travel (already here, dead, or past the last day) just
+## re-renders; a successful one clears both selections before the arrival
+## sequence runs, because the new location has a different market.
 func _do_travel(dest_location_index: int) -> void:
-	if _world.travel(dest_location_index) != SimWorld.OK:
-		_refresh()
-		return
+	_arrival.begin_travel(_world, _dialogs, _handle_death, dest_location_index, _on_arrived)
+
+
+func _on_arrived() -> void:
 	_hud.clear_selection()
 	_refresh()
-	_arrival.begin(_world, _dialogs, _handle_death)
 
 
 # --- endgame ----------------------------------------------------------------

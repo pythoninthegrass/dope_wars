@@ -118,6 +118,22 @@ const MSG_LOAN_DUE_TODAY := "MSG_LOAN_DUE_TODAY"
 const MSG_LOAN_DAYS_PAST_DUE := "MSG_LOAN_DAYS_PAST_DUE"
 const MSG_LOAN_ONE_DAY_PAST_DUE := "MSG_LOAN_ONE_DAY_PAST_DUE"
 const MSG_SHARK_RELEASED := "MSG_SHARK_RELEASED"
+const DLG_LOAN_SHARK := "DLG_LOAN_SHARK"
+const BTN_PAY_NOW := "BTN_PAY_NOW"
+const BTN_PAY_LATER := "BTN_PAY_LATER"
+const MSG_VISIT_DUE_TODAY := "MSG_VISIT_DUE_TODAY"
+const MSG_VISIT_DUE_YESTERDAY := "MSG_VISIT_DUE_YESTERDAY"
+const MSG_VISIT_DAYS_PAST_DUE := "MSG_VISIT_DAYS_PAST_DUE"
+const MSG_VISIT_OWE := "MSG_VISIT_OWE"
+const MSG_VISIT_WARNING := "MSG_VISIT_WARNING"
+const MSG_VISIT_WINDOW := "MSG_VISIT_WINDOW"
+const MSG_VISIT_STAIRS := "MSG_VISIT_STAIRS"
+const MSG_VISIT_CHAINSAW := "MSG_VISIT_CHAINSAW"
+const MSG_VISIT_OF := "MSG_VISIT_OF"
+const MSG_VISIT_TOMORROW := "MSG_VISIT_TOMORROW"
+const MSG_PAY_OFF_SHORT := "MSG_PAY_OFF_SHORT"
+const PRONOUN_HIS := "PRONOUN_HIS"
+const PRONOUN_HER := "PRONOUN_HER"
 
 const MSG_PRICE_BUST := "MSG_PRICE_BUST"
 const MSG_PRICE_CRASH_ACID := "MSG_PRICE_CRASH_ACID"
@@ -263,6 +279,34 @@ static func loan_days(days_left: int) -> String:
 	if days_left == -1:
 		return t(MSG_LOAN_ONE_DAY_PAST_DUE)
 	return t(MSG_LOAN_DAYS_PAST_DUE).format([-days_left])
+
+
+## The first line of a shark's visit: due today, due yesterday, or N days past due.
+static func visit_status(days_left: int) -> String:
+	if days_left >= 0:
+		return t(MSG_VISIT_DUE_TODAY)
+	if days_left == -1:
+		return t(MSG_VISIT_DUE_YESTERDAY)
+	return t(MSG_VISIT_DAYS_PAST_DUE).format([-days_left])
+
+
+## Everything a visit says below its status line: the demand, the level 3 warning,
+## or the beating text with the shark's pronoun.
+static func visit_demand(shark_name: String, owed: int) -> String:
+	return t(MSG_VISIT_OWE).format([group(owed), shark_name])
+
+
+static func visit_warning(shark_name: String) -> String:
+	return t(MSG_VISIT_WARNING).format([shark_name])
+
+
+static func visit_beating(message: int, shark_name: String, female: bool) -> String:
+	var key := MSG_VISIT_WINDOW
+	if message == 2:
+		key = MSG_VISIT_STAIRS
+	elif message == 3:
+		key = MSG_VISIT_CHAINSAW
+	return t(key).format([shark_name, t(PRONOUN_HER if female else PRONOUN_HIS)])
 
 
 static func units_at(price: float) -> String:

@@ -129,6 +129,7 @@ C_SCALAR_CTYPES: dict[str, str] = {
     "dw_arrival_event_kind": "c_uint8",
     "dw_price_event_kind": "c_uint8",
     "dw_finances_action": "c_uint8",
+    "dw_visit_kind": "c_uint8",
 }
 
 

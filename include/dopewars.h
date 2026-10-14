@@ -193,6 +193,24 @@ enum {
     DW_PRICE_EVENT_VET = 3,
 };
 
+/* dw_visits_copy selector: which loans to list. */
+typedef uint8_t dw_visit_kind;
+enum {
+    /* Days left 0 or below: the shark visits before the day advances. */
+    DW_VISITS_OVERDUE = 0,
+    /* Exactly 1 day left: the news says the shark visits tomorrow. */
+    DW_VISITS_TOMORROW = 1,
+};
+
+/* dw_visit_view.message: which beating text the visit shows. */
+typedef uint8_t dw_visit_message;
+enum {
+    DW_VISIT_NO_BEATING = 0,
+    DW_VISIT_WINDOW = 1,
+    DW_VISIT_STAIRS = 2,
+    DW_VISIT_CHAINSAW = 3,
+};
+
 /* dw_finances action selector. Loans are repaid with dw_repay. */
 typedef uint8_t dw_finances_action;
 enum {
@@ -305,6 +323,23 @@ typedef struct dw_offer_view {
     int64_t  max_amount;
 } dw_offer_view;
 DW_STATIC_ASSERT(sizeof(dw_offer_view) == 16, "dw_offer_view layout changed");
+
+/* What one loan shark visit shows (docs/beermat-2.1-re.md, "Visits"). `level`
+ * is |days_left| + bruisers - 1 clamped at 0: 0 and 1 are the plain demand, 2
+ * and 3 add the warnings, and 4 and up are a beating, in which case Pay Now and
+ * Pay Later are not offered. `damage` is the health already taken (0 below
+ * level 4), `message` picks the beating text and `dead` is set when it took
+ * the last of the health. */
+typedef struct dw_visit_view {
+    int64_t  owed;             /* the loan balance */
+    int32_t  days_left;        /* 0 or below */
+    int32_t  level;
+    int32_t  damage;
+    uint8_t  message;          /* dw_visit_message */
+    uint8_t  dead;             /* 0 or 1 */
+    uint8_t  _pad0[2];         /* specified-zero */
+} dw_visit_view;
+DW_STATIC_ASSERT(sizeof(dw_visit_view) == 24, "dw_visit_view layout changed");
 
 /* One entry in a two-call inventory copy. Slots with qty == 0 are
  * omitted from the copy (the required length is the count of live
@@ -670,6 +705,21 @@ dw_result dw_repay(dw_world *world, uint32_t shark_index, int64_t *out_paid);
  * nothing once all DW_NUM_SHARKS are out. Not called by dw_travel; the
  * caller sequences it ahead of the dealer roll. */
 dw_result dw_roll_shark_release(dw_world *world, int32_t *out_shark);
+
+/* The sharks that visit (DW_VISITS_OVERDUE) or warn of a visit tomorrow
+ * (DW_VISITS_TOMORROW), as shark indexes in the order the loans were taken.
+ * Two-call length-then-fill. Returns DW_ERR_INVALID_ARGUMENT for an unknown
+ * kind. */
+dw_result dw_visits_copy(const dw_world *world, dw_visit_kind kind, uint32_t *out_sharks, size_t out_capacity, size_t *out_required);
+
+/* Open one shark's visit before the day advances (docs/beermat-2.1-re.md, N-08).
+ * From level 4 up the beating lands now: Random(16) + 15 damage capped at
+ * health, then Random(3) + 1 picks the text (text 1 and no draw when it takes
+ * the last of the health). Below level 4 nothing is drawn or changed. Paying
+ * afterwards is dw_repay; paying later is doing nothing. Returns
+ * DW_ERR_INVALID_ARGUMENT for an unknown shark and DW_ERR_NO_SUCH_LOAN when
+ * none is owed to them. */
+dw_result dw_shark_visit(dw_world *world, uint32_t shark_index, dw_visit_view *out_visit);
 
 /* ---------------------------------------------------------------------- */
 /* Arrival / dealer events                                                 */
