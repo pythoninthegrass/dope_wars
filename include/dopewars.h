@@ -635,8 +635,8 @@ dw_result dw_accept_gun_offer(dw_world *world, const dw_gun_offer *offer);
 /* ---------------------------------------------------------------------- */
 
 /* Roll whether a cop chase starts on arrival, per `docs/beermat-2.1-re.md`
- * (N-22): Random(8) == 0 (1 in 8), but not on the last two days (day >= limit -
- * 1). Draws one value. */
+ * (N-22): Random(8) == 0 (1 in 8), but a chase does not start on the last two
+ * days (day >= limit - 1). Always draws one value. */
 dw_result dw_should_start_chase(dw_world *world, uint8_t *out_should_start);
 
 /* Populate *out_chase for a chase that dw_should_start_chase just

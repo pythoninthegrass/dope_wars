@@ -76,9 +76,9 @@ struct FightResult(Copyable, Movable):
 
 
 def should_start_chase(mut game: world.World) raises -> Bool:
-    if game.day >= game.num_days - 1:
-        return False
-    return rng_mod.rand_int(game.rng, 0, 7) == 0
+    # The draw is consumed on every travel; only the start is suppressed on the last two days.
+    var rolled = rng_mod.rand_int(game.rng, 0, 7) == 0
+    return rolled and game.day < game.num_days - 1
 
 
 def start_chase(mut game: world.World) raises -> Chase:

@@ -67,6 +67,15 @@ def test_no_chase_starts_on_the_last_two_days() raises:
         assert_true(not combat.should_start_chase(game))
 
 
+def test_the_chase_draw_is_consumed_on_the_last_two_days() raises:
+    for length in _lengths():
+        var game = world.new_game(UInt32(7), length, -1)
+        game.day = length - 1
+        game.rng.set_script([0.0, 0.5])
+        assert_true(not combat.should_start_chase(game))
+        assert_equal(game.rng._script_pos, 1)
+
+
 def test_finish_reports_the_last_day_of_each_length() raises:
     for length in _lengths():
         var game = world.new_game(UInt32(7), length, -1)
