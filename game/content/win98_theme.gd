@@ -34,6 +34,11 @@ extends RefCounted
 const FONT_TABLE := 13
 const FONT_BODY := 14
 const FONT_LED := 18
+## 2.1's dialog headings -- the group box captions, the Cash and Bank labels
+## and the shark name -- are Delphi Font.Height = -19 against an 11px body
+## (vendor/dopewars-2001/re/forms/FinanceDlg.dfm). The port's body is 14, so
+## the heading keeps the oracle's 1.7x against it.
+const FONT_DIALOG_HEADING := 24
 ## The label is set larger than the value it sits beside (screenshot 1's
 ## labels read as the bigger, bolder element of the two).
 const FONT_LED_LABEL := 23

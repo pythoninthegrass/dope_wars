@@ -17,11 +17,17 @@ extends DopeDialog
 ## the host has already closed the dialog by the time the owner hears of them.
 
 ## The form is 564 wide, 352 of it the left column and 200 the right; the port
-## is wider because its chrome measures in 15px rem rather than Delphi pixels.
-const WIDTH := 660.0
+## is wider because its chrome measures in 15px rem rather than Delphi pixels,
+## and the whole dialog has to stay inside the 704x620 game window.
+const WIDTH := 672.0
 const LEFT_WEIGHT := 352.0
-const RIGHT_WEIGHT := 200.0
-const TABLE_HEIGHT := 112.0
+## Narrower than the form's 200: that column is sized around the shark portrait
+## 2.1 paints there, which the port does not draw, and the left column needs the
+## width for the debt cap note to read on one line as the oracle's does.
+const RIGHT_WEIGHT := 170.0
+## The form's lists are 100 tall in a 446-tall dialog; the port's window leaves
+## less room once its larger type is counted.
+const TABLE_HEIGHT := 90.0
 
 ## The column widths the form gives each list, in the order its columns appear.
 const LOAN_COLUMNS := [142, 80, 50, 64]
@@ -95,13 +101,13 @@ func _money_panel(parent: Container, cash: int, bank: int, withhold: int) -> voi
 	grid.add_theme_constant_override("v_separation", 6)
 	margin.add_child(grid)
 
-	_value_box(grid, "CashValue", tr(Copy.FIN_CASH), Copy.money(cash))
+	_value_box(grid, "CashValue", tr(Copy.FIN_CASH), Copy.fmt(cash))
 	# index.html:1336-1338: each action is disabled when it could not move a dollar.
 	_panel_button(grid, "finDeposit", Copy.BTN_DEPOSIT, Copy.HINT_DEPOSIT, cash <= 0)
 	# 2.1's Deposit All But.. acts at once, so it is disabled when it would move nothing.
 	_panel_button(grid, "finDepositAllBut", Copy.BTN_DEPOSIT_ALL_BUT, Copy.HINT_DEPOSIT_ALL_BUT, cash <= withhold)
 
-	_value_box(grid, "BankValue", tr(Copy.FIN_BANK), Copy.money(bank))
+	_value_box(grid, "BankValue", tr(Copy.FIN_BANK), Copy.fmt(bank))
 	_panel_button(grid, "finWithdraw", Copy.BTN_WITHDRAW, Copy.HINT_WITHDRAW, bank <= 0)
 	_panel_button(grid, "finWithdrawAll", Copy.BTN_WITHDRAW_ALL, Copy.HINT_WITHDRAW_ALL, bank <= 0)
 
@@ -162,7 +168,7 @@ func _right_column(right: VBoxContainer) -> void:
 	_shark_label.name = "SharkNameLabel"
 	_shark_label.text = tr(Copy.FIN_SHARKS_LABEL)
 	_shark_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_shark_label.add_theme_font_override("font", Win98Theme.bold_font())
+	_shark_label.add_theme_font_size_override("font_size", Win98Theme.FONT_DIALOG_HEADING)
 	right.add_child(_shark_label)
 
 	var spacer := Control.new()
@@ -184,7 +190,7 @@ func _group_box(parent: Container, node_name: String, caption: String) -> VBoxCo
 	var label := Label.new()
 	label.name = node_name + "Caption"
 	label.text = caption
-	label.add_theme_font_override("font", Win98Theme.bold_font())
+	label.add_theme_font_size_override("font_size", Win98Theme.FONT_DIALOG_HEADING)
 	group.add_child(label)
 
 	var frame := PanelContainer.new()
@@ -193,7 +199,7 @@ func _group_box(parent: Container, node_name: String, caption: String) -> VBoxCo
 
 	var margin := MarginContainer.new()
 	for side in ["left", "right", "top", "bottom"]:
-		margin.add_theme_constant_override("margin_" + side, 8)
+		margin.add_theme_constant_override("margin_" + side, 6)
 	frame.add_child(margin)
 
 	var content := VBoxContainer.new()
@@ -209,12 +215,19 @@ func _value_box(grid: GridContainer, node_name: String, label_text: String, valu
 	var label := Label.new()
 	label.text = label_text
 	label.add_theme_font_override("font", Win98Theme.bold_font())
+	label.add_theme_font_size_override("font_size", Win98Theme.FONT_DIALOG_HEADING)
 	grid.add_child(label)
 
 	var value := LineEdit.new()
 	value.name = node_name
 	value.text = value_text
 	value.editable = false
+	# The oracle's boxes read "1,000", left-aligned and unprefixed; the theme
+	# right-aligns a LineEdit for the quantity dialogs' spinners.
+	value.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	# A Godot LineEdit greys its text when it is not editable; the oracle's
+	# read-only boxes print theirs in the same black as an editable field.
+	value.add_theme_color_override("font_uneditable_color", Color.BLACK)
 	value.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	grid.add_child(value)
 
@@ -225,6 +238,10 @@ func _panel_button(grid: GridContainer, key: String, label_key: String, hint_key
 	button.disabled = disabled
 
 
+## A list, framed like the market table on the main window: a white inset
+## frame around the Tree, with each column title aligned the way its cells are,
+## which is what the oracle's TListView headers do (the form right-justifies
+## every column but the name).
 func _table(parent: Container, node_name: String, column_keys: Array, widths: Array) -> Tree:
 	var tree := Tree.new()
 	tree.name = node_name
@@ -233,13 +250,26 @@ func _table(parent: Container, node_name: String, column_keys: Array, widths: Ar
 	tree.hide_root = true
 	tree.select_mode = Tree.SELECT_ROW
 	tree.custom_minimum_size = Vector2(0, TABLE_HEIGHT)
+	# Tree shows a cell's own text as a tooltip when no tooltip_text is set
+	# (scene/gui/tree.cpp); neither the oracle nor the main window's tables do.
+	tree.auto_tooltip = false
 	for column in column_keys.size():
 		var title := tr(String(column_keys[column]))
 		tree.set_column_title(column, title)
+		tree.set_column_title_alignment(
+			column, HORIZONTAL_ALIGNMENT_LEFT if column == 0 else HORIZONTAL_ALIGNMENT_RIGHT
+		)
 		tree.set_column_expand(column, column == 0)
 		tree.set_column_custom_minimum_width(column, _column_width(title, int(widths[column])))
 	tree.create_item()
-	parent.add_child(tree)
+
+	# market_table.gd: the frame belongs to a wrapper rather than the Tree,
+	# whose own opaque header strip would paint over a border along its top.
+	var frame := PanelContainer.new()
+	frame.name = node_name + "Frame"
+	frame.theme_type_variation = &"TableFrame"
+	frame.add_child(tree)
+	parent.add_child(frame)
 	return tree
 
 

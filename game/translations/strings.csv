@@ -66,8 +66,8 @@ MSG_BUY_PROMPT,"You can afford {0} units of {1}, and have room in your coat for 
 MSG_SELL_PROMPT,You have {0} units of {1}.
 MSG_UNITS_AT,units @ ${0}
 MSG_SCORE_NOT_HIGH_ENOUGH,"{0} was not good enough to get on your highest score list."
-FIN_CASH,Cash
-FIN_BANK,Bank
+FIN_CASH,Cash:
+FIN_BANK,Bank:
 BTN_DEPOSIT,Deposit
 BTN_WITHDRAW,Withdraw
 BTN_DEPOSIT_ALL_BUT,Deposit All But..

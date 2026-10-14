@@ -105,7 +105,7 @@ const CASE_FLOORS := {
 	"travel_arrival_outcomes": 12,
 	"loan_sharks": 24,
 	"loan_shark_visits": 79,
-	"finances_layout": 48,
+	"finances_layout": 61,
 	"sound_cues": 7,
 	"allow_sound_toggle": 8,
 }
@@ -1480,6 +1480,18 @@ func _test_finances_layout() -> void:
 	if dialog == null:
 		return
 
+	# The window is fixed at 704x620 (project.godot) and the dialog's type is
+	# the oracle's, so the whole of it has to fit without being clipped.
+	await _idle()
+	var room := Vector2(
+		ProjectSettings.get_setting("display/window/size/viewport_width"),
+		ProjectSettings.get_setting("display/window/size/viewport_height")
+	)
+	# The lower bound keeps this honest: an unlaid-out dialog measures zero and
+	# would "fit" whatever the layout did.
+	_assert(dialog.size.y > 400, "the dialog should be laid out before it is measured, got %s" % dialog.size)
+	_assert(dialog.size.x <= room.x and dialog.size.y <= room.y, "the dialog should fit the game window, got %s in %s" % [dialog.size, room])
+
 	var money := _find_named(dialog, "MoneyPanel") as PanelContainer
 	_assert(money != null, "the money panel should be a bevelled panel of its own")
 	if money == null:
@@ -1490,10 +1502,12 @@ func _test_finances_layout() -> void:
 	if cash_box == null or bank_box == null:
 		return
 	_assert(not cash_box.editable and not bank_box.editable, "the value boxes should be read-only, as the oracle's are")
-	_assert(cash_box.text == Copy.money(cash), "the cash box should show the cash on hand, got '%s'" % cash_box.text)
-	_assert(bank_box.text == Copy.money(0), "the bank box should show the bank balance, got '%s'" % bank_box.text)
+	# The oracle's boxes read "1,000": grouped, left-aligned and unprefixed.
+	_assert(cash_box.text == Copy.fmt(cash), "the cash box should show the cash on hand, got '%s'" % cash_box.text)
+	_assert(bank_box.text == Copy.fmt(0), "the bank box should show the bank balance, got '%s'" % bank_box.text)
+	_assert(cash_box.alignment == HORIZONTAL_ALIGNMENT_LEFT, "the value boxes should read left-aligned, as the oracle's do")
 	var panel_text := _copy_text(money)
-	_assert(panel_text.contains("Cash") and panel_text.contains("Bank"), "the value boxes should carry their own labels, got '%s'" % panel_text)
+	_assert(panel_text.contains("Cash:") and panel_text.contains("Bank:"), "the value boxes should carry the form's own labels, got '%s'" % panel_text)
 	for key in ["finDeposit", "finDepositAllBut", "finWithdraw", "finWithdrawAll"]:
 		_assert(_find_named(money, key) != null, "%s should sit in the money panel beside the values" % key)
 	var grid := _first_grid(money)
@@ -1536,6 +1550,14 @@ func _test_finances_layout() -> void:
 		_assert(button != null and button.tooltip_text == String(pair[1]), "%s should carry the form's hint as its tooltip, got '%s'" % [pair[0], "" if button == null else button.tooltip_text])
 
 	_assert(_tree_rows(loans)[0] == ["Honest Harry", "5,500", "15", "10"], "Days Left should be a bare day count, got %s" % [_tree_rows(loans)[0]])
+	# The lists wear the main window's table chrome: a white inset frame, and
+	# column titles aligned the way their cells are.
+	for tree in [loans, offers]:
+		var frame := tree.get_parent() as PanelContainer
+		_assert(frame != null and frame.theme_type_variation == &"TableFrame", "%s should sit in the market table's white frame" % tree.name)
+		for column in tree.columns:
+			var wanted := HORIZONTAL_ALIGNMENT_LEFT if column == 0 else HORIZONTAL_ALIGNMENT_RIGHT
+			_assert(tree.get_column_title_alignment(column) == wanted, "the '%s' title should be aligned with its cells" % tree.get_column_title(column))
 	for tree in [loans, offers]:
 		for column in tree.columns:
 			var title: String = tree.get_column_title(column)
