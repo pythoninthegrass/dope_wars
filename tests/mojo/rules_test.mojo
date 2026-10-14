@@ -19,7 +19,6 @@ def test_scalar_rules_match_js() raises:
     assert_equal(rules.START_DEBT, 5500)
     assert_equal(rules.START_HEALTH, 100)
     assert_equal(rules.START_COAT_CAPACITY, 100)
-    assert_equal(rules.DEBT_INTEREST, 0.10)
     assert_equal(rules.BANK_INTEREST, 0.05)
     assert_equal(rules.START_LOCATION, "bronx")
     assert_equal(rules.CHEAP_DIVIDE, 10)

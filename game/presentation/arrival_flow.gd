@@ -11,8 +11,9 @@ extends RefCounted
 ##   1. one toast per cheap/expensive price event, cheapest to draw no news
 ##   2. if should_start_chase fired, the chase -- and nothing else. A chase
 ##      skips the dealer and the arrival event entirely.
-##   3. otherwise the dealer visit roll, then (once that dealer's dialog is
-##      done) the arrival event, rolled lazily so a purchase comes first
+##   3. otherwise the jail release roll (docs/beermat-2.1-re.md, N-09), the
+##      dealer visit roll, then (once that dealer's dialog is done) the
+##      arrival event, rolled lazily so a purchase comes first
 ##
 ## The chase is a state rather than a queue entry because it is not linear:
 ## Run and Stay re-present it, and only a win or a death ends it.
@@ -20,7 +21,7 @@ extends RefCounted
 signal state_changed()
 signal finished()
 
-enum Step { TOAST, EVENT_ROLL, COAT_DEALER }
+enum Step { TOAST, SHARK_RELEASED, EVENT_ROLL, COAT_DEALER }
 
 ## The live chase, or {} when none is unresolved. Carries the deputy count
 ## and whether the player may fight, both read off dw_start_chase.
@@ -70,6 +71,13 @@ func _build() -> void:
 		_chase.erase("result")
 		return
 
+	# The arrival roll does not run on the last day (docs/beermat-2.1-re.md, "Travel").
+	var state := _world.state_get()
+	if int(state.get("day", 0)) < int(state.get("num_days", 0)):
+		var release := _world.roll_shark_release()
+		if int(release.get("result", SimWorld.ERR_INVALID_ARGUMENT)) == SimWorld.OK and int(release.get("shark_index", -1)) >= 0:
+			_queue.append({"step": Step.SHARK_RELEASED, "shark_index": int(release["shark_index"])})
+
 	var visit := _world.roll_dealer_visit()
 	if int(visit.get("result", SimWorld.ERR_INVALID_ARGUMENT)) == SimWorld.OK and int(visit.get("kind", SimWorld.DEALER_NONE)) == SimWorld.DEALER_COAT:
 		_queue.append({"step": Step.COAT_DEALER})
@@ -92,6 +100,12 @@ func _advance() -> void:
 			_present_alert(
 				Copy.DLG_WORD_ON_THE_STREET,
 				Copy.price_event_message(int(event["kind"]), Roster.drug_id(int(event["drug_index"])), Roster.drug_name(int(event["drug_index"]))),
+				AlertDialog.ICON_NEWS
+			)
+		Step.SHARK_RELEASED:
+			_present_alert(
+				Copy.DLG_WORD_ON_THE_STREET,
+				tr(Copy.MSG_SHARK_RELEASED).format([Roster.shark_name(int(entry["shark_index"]))]),
 				AlertDialog.ICON_NEWS
 			)
 		Step.EVENT_ROLL:

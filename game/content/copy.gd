@@ -71,7 +71,7 @@ const DLG_SELL := "DLG_SELL"
 const DLG_FINANCES := "DLG_FINANCES"
 const DLG_DEPOSIT := "DLG_DEPOSIT"
 const DLG_WITHDRAW := "DLG_WITHDRAW"
-const DLG_PAY_LOAN := "DLG_PAY_LOAN"
+const DLG_BORROW := "DLG_BORROW"
 const DLG_WORD_ON_THE_STREET := "DLG_WORD_ON_THE_STREET"
 const DLG_RANDOM_EVENT := "DLG_RANDOM_EVENT"
 const DLG_COAT_DEALER := "DLG_COAT_DEALER"
@@ -100,10 +100,24 @@ const FIN_BANK := "FIN_BANK"
 const FIN_DEBT := "FIN_DEBT"
 const BTN_DEPOSIT := "BTN_DEPOSIT"
 const BTN_WITHDRAW := "BTN_WITHDRAW"
-const BTN_PAY_LOAN := "BTN_PAY_LOAN"
+const BTN_REPAY := "BTN_REPAY"
 const MSG_DEPOSIT_PROMPT := "MSG_DEPOSIT_PROMPT"
 const MSG_WITHDRAW_PROMPT := "MSG_WITHDRAW_PROMPT"
-const MSG_PAY_LOAN_PROMPT := "MSG_PAY_LOAN_PROMPT"
+const MSG_BORROW_PROMPT := "MSG_BORROW_PROMPT"
+const FIN_SHARKS := "FIN_SHARKS"
+const FIN_SHARK_COLUMNS := "FIN_SHARK_COLUMNS"
+const FIN_NO_OFFERS := "FIN_NO_OFFERS"
+const FIN_LOANS := "FIN_LOANS"
+const FIN_NO_LOANS := "FIN_NO_LOANS"
+const FIN_DEBT_CAP_NOTE := "FIN_DEBT_CAP_NOTE"
+const MSG_SHARK_OFFER := "MSG_SHARK_OFFER"
+const MSG_LOAN_ROW := "MSG_LOAN_ROW"
+const MSG_LOAN_DAYS_LEFT := "MSG_LOAN_DAYS_LEFT"
+const MSG_LOAN_ONE_DAY_LEFT := "MSG_LOAN_ONE_DAY_LEFT"
+const MSG_LOAN_DUE_TODAY := "MSG_LOAN_DUE_TODAY"
+const MSG_LOAN_DAYS_PAST_DUE := "MSG_LOAN_DAYS_PAST_DUE"
+const MSG_LOAN_ONE_DAY_PAST_DUE := "MSG_LOAN_ONE_DAY_PAST_DUE"
+const MSG_SHARK_RELEASED := "MSG_SHARK_RELEASED"
 
 const MSG_PRICE_BUST := "MSG_PRICE_BUST"
 const MSG_PRICE_CRASH_ACID := "MSG_PRICE_CRASH_ACID"
@@ -238,6 +252,19 @@ static func trend(direction: int) -> String:
 
 
 ## "units @ $1,234" (index.html:1302).
+## The days-left column of an outstanding loan; a loan past due counts up.
+static func loan_days(days_left: int) -> String:
+	if days_left == 0:
+		return t(MSG_LOAN_DUE_TODAY)
+	if days_left == 1:
+		return t(MSG_LOAN_ONE_DAY_LEFT)
+	if days_left > 1:
+		return t(MSG_LOAN_DAYS_LEFT).format([days_left])
+	if days_left == -1:
+		return t(MSG_LOAN_ONE_DAY_PAST_DUE)
+	return t(MSG_LOAN_DAYS_PAST_DUE).format([-days_left])
+
+
 static func units_at(price: float) -> String:
 	return t(MSG_UNITS_AT).format([fmt(price)])
 

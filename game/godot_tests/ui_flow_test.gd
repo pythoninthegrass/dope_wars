@@ -71,6 +71,7 @@ const CASES := [
 	"chase_and_doctor",
 	"dealer_dialogs",
 	"travel_arrival_outcomes",
+	"loan_sharks",
 	"sound_cues",
 	"allow_sound_toggle",
 ]
@@ -101,6 +102,7 @@ const CASE_FLOORS := {
 	"chase_and_doctor": 12,
 	"dealer_dialogs": 14,
 	"travel_arrival_outcomes": 12,
+	"loan_sharks": 26,
 	"sound_cues": 7,
 	"allow_sound_toggle": 8,
 }
@@ -149,6 +151,8 @@ func _run() -> void:
 	await _test_dealer_dialogs()
 	_case("travel_arrival_outcomes")
 	await _test_travel_arrival_outcomes()
+	_case("loan_sharks")
+	await _test_loan_sharks()
 	_case("sound_cues")
 	await _test_sound_cues()
 	_case("allow_sound_toggle")
@@ -1276,6 +1280,102 @@ func _test_dealer_dialogs() -> void:
 
 
 ## A travel reaches each 2.1 arrival outcome: a chase, a coat dealer offer, or neither.
+# docs/beermat-2.1-re.md "Loan sharks". The finances dialog lists the sharks
+# making an offer and the outstanding loans; Borrow opens a quantity dialog
+# capped at the offer, Repay settles one loan, and the dialog re-opens after
+# each. Offers need released sharks, so the jail release roll is driven until
+# one is out, which is also what the arrival flow does on its own.
+func _test_loan_sharks() -> void:
+	var world := _fresh(SEED)
+	_main._do_finances()
+	await _idle()
+	var dialog := _main.dialogs().current() as FinancesDialog
+	_assert(dialog != null, "Finances should open a finances dialog")
+	if dialog == null:
+		return
+	_assert(_find_named(dialog, "finRepay0") != null, "the starter loan from Honest Harry should list a Repay button")
+	_assert(_find_named(dialog, "finBorrow0") == null and _find_named(dialog, "finBorrow1") == null, "no shark offers while all but Harry are in jail")
+	_assert((_find_named(dialog, "finRepay0") as Button).text == "Repay $10,525", "Repay should show the early payoff, got '%s'" % (_find_named(dialog, "finRepay0") as Button).text)
+	_assert((_find_named(dialog, "finRepay0") as Button).disabled, "Repay should be disabled without the cash to settle")
+	var text := _copy_text(dialog)
+	_assert(text.contains("Honest Harry: $5,500, 10 days left"), "the loan row should name the shark, balance and days left, got '%s'" % text)
+	_assert(text.contains("Nobody is lending right now."), "an empty offer list should say so")
+	_assert(text.contains("Note: Your maximum TOTAL debt cannot exceed 1,000,000"), "the dialog should carry the debt cap note")
+	_main.dialogs().close()
+
+	var guard := 0
+	while world.offers_copy().is_empty() and guard < 200:
+		guard += 1
+		world.roll_shark_release()
+	_assert(not world.offers_copy().is_empty(), "rolling the jail release should bring out a shark")
+	var offer: Dictionary = world.offers_copy()[0]
+	var shark_index := int(offer["shark_index"])
+	var shark: Dictionary = Roster.sharks()[shark_index]
+	_main._do_finances()
+	await _idle()
+	dialog = _main.dialogs().current() as FinancesDialog
+	var borrow_button := _find_named(dialog, "finBorrow%d" % shark_index) as Button
+	_assert(borrow_button != null, "a released shark should list a Borrow button")
+	_assert(
+		borrow_button.text == "%s  %d%%  %d days  %dx" % [shark["name"], shark["rate_percent"], shark["duration_days"], shark["multiplier"]],
+		"the offer should show name, rate, duration and multiplier, got '%s'" % borrow_button.text
+	)
+
+	var cash_before := int(world.state_get()["cash"])
+	_main._on_finances_action("finBorrow%d" % shark_index)
+	await _idle()
+	var amount := _main.dialogs().current() as QuantityDialog
+	_assert(amount != null, "Borrow should open a quantity dialog")
+	if amount == null:
+		return
+	_assert(amount.max_value() == int(offer["max_amount"]), "the borrow spinner should cap at the offer, got %d" % amount.max_value())
+	amount.set_value(1000)
+	_main.dialogs().confirm()
+	await _idle()
+	_assert(int(world.state_get()["cash"]) == cash_before + 1000, "borrowing 1000 should add 1000 cash")
+	_assert(int(world.state_get()["debt"]) == 6500, "borrowing 1000 should raise the debt to 6500")
+	_assert(_main.hud().led_text("debt") == Copy.led_fmt(6500), "the debt LED should follow the loan")
+	dialog = _main.dialogs().current() as FinancesDialog
+	_assert(dialog != null, "the finances dialog should re-open after borrowing")
+	_assert(_find_named(dialog, "finBorrow%d" % shark_index) == null, "a shark owed money should stop offering")
+	_assert(_find_named(dialog, "finRepay%d" % shark_index) != null, "the new loan should list a Repay button")
+	_assert(_copy_text(dialog).contains("%s: $1,000, %s" % [shark["name"], Copy.loan_days(int(shark["duration_days"]))]), "the new loan row should show its days left")
+
+	var payoff := int(world.loans_copy()[1]["payoff"])
+	cash_before = int(world.state_get()["cash"])
+	_main._on_finances_action("finRepay%d" % shark_index)
+	await _idle()
+	_assert(int(world.state_get()["cash"]) == cash_before - payoff, "repaying should take the payoff out of cash")
+	_assert(world.loans_copy().size() == 1, "a repaid loan should leave the list")
+	dialog = _main.dialogs().current() as FinancesDialog
+	_assert(dialog != null and _find_named(dialog, "finBorrow%d" % shark_index) != null, "a repaid shark should offer again")
+	_main.dialogs().close()
+
+	_assert(Copy.loan_days(1) == "1 day left" and Copy.loan_days(0) == "Due today", "the days column should read 1 day left and Due today")
+	_assert(Copy.loan_days(-1) == "1 day past due" and Copy.loan_days(-3) == "3 days past due", "a late loan should count days past due")
+
+	# The arrival flow rolls the release itself and announces it.
+	var announced := false
+	for seed_value in range(1, 200):
+		_main.dialogs().close()
+		_fresh(seed_value)
+		_main.hud().borough_pressed(1)
+		await _idle()
+		var steps := 0
+		while _main.dialogs().is_open() and steps < 20:
+			steps += 1
+			var current := _main.dialogs().current()
+			if current is AlertDialog and _copy_text(current).contains("was released from jail today!"):
+				announced = true
+				break
+			_main.dialogs().confirm()
+			await _idle()
+		if announced:
+			break
+	_assert(announced, "some seed should release a shark on the first arrival and announce it")
+	_main.dialogs().close()
+
+
 func _test_travel_arrival_outcomes() -> void:
 	# A chase: the first travel starts one, and nothing else runs. Arm a gun so
 	# the chase can be fought to a win, which is how it drains.

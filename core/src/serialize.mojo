@@ -22,16 +22,19 @@
 import floatbits
 import rules
 import rng as rng_mod
+import sharks
 import world
 
 
-# seed(4) + rng_state(4) + day(8) + num_days(8) + cash/debt/bank(3*17)
+# seed(4) + rng_state(4) + day(8) + num_days(8) + cash/bank(2*17)
 # + start_cash(17) + health/coat_capacity/guns/location_index(4*8)
 # + dead/last_day_warned(2) + price_order(4+12) + price slots(12*10)
 # + prev_price_order(4+12) + prev price slots(12*9) + inv_order(4+12)
 # + inv slots(12*26) + price_events(4+8*16) with 12 drugs and 8 events; now 13 drugs and
-# 13 events, plus last_price/seen_price(13*8 each) and last_event/price_direction(13 each).
-comptime DUMP_LEN = 1208
+# 13 events, plus last_price/seen_price(13*8 each) and last_event/price_direction(13 each), then the
+# loans: count(4), 5 slots of shark(1) + balance(8) + days_left(8), and 5 released flags.
+comptime LOAN_COUNT_OFFSET = 1191
+comptime DUMP_LEN = 1285
 
 
 struct ByteWriter:
@@ -119,7 +122,6 @@ def dump(ref game: world.World) raises -> List[UInt8]:
     writer.i64(game.day)
     writer.i64(game.num_days)
     writer.f64(game.cash)
-    writer.f64(game.debt)
     writer.f64(game.bank)
     writer.f64(game.start_cash)
     writer.i64(game.health)
@@ -157,6 +159,14 @@ def dump(ref game: world.World) raises -> List[UInt8]:
         writer.i64(game.seen_price[i])
         writer.u8(UInt8(Int(game.price_direction[i]) + 1))
 
+    writer.u32(UInt32(game.loan_count))
+    for i in range(sharks.NUM_SHARKS):
+        writer.u8(game.loan_shark[i])
+        writer.i64(game.loan_balance[i])
+        writer.i64(game.loan_days_left[i])
+    for i in range(sharks.NUM_SHARKS):
+        writer.u8(game.shark_released[i])
+
     if len(writer.bytes) != DUMP_LEN:
         raise Error(
             "serialized world is "
@@ -176,7 +186,6 @@ def load(bytes: List[UInt8]) raises -> world.World:
     game.day = reader.i64()
     game.num_days = reader.i64()
     game.cash = reader.f64()
-    game.debt = reader.f64()
     game.bank = reader.f64()
     game.start_cash = reader.f64()
     game.health = reader.i64()
@@ -220,5 +229,17 @@ def load(bytes: List[UInt8]) raises -> world.World:
         game.last_event[i] = reader.u8()
         game.seen_price[i] = reader.i64()
         game.price_direction[i] = Int8(Int(reader.u8()) - 1)
+
+    game.loan_count = Int(reader.u32())
+    if game.loan_count > sharks.NUM_SHARKS:
+        raise Error("serialized world has more loans than sharks")
+    for i in range(sharks.NUM_SHARKS):
+        game.loan_shark[i] = reader.u8()
+        if Int(game.loan_shark[i]) >= sharks.NUM_SHARKS:
+            raise Error("serialized loan names an unknown shark")
+        game.loan_balance[i] = reader.i64()
+        game.loan_days_left[i] = reader.i64()
+    for i in range(sharks.NUM_SHARKS):
+        game.shark_released[i] = reader.u8()
 
     return game^

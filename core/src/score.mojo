@@ -51,7 +51,7 @@ comptime MAX_HIGH_SCORES = 10
 
 
 def finish(ref game: world.World) -> FinishResult:
-    return FinishResult(game.cash + game.bank - game.debt, game.dead, game.day)
+    return FinishResult(game.cash + game.bank - Float64(game.total_debt()), game.dead, game.day)
 
 
 def insert_high_score(mut scores: List[HighScore], entry: HighScore) -> Bool:

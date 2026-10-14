@@ -64,7 +64,7 @@ The table above is the read-only classification. This section records what was d
 | 08-serialize-roundtrip | retired | Re-homed as `serialize_test.mojo`. |
 | 09-full-run-31day | retired | Re-homed as `run_test.mojo`. |
 | 10-rolls-and-helpers | split | Kept the coat dealer offer range and `price < cash` rule and `applyDamage`, projected on cash, health, dead. The 1 in 6 chase start, travel and gun dealer offer steps are retired. |
-| 11-finances | split | Kept deposit, withdraw and unknown-action steps, projected on cash and bank. The `payLoan` steps are retired with the single debt (N-06); per-loan repayment (N-06, N-30) has no entry point yet. |
+| 11-finances | split | Kept deposit, withdraw and unknown-action steps, projected on cash and bank. The `payLoan` steps are retired with the single debt (N-06); per-loan repayment (N-06, N-30) is pinned by `tests/mojo/loans_test.mojo` (TASK-013.02.04). |
 | 12-dealer-visits | retired | Pinned the 1.2 combined visit draw. The 2.1 trigger is a pending test (N-28). |
 
 ### Rules with no entry point yet

@@ -141,3 +141,11 @@ additive.
 **Godot port:** the core rolls prices as `docs/beermat-2.1-re.md` "Price roll" describes, minus the tip drug and the stored hospital multiplier (the `Random(9)` is drawn and discarded so the stream matches; the Old Lady, arrest and hospital slices add the rest). An event price shows the flat glyph in the direction column instead of Beermat's fourth icon, because the icon was not identified. The arrow compares with the last day the drug was on sale, as Beermat does, so a drug absent yesterday still gets an arrow against an older day.
 
 **Approved because:** each omitted piece belongs to a slice that owns the state it needs, and the omission changes no draw the port makes today.
+
+## 11. Loan shark rows act directly instead of select-then-act
+
+**Beermat 2.1:** the finance dialog lists the sharks and the outstanding loans as selectable rows; picking a row fills a borrow box (borrow) or shows the amount owed (repay), and a separate button confirms.
+
+**Godot port (`game/presentation/dialogs/finances_dialog.gd`):** each offer is a Borrow button named `finBorrow<shark index>` that opens a quantity dialog capped at the offer's `max_amount`, and each outstanding loan has a Repay button named `finRepay<shark index>` that shows the payoff and settles the whole loan at once. The rules are unchanged; only the interaction differs. Pay All Loans is not implemented.
+
+**Approved because:** Lance approved the per-row buttons (TASK-013.02.04) because they reuse the existing quantity dialog and need no selection state.

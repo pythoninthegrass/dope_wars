@@ -64,6 +64,11 @@ public:
 	int sell(int drug_index, int qty);
 	int travel(int dest_location_index);
 	Dictionary finances(int action, int64_t amount);
+	Array loans_copy();
+	Array offers_copy();
+	int borrow(int shark_index, int64_t amount);
+	Dictionary repay(int shark_index);
+	Dictionary roll_shark_release();
 
 	// Arrival / dealer events
 	Dictionary roll_arrival_event();
@@ -94,13 +99,13 @@ public:
 	// Rules
 	Array rules_locations();
 	Array rules_drugs();
+	Array rules_sharks();
 	static int rules_default_num_days();
 	static int rules_default_start_cash();
 	static int64_t rules_default_start_debt();
 	static int rules_default_start_health();
 	static int rules_default_start_coat_capacity();
 	static int rules_default_start_location_index();
-	static int rules_debt_interest_bp();
 	static int rules_bank_interest_bp();
 	static int rules_cheap_divide();
 	static int rules_expensive_multiply();

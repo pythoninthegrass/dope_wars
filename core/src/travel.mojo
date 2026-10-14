@@ -10,10 +10,11 @@
 #   3. dead
 #   4. the game is over (day >= numDays)
 #
-# Interest is applied on the way out: debt compounds at 10% and bank at 5%, each
-# rounded to a whole dollar and skipped at a balance of 0 or less (see interest).
+# Interest is applied on the way out: each loan compounds at its shark's rate and
+# the bank at 5%, each rounded to a whole dollar (see interest and loans).
 
 import interest
+import loans
 import prices
 import result
 import rules
@@ -31,7 +32,7 @@ def travel(mut game: world.World, dest_index: Int) raises -> result.Outcome:
         return result.Outcome(result.ERR_GAME_OVER)
 
     game.day += 1
-    game.debt = Float64(interest.debt_after_interest(Int64(game.debt)))
+    loans.apply_daily_interest(game)
     game.bank = Float64(interest.bank_after_interest(Int64(game.bank)))
     game.location_index = dest_index
     _ = prices.generate_prices(game)

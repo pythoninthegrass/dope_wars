@@ -30,6 +30,8 @@ const ERR_GAME_OVER := DopeWarsWorld.DW_ERR_GAME_OVER
 const ERR_DEAD := DopeWarsWorld.DW_ERR_DEAD
 const ERR_SERIALIZATION_FAILED := DopeWarsWorld.DW_ERR_SERIALIZATION_FAILED
 const ERR_SCORE_TOO_LOW := DopeWarsWorld.DW_ERR_SCORE_TOO_LOW
+const ERR_NOT_OFFERED := DopeWarsWorld.DW_ERR_NOT_OFFERED
+const ERR_NO_SUCH_LOAN := DopeWarsWorld.DW_ERR_NO_SUCH_LOAN
 
 const ARRIVAL_NONE := DopeWarsWorld.DW_ARRIVAL_NONE
 const ARRIVAL_MUGGED := DopeWarsWorld.DW_ARRIVAL_MUGGED
@@ -48,7 +50,6 @@ const PRICE_EVENT_VET := DopeWarsWorld.DW_PRICE_EVENT_VET
 
 const FINANCES_DEPOSIT := DopeWarsWorld.DW_FINANCES_DEPOSIT
 const FINANCES_WITHDRAW := DopeWarsWorld.DW_FINANCES_WITHDRAW
-const FINANCES_PAY_LOAN := DopeWarsWorld.DW_FINANCES_PAY_LOAN
 
 const NUM_LOCATIONS := DopeWarsWorld.DW_NUM_LOCATIONS
 const NUM_DRUGS := DopeWarsWorld.DW_NUM_DRUGS
@@ -144,6 +145,37 @@ func travel(dest_location_index: int) -> int:
 ## which may be less than `amount`.
 func finances(action: int, amount: int) -> Dictionary:
 	return _world.finances(action, amount)
+
+
+# --- loan sharks ----------------------------------------------------------
+
+
+## Array of {shark_index, balance, payoff, days_left} in the order the loans
+## were taken. `payoff` is what repay() would charge right now.
+func loans_copy() -> Array:
+	return _world.loans_copy()
+
+
+## Array of {shark_index, max_amount} for the sharks making an offer, in shark
+## index order.
+func offers_copy() -> Array:
+	return _world.offers_copy()
+
+
+## Returns a result code: OK, ERR_INVALID_ARGUMENT, ERR_NOT_OFFERED.
+func borrow(shark_index: int, amount: int) -> int:
+	return _world.borrow(shark_index, amount)
+
+
+## Settles one loan in full. Returns {result, paid}.
+func repay(shark_index: int) -> Dictionary:
+	return _world.repay(shark_index)
+
+
+## The jail release roll for one non-chase arrival. Returns {result,
+## shark_index}; shark_index is -1 when nobody was released.
+func roll_shark_release() -> Dictionary:
+	return _world.roll_shark_release()
 
 
 # --- arrival / dealer events ------------------------------------------------
@@ -271,6 +303,12 @@ func rules_drugs() -> Array:
 	return _world.rules_drugs()
 
 
+## Array of {name, rate_percent, duration_days, multiplier, bruisers, female}.
+## Static table, indexed by shark index.
+func rules_sharks() -> Array:
+	return _world.rules_sharks()
+
+
 func world_size() -> int:
 	return DopeWarsWorld.world_size()
 
@@ -301,10 +339,6 @@ func rules_default_start_coat_capacity() -> int:
 
 func rules_default_start_location_index() -> int:
 	return DopeWarsWorld.rules_default_start_location_index()
-
-
-func rules_debt_interest_bp() -> int:
-	return DopeWarsWorld.rules_debt_interest_bp()
 
 
 func rules_bank_interest_bp() -> int:

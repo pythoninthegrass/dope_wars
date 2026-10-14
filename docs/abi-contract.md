@@ -125,17 +125,30 @@ Both are additive, so `DW_ABI_VERSION` is unchanged at `1u`.
 
 ## Float projections
 
-The core keeps `cash`, `bank`, `debt` and `avg_price` as `Float64` because the
-JS oracle does (`cash` and `avg_price` carry fractions; since v9 `bank` and `debt` are always whole dollars but stay `Float64`, so the dump layout is unchanged). Several ABI view
+The core keeps `cash`, `bank` and `avg_price` as `Float64` because the
+JS oracle does (`cash` and `avg_price` carry fractions; since v9 `bank` is always whole dollars but stays `Float64`, so the dump layout is unchanged). Debt is not a float: it is the sum of the loan balances, which are `Int64` whole dollars (see "Loan sharks"). Several ABI view
 fields are integers, so they are a lossy **display** projection:
 
-- `dw_state_view.bank` / `.debt` (`int64_t`)
+- `dw_state_view.bank` (`int64_t`)
 - `dw_inventory_slot.avg_price_cents` (`int64_t`, dollars × 100)
 - `dw_finish_result.score` (`int64_t`)
 
 The rule is **truncate toward zero** for every float64 → int64 projection.
 Persistence is unaffected: `dw_world_dump` is opaque bytes and keeps the raw
 float64, so save/load stays bit-exact.
+
+## Loan sharks
+
+Beermat 2.1 replaces the single debt with up to five loans, one per shark (`docs/beermat-2.1-re.md`, "Loan sharks"). The world holds the loans in the order they were taken, each as a shark index, a whole-dollar balance and a `days_left` that counts down on every travel and goes negative once the loan is past due, plus a released-from-jail flag per shark. A new game releases Honest Harry and opens the starter loan: 5,500 from Harry, 10 days left, at Harry's 15% a day. There is no `debt` field in the world: `dw_state_view.debt` is the total of the balances, and `dw_finish` scores `cash + bank` minus that total.
+
+- `dw_rules_sharks_copy` is the static shark table (`dw_shark_view`: name, rate in percent per day, duration in days, borrow multiplier of cash plus bank, bruiser count, sex), `DW_NUM_SHARKS` long, indexed by shark index.
+- `dw_loans_copy` lists the loans (`dw_loan_view`: balance, `payoff`, `days_left`, shark index). `payoff` is what `dw_repay` charges now: the balance once the loan is due, otherwise the balance plus 30% of the interest the remaining days would add.
+- `dw_offers_copy` lists the sharks that are out of jail and owed nothing (`dw_offer_view`: shark index, `max_amount`), where `max_amount` is the multiplier times cash plus bank, capped at 1,000,000 minus total debt.
+- `dw_borrow(shark, amount)` adds the cash and appends a loan with the shark's duration. It returns `DW_ERR_NOT_OFFERED` for a shark in jail or already owed, and `DW_ERR_INVALID_ARGUMENT` for an unknown shark or an amount that is not above 0 or is above `max_amount`. Interest can still push total debt past the 1,000,000 cap; the cap only gates borrowing.
+- `dw_repay(shark, out_paid)` settles one loan in full from cash. It returns `DW_ERR_NO_SUCH_LOAN` when nothing is owed to that shark and `DW_ERR_INSUFFICIENT_CASH` when cash is short. There is no partial repayment.
+- `dw_roll_shark_release` is the jail release roll for one non-chase arrival: while any shark is still in jail, `Random(7) < 3` releases one by drawing `Random(5)` until it lands on a shark still in jail. It draws nothing once all five are out. Like `dw_roll_dealer_visit` it is not called by `dw_travel`; the arrival sequence calls it ahead of the dealer roll.
+- `dw_travel` compounds each loan at its shark's rate, `Round(balance * (rate / 100.0) + balance)`. The rate is a double, so an exact .5 tie goes to the side the double's error points at (0.15 is a hair low, so ties round down; 0.10 is a hair high, so they round up; 0.25 is exact, so it rounds to even), and `days_left` drops by one.
+- `DW_FINANCES_PAY_LOAN` and `dw_rules_debt_interest_bp` are removed; `dw_finances` handles deposit and withdraw only.
 
 ## Versioning
 
@@ -173,7 +186,7 @@ float64, so save/load stays bit-exact.
 - **v9 (TASK-010.02.08)**: Beermat's interest rounding (`docs/beermat-re.md`, M-10). `dw_travel` rounds debt and bank interest to whole dollars with ties-to-even (computed in integers to match the binary's x87 product) and skips a balance of 0 or less, so `bank` is always integral. No signature, struct layout or dump length changes, but the observable result of `dw_travel` does, which the policy above counts as a bump.
 - **v10 (TASK-010.02.11)**: Beermat only records a final score above 0 (`docs/beermat-re.md`, M-13). `dw_insert_highscore` now returns the new `DW_ERR_SCORE_TOO_LOW` (14) instead of `DW_OK` when `entry->score <= 0`, leaving `scores` and `*out_count` unchanged. The new enum constant is appended, not renumbered, but the function's observable behavior changes for that input, which the policy above counts as a bump. No struct layout or dump length changes.
 
-Beermat 2.1 slices that keep the signatures and struct sizes are additive and do not bump the version. TASK-013.02.02 carved `dw_highscore_entry.num_days` (`uint16_t`, the game length) out of the padding. TASK-013.02.03 raised `DW_NUM_DRUGS` to 13 (MDA and Mushrooms replace Smack and Shrooms in their slots, Special K is slot 12), added `DW_PRICE_EVENT_VET` (3) for the Special K spike, carved `dw_price_slot.direction` (`int8_t`, -1, 0 or 1) out of the padding, and grew the dump from 846 to 1208 bytes (13 drugs, 13 price-event slots and the roll history). A save from an earlier build fails the dump length check and starts a new game.
+Beermat 2.1 slices that keep the signatures and struct sizes are additive and do not bump the version. TASK-013.02.02 carved `dw_highscore_entry.num_days` (`uint16_t`, the game length) out of the padding. TASK-013.02.04 replaces the single debt with loans: `dw_state_view.debt` is now the total of the loans, `DW_FINANCES_PAY_LOAN` and `dw_rules_debt_interest_bp` are removed, `dw_rules_sharks_copy`, `dw_loans_copy`, `dw_offers_copy`, `dw_borrow`, `dw_repay` and `dw_roll_shark_release` are new with `dw_shark_view`, `dw_loan_view`, `dw_offer_view`, `DW_NUM_SHARKS`, `DW_ERR_NOT_OFFERED` (15) and `DW_ERR_NO_SUCH_LOAN` (16), `dw_travel` compounds each loan at its shark's rate, and the dump drops the `debt` float and gains the loans block (1208 to 1285 bytes). TASK-013.02.03 raised `DW_NUM_DRUGS` to 13 (MDA and Mushrooms replace Smack and Shrooms in their slots, Special K is slot 12), added `DW_PRICE_EVENT_VET` (3) for the Special K spike, carved `dw_price_slot.direction` (`int8_t`, -1, 0 or 1) out of the padding, and grew the dump from 846 to 1208 bytes (13 drugs, 13 price-event slots and the roll history). A save from an earlier build fails the dump length check and starts a new game.
 
 ## Serialization
 
@@ -182,12 +195,12 @@ Beermat 2.1 slices that keep the signatures and struct sizes are additive and do
   not depend on inventory occupancy or price-table content.
 - `dw_world_dump` writes the canonical byte sequence produced by
   `core/src/serialize.mojo`: the scalar state (seed, RNG state, day, num_days,
-  cash, debt, bank, start_cash, health, coat capacity, guns, location, dead,
+  cash, bank, start_cash, health, coat capacity, guns, location, dead,
   last-day-warned), then each ordered map as a live count followed by all
   `DW_NUM_DRUGS` order slots (zero-padded past the live count) and all
   `DW_NUM_DRUGS` dense slots, then the price-event list as a count followed by
   `MAX_PRICE_EVENTS` slots, then the roll history per drug (last price, last
-  event flag, last-seen price, price direction). Floats are stored as an exact
+  event flag, last-seen price, price direction), then the loans (a live count, five slots of shark index, balance and days left, zero-filled past the count, and five released-from-jail flags). Floats are stored as an exact
   (sign, exponent, mantissa) decomposition, so a save/load cycle is bit-exact.
   Deterministic little-endian encoding, no compression, no framing.
 - `dw_world_load` accepts exactly the byte sequence `dw_world_dump` produced

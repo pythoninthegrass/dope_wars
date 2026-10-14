@@ -4,7 +4,7 @@
 # entry point that exists today, so it fails on the 1.2 code and passes once the
 # rule lands. They are skipped in main() until then; the slice that implements a
 # rule removes its skip line, and the test must pass. The N-xx ID names the rule.
-# Rules with no entry point yet (loans, weapons, game length, the 13-drug roster's
+# Rules with no entry point yet (weapons, game length, the 13-drug roster's
 # price roll) get their tests with the API their slice adds.
 
 import combat

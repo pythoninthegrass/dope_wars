@@ -311,23 +311,53 @@ func _do_finances() -> void:
 	var cash := int(state.get("cash", 0))
 	var bank := int(state.get("bank", 0))
 	var debt := int(state.get("debt", 0))
-	_dialogs.open(FinancesDialog.new().present(cash, bank, debt), _on_finances_action)
+	_dialogs.open(
+		FinancesDialog.new().present(cash, bank, debt, _world.offers_copy(), _world.loans_copy()),
+		_on_finances_action
+	)
 
 
 func _on_finances_action(key: String) -> void:
 	if not key.begins_with("fin") or key == "finClose":
+		return
+	if key.begins_with("finBorrow"):
+		_borrow_from(int(key.trim_prefix("finBorrow")))
+		return
+	if key.begins_with("finRepay"):
+		_world.repay(int(key.trim_prefix("finRepay")))
+		_refresh()
+		_do_finances()
 		return
 	var action := _finances_action_for(key)
 	if action < 0:
 		return
 	var state := _world.state_get()
 	var dialog := FinancesDialog.new()
-	var limit := dialog.amount_for(action, int(state.get("cash", 0)), int(state.get("bank", 0)), int(state.get("debt", 0)))
-	var prompt := dialog.prompt_for(action, int(state.get("cash", 0)), int(state.get("bank", 0)), int(state.get("debt", 0)))
+	var limit := dialog.amount_for(action, int(state.get("cash", 0)), int(state.get("bank", 0)))
+	var prompt := dialog.prompt_for(action, int(state.get("cash", 0)), int(state.get("bank", 0)))
 	var amount := QuantityDialog.new().present(_finances_title(action), prompt, limit)
 	_dialogs.open(amount, func(confirm_key: String) -> void:
 		if confirm_key == "qtyOk":
 			_world.finances(action, amount.value())
+		_refresh()
+		_do_finances()
+	)
+
+
+## The borrow quantity dialog for one shark's offer, capped at what the core
+## says they will lend right now.
+func _borrow_from(shark_index: int) -> void:
+	var limit := -1
+	for offer in _world.offers_copy():
+		if int(offer["shark_index"]) == shark_index:
+			limit = int(offer["max_amount"])
+	if limit <= 0:
+		return
+	var prompt := tr(Copy.MSG_BORROW_PROMPT).format([Roster.shark_name(shark_index), Copy.fmt(limit)])
+	var amount := QuantityDialog.new().present(Copy.DLG_BORROW, prompt, limit)
+	_dialogs.open(amount, func(confirm_key: String) -> void:
+		if confirm_key == "qtyOk" and amount.value() > 0:
+			_world.borrow(shark_index, amount.value())
 		_refresh()
 		_do_finances()
 	)
@@ -339,8 +369,6 @@ static func _finances_action_for(key: String) -> int:
 			return SimWorld.FINANCES_DEPOSIT
 		"finWithdraw":
 			return SimWorld.FINANCES_WITHDRAW
-		"finPayLoan":
-			return SimWorld.FINANCES_PAY_LOAN
 	return -1
 
 
@@ -350,8 +378,6 @@ static func _finances_title(action: int) -> String:
 			return Copy.DLG_DEPOSIT
 		SimWorld.FINANCES_WITHDRAW:
 			return Copy.DLG_WITHDRAW
-		SimWorld.FINANCES_PAY_LOAN:
-			return Copy.DLG_PAY_LOAN
 	return Copy.DLG_FINANCES
 
 

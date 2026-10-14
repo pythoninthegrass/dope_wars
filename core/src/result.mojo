@@ -18,6 +18,8 @@ comptime ERR_UNKNOWN_LOCATION = 6
 comptime ERR_ALREADY_THERE = 7
 comptime ERR_GAME_OVER = 8
 comptime ERR_DEAD = 9
+comptime ERR_NOT_OFFERED = 10
+comptime ERR_NO_SUCH_LOAN = 11
 
 
 struct Outcome:

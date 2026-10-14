@@ -35,6 +35,7 @@ belong in the Python harness. Run through task core:abi-header-check.
 DW_STATIC_ASSERT(DW_ABI_VERSION == 10u, "DW_ABI_VERSION drifted from the v10 contract");
 DW_STATIC_ASSERT(DW_NUM_LOCATIONS == 6u, "DW_NUM_LOCATIONS drifted");
 DW_STATIC_ASSERT(DW_NUM_DRUGS == 13u, "DW_NUM_DRUGS drifted");
+DW_STATIC_ASSERT(DW_NUM_SHARKS == 5u, "DW_NUM_SHARKS drifted");
 DW_STATIC_ASSERT(DW_MAX_HIGHSCORES == 10u, "DW_MAX_HIGHSCORES drifted");
 DW_STATIC_ASSERT(offsetof(dw_price_slot, direction) == 9, "dw_price_slot.direction offset changed");
 DW_STATIC_ASSERT(offsetof(dw_highscore_entry, num_days) == 46, "dw_highscore_entry.num_days offset changed");
@@ -48,6 +49,8 @@ DW_STATIC_ASSERT(DW_ERR_BUFFER_TOO_SMALL == 2, "result code renumbered");
 DW_STATIC_ASSERT(DW_ERR_ABI_VERSION_MISMATCH == 3, "result code renumbered");
 DW_STATIC_ASSERT(DW_ERR_SERIALIZATION_FAILED == 13, "result code renumbered");
 DW_STATIC_ASSERT(DW_ERR_SCORE_TOO_LOW == 14, "result code renumbered");
+DW_STATIC_ASSERT(DW_ERR_NOT_OFFERED == 15, "result code renumbered");
+DW_STATIC_ASSERT(DW_ERR_NO_SUCH_LOAN == 16, "result code renumbered");
 
 /* Kind enums are uint8_t typedefs for the same width reason. */
 DW_STATIC_ASSERT(sizeof(dw_arrival_event_kind) == 1, "arrival kind must stay uint8_t");
@@ -113,7 +116,6 @@ static void *const dw_implemented_surface[] = {
     (void *) &dw_rules_default_start_health,
     (void *) &dw_rules_default_start_coat_capacity,
     (void *) &dw_rules_default_start_location_index,
-    (void *) &dw_rules_debt_interest_bp,
     (void *) &dw_rules_bank_interest_bp,
     (void *) &dw_rules_cheap_divide,
     (void *) &dw_rules_expensive_multiply,

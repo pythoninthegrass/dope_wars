@@ -17,6 +17,7 @@ extends RefCounted
 
 static var _drugs: Array = []
 static var _locations: Array = []
+static var _sharks: Array = []
 static var _loaded := false
 
 
@@ -27,6 +28,7 @@ static func _ensure() -> void:
 	var world := SimWorld.new()
 	_drugs = world.rules_drugs()
 	_locations = world.rules_locations()
+	_sharks = world.rules_sharks()
 
 
 static func drugs() -> Array:
@@ -37,6 +39,13 @@ static func drugs() -> Array:
 static func locations() -> Array:
 	_ensure()
 	return _locations
+
+
+## Array of {name, rate_percent, duration_days, multiplier, bruisers, female},
+## indexed by shark index.
+static func sharks() -> Array:
+	_ensure()
+	return _sharks
 
 
 static func location_count() -> int:
@@ -78,3 +87,10 @@ static func location_name(location_index: int) -> String:
 	if location_index < 0 or location_index >= _locations.size():
 		return ""
 	return String(_locations[location_index]["name"])
+
+
+static func shark_name(shark_index: int) -> String:
+	_ensure()
+	if shark_index < 0 or shark_index >= _sharks.size():
+		return ""
+	return String(_sharks[shark_index]["name"])

@@ -22,6 +22,7 @@ import result
 import rules
 import score
 import serialize
+import sharks
 import trade
 import travel
 import world
@@ -90,7 +91,12 @@ def _apply_set_field(mut game: world.World, ref rec: record.Record) raises:
     if args.has("cash"):
         game.cash = args.float_at("cash")
     if args.has("debt"):
-        game.debt = args.float_at("debt")
+        # The 1.2 fixtures carry one lump of debt; here it is a single loan from the first shark.
+        while game.loan_count > 0:
+            game.remove_loan(0)
+        var debt = Int64(args.float_at("debt"))
+        if debt > 0:
+            game.add_loan(0, debt, sharks.shark(0).duration)
     if args.has("bank"):
         game.bank = args.float_at("bank")
     if args.has("health"):

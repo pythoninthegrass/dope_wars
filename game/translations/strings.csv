@@ -44,7 +44,7 @@ DLG_SELL,Sell
 DLG_FINANCES,Finances
 DLG_DEPOSIT,Deposit
 DLG_WITHDRAW,Withdraw
-DLG_PAY_LOAN,Pay Loan
+DLG_BORROW,Borrow
 DLG_WORD_ON_THE_STREET,Word on the street
 DLG_RANDOM_EVENT,Random Event
 DLG_COAT_DEALER,Coat Dealer
@@ -69,10 +69,24 @@ FIN_BANK,Bank
 FIN_DEBT,Debt
 BTN_DEPOSIT,Deposit
 BTN_WITHDRAW,Withdraw
-BTN_PAY_LOAN,Pay Loan
+BTN_REPAY,Repay ${0}
 MSG_DEPOSIT_PROMPT,Deposit how much of your ${0} cash?
 MSG_WITHDRAW_PROMPT,Withdraw how much of your ${0} bank balance?
-MSG_PAY_LOAN_PROMPT,Pay down how much of your ${0} debt?
+MSG_BORROW_PROMPT,Borrow how much from {0}? They will lend up to ${1}.
+FIN_SHARKS,Loan Sharks
+FIN_SHARK_COLUMNS,"Name, % Rate, Duration, Amount"
+FIN_NO_OFFERS,Nobody is lending right now.
+FIN_LOANS,Outstanding Loans
+FIN_NO_LOANS,You owe nothing.
+FIN_DEBT_CAP_NOTE,"Note: Your maximum TOTAL debt cannot exceed 1,000,000"
+MSG_SHARK_OFFER,{0}  {1}%  {2} days  {3}x
+MSG_LOAN_ROW,"{0}: ${1}, {2}"
+MSG_LOAN_DAYS_LEFT,{0} days left
+MSG_LOAN_ONE_DAY_LEFT,1 day left
+MSG_LOAN_DUE_TODAY,Due today
+MSG_LOAN_DAYS_PAST_DUE,{0} days past due
+MSG_LOAN_ONE_DAY_PAST_DUE,1 day past due
+MSG_SHARK_RELEASED,{0} was released from jail today!
 MSG_PRICE_BUST,Cops made a big {0} bust!  Prices are outrageous!
 MSG_PRICE_CRASH_ACID,The market has been flooded with cheap home-made acid!
 MSG_PRICE_CRASH_HASHISH,The Marrakesh Express has arrived!

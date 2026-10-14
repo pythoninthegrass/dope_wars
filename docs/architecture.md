@@ -37,7 +37,7 @@ records which fixtures were kept, split or retired.
   `core/src/abi.mojo` is the only file that declares `@export` symbols; every
   other module under `core/src/` (`world.mojo`, `prices.mojo`, `trade.mojo`,
   `travel.mojo`, `events.mojo`, `dealers.mojo`, `combat.mojo`, `finances.mojo`,
-  `score.mojo`, `serialize.mojo`, `rules.mojo`, `rng.mojo`, `jsmath.mojo`,
+  `loans.mojo`, `sharks.mojo`, `interest.mojo`, `score.mojo`, `serialize.mojo`, `rules.mojo`, `rng.mojo`, `jsmath.mojo`,
   `floatbits.mojo`, `result.mojo`) implements one slice of it. This is where
   `<script id="engine">` (`index.html:609-1079`) ends up.
 - **`include/dopewars.h` — the frozen C ABI.** The single cross-language
@@ -163,7 +163,14 @@ direction.
   `dw_highscore_entry.num_days` and a default game length of 30;
   TASK-013.02.03 makes the roster 13 drugs, adds the roll history to the world
   state (dump 846 -> 1208 bytes), `dw_price_slot.direction` and
-  `DW_PRICE_EVENT_VET`. Details in `docs/abi-contract.md`.
+  `DW_PRICE_EVENT_VET`; TASK-013.02.04 replaces the single debt with a list
+  of loans from five loan sharks (`loans.mojo`, `sharks.mojo`): the world
+  keeps up to five loans and a released-from-jail flag per shark,
+  `dw_state_view.debt` is their total, the dump gains the loans block
+  (1208 -> 1285 bytes), and `dw_borrow`, `dw_repay`, `dw_loans_copy`,
+  `dw_offers_copy`, `dw_rules_sharks_copy` and `dw_roll_shark_release` are
+  new while `DW_FINANCES_PAY_LOAN` and `dw_rules_debt_interest_bp` go.
+  Details in `docs/abi-contract.md`, "Loan sharks".
 
 ## Mojo LOC share
 

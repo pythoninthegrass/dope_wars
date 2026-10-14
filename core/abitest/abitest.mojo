@@ -74,6 +74,32 @@ struct StateView(Copyable, Movable):
 
 
 @fieldwise_init
+struct SharkView(Copyable, Movable):
+    var name: Array[UInt8, 32]
+    var rate_percent: UInt32
+    var duration_days: UInt32
+    var multiplier: UInt32
+    var bruisers: UInt32
+    var female: UInt8
+    var _pad0: Array[UInt8, 3]
+
+
+@fieldwise_init
+struct LoanView(Copyable, Movable):
+    var balance: Int64
+    var payoff: Int64
+    var days_left: Int32
+    var shark_index: UInt32
+
+
+@fieldwise_init
+struct OfferView(Copyable, Movable):
+    var shark_index: UInt32
+    var _pad0: Array[UInt8, 4]
+    var max_amount: Int64
+
+
+@fieldwise_init
 struct InventorySlot(Copyable, Movable):
     var drug_index: UInt32
     var qty: UInt32
@@ -198,6 +224,8 @@ comptime DW_ERR_GAME_OVER = Int32(11)
 comptime DW_ERR_DEAD = Int32(12)
 comptime DW_ERR_SERIALIZATION_FAILED = Int32(13)
 comptime DW_ERR_SCORE_TOO_LOW = Int32(14)
+comptime DW_ERR_NOT_OFFERED = Int32(15)
+comptime DW_ERR_NO_SUCH_LOAN = Int32(16)
 
 comptime DW_NUM_LOCATIONS = 6
 comptime DW_NUM_DRUGS = 13
@@ -333,6 +361,9 @@ def test_struct_sizes_match_header() raises:
     assert_equal(size_of[Config](), 16)
     assert_equal(size_of[LocationView](), 64)
     assert_equal(size_of[DrugView](), 76)
+    assert_equal(size_of[SharkView](), 52)
+    assert_equal(size_of[LoanView](), 24)
+    assert_equal(size_of[OfferView](), 16)
     assert_equal(size_of[StateView](), 56)
     assert_equal(size_of[InventorySlot](), 16)
     assert_equal(size_of[PriceSlot](), 12)
@@ -703,7 +734,6 @@ def test_rules_accessors() raises:
     assert_equal(external_call["dw_rules_default_start_health", Int32](), Int32(100))
     assert_equal(external_call["dw_rules_default_start_coat_capacity", Int32](), Int32(100))
     assert_equal(external_call["dw_rules_default_start_location_index", Int32](), Int32(0))
-    assert_equal(external_call["dw_rules_debt_interest_bp", UInt32](), UInt32(1000))
     assert_equal(external_call["dw_rules_bank_interest_bp", UInt32](), UInt32(500))
     assert_equal(external_call["dw_rules_cheap_divide", UInt32](), UInt32(10))
     assert_equal(external_call["dw_rules_expensive_multiply", UInt32](), UInt32(5))
@@ -780,8 +810,8 @@ def test_game_step_sequence() raises:
     var after_travel = _state(ptr)
     assert_equal(after_travel.day, UInt32(2))
     assert_equal(after_travel.location_index, UInt32(2))
-    # Debt compounds 10% and rounds to a whole dollar on travel.
-    assert_equal(after_travel.debt, Int64(6050))
+    # The starter loan compounds at 15% and rounds to a whole dollar on travel.
+    assert_equal(after_travel.debt, Int64(6325))
 
 
 def test_finances_moves_money() raises:
@@ -798,9 +828,103 @@ def test_finances_moves_money() raises:
     assert_equal(actual, Int64(200))
     assert_equal(_state(ptr).cash, Int32(1700))
 
-    assert_equal(external_call["dw_finances", Int32](ptr, UInt8(2), Int64(1000), Pointer(to=actual)), DW_OK)
-    assert_equal(actual, Int64(1000))
-    assert_equal(_state(ptr).debt, Int64(4500))
+    # Repaying a loan is no longer a finances action.
+    assert_equal(external_call["dw_finances", Int32](ptr, UInt8(2), Int64(1000), Pointer(to=actual)), DW_ERR_INVALID_ARGUMENT)
+    assert_equal(_state(ptr).debt, Int64(5500))
+
+
+def _loans(ptr: Pointer[UInt8, origin=MutUntrackedOrigin]) raises -> List[LoanView]:
+    var required: UInt = 0
+    var dummy = LoanView(Int64(0), Int64(0), Int32(0), UInt32(0))
+    assert_equal(external_call["dw_loans_copy", Int32](ptr, Pointer(to=dummy), UInt(0), Pointer(to=required)), DW_OK)
+    var out = List[LoanView]()
+    for _ in range(Int(required)):
+        out.append(LoanView(Int64(0), Int64(0), Int32(0), UInt32(0)))
+    var actual: UInt = 0
+    if required > 0:
+        assert_equal(external_call["dw_loans_copy", Int32](ptr, out.unsafe_ptr(), required, Pointer(to=actual)), DW_OK)
+    return out^
+
+
+def _offers(ptr: Pointer[UInt8, origin=MutUntrackedOrigin]) raises -> List[OfferView]:
+    var required: UInt = 0
+    var dummy = OfferView(UInt32(0), Array[UInt8, 4](fill=0), Int64(0))
+    assert_equal(external_call["dw_offers_copy", Int32](ptr, Pointer(to=dummy), UInt(0), Pointer(to=required)), DW_OK)
+    var out = List[OfferView]()
+    for _ in range(Int(required)):
+        out.append(OfferView(UInt32(0), Array[UInt8, 4](fill=0), Int64(0)))
+    var actual: UInt = 0
+    if required > 0:
+        assert_equal(external_call["dw_offers_copy", Int32](ptr, out.unsafe_ptr(), required, Pointer(to=actual)), DW_OK)
+    return out^
+
+
+def test_shark_table_copy() raises:
+    var required: UInt = 0
+    var dummy = SharkView(Array[UInt8, 32](fill=0), UInt32(0), UInt32(0), UInt32(0), UInt32(0), UInt8(0), Array[UInt8, 3](fill=0))
+    assert_equal(external_call["dw_rules_sharks_copy", Int32](Pointer(to=dummy), UInt(0), Pointer(to=required)), DW_OK)
+    assert_equal(required, UInt(5))
+    var table = List[SharkView]()
+    for _ in range(5):
+        table.append(SharkView(Array[UInt8, 32](fill=0), UInt32(0), UInt32(0), UInt32(0), UInt32(0), UInt8(0), Array[UInt8, 3](fill=0)))
+    var actual: UInt = 0
+    assert_equal(external_call["dw_rules_sharks_copy", Int32](table.unsafe_ptr(), UInt(4), Pointer(to=actual)), DW_ERR_BUFFER_TOO_SMALL)
+    assert_equal(external_call["dw_rules_sharks_copy", Int32](table.unsafe_ptr(), UInt(5), Pointer(to=actual)), DW_OK)
+    assert_equal(table[0].name[0], UInt8(ord("H")))
+    assert_equal(table[0].rate_percent, UInt32(15))
+    assert_equal(table[0].duration_days, UInt32(10))
+    assert_equal(table[0].multiplier, UInt32(10))
+    assert_equal(table[3].rate_percent, UInt32(30))
+    assert_equal(table[3].female, UInt8(1))
+    assert_equal(table[4].multiplier, UInt32(100))
+
+
+def test_loans_borrow_and_repay() raises:
+    var ptr = _world()
+    assert_equal(_init(ptr, UInt32(7)), DW_OK)
+    var starter = _loans(ptr)
+    assert_equal(len(starter), 1)
+    assert_equal(starter[0].shark_index, UInt32(0))
+    assert_equal(starter[0].balance, Int64(5500))
+    assert_equal(starter[0].days_left, Int32(10))
+    # 5500 compounds to 22,250 over 10 days; 30% of the 16,750 interest is 5,025.
+    assert_equal(starter[0].payoff, Int64(10525))
+    assert_equal(len(_offers(ptr)), 0)
+    assert_equal(external_call["dw_borrow", Int32](ptr, UInt32(1), Int64(100)), DW_ERR_NOT_OFFERED)
+    assert_equal(external_call["dw_borrow", Int32](ptr, UInt32(9), Int64(100)), DW_ERR_INVALID_ARGUMENT)
+    var paid: Int64 = 0
+    assert_equal(external_call["dw_repay", Int32](ptr, UInt32(1), Pointer(to=paid)), DW_ERR_NO_SUCH_LOAN)
+    assert_equal(external_call["dw_repay", Int32](ptr, UInt32(0), Pointer(to=paid)), DW_ERR_INSUFFICIENT_CASH)
+
+    # Release every shark by rolling until none are left in jail.
+    var released: Int32 = -1
+    var count = 0
+    for _ in range(500):
+        assert_equal(external_call["dw_roll_shark_release", Int32](ptr, Pointer(to=released)), DW_OK)
+        if released >= 0:
+            assert_true(released >= 1 and released <= 4)
+            count += 1
+    assert_equal(count, 4)
+    var offers = _offers(ptr)
+    assert_equal(len(offers), 4)
+    assert_equal(offers[0].shark_index, UInt32(1))
+    assert_equal(offers[0].max_amount, Int64(40000))
+
+    assert_equal(external_call["dw_borrow", Int32](ptr, UInt32(1), Int64(40001)), DW_ERR_INVALID_ARGUMENT)
+    assert_equal(external_call["dw_borrow", Int32](ptr, UInt32(1), Int64(1000)), DW_OK)
+    var view = _state(ptr)
+    assert_equal(view.cash, Int32(3000))
+    assert_equal(view.debt, Int64(6500))
+    assert_equal(len(_offers(ptr)), 3)
+    var owed = _loans(ptr)
+    assert_equal(len(owed), 2)
+    assert_equal(owed[1].shark_index, UInt32(1))
+    assert_equal(owed[1].days_left, Int32(15))
+
+    assert_equal(external_call["dw_repay", Int32](ptr, UInt32(1), Pointer(to=paid)), DW_OK)
+    assert_equal(paid, owed[1].payoff)
+    assert_equal(len(_loans(ptr)), 1)
+    assert_equal(len(_offers(ptr)), 4)
 
 
 def test_dealer_offers_and_purchases() raises:

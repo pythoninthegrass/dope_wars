@@ -119,7 +119,7 @@ def assert_state_matches(
     if expected.has_field("cash"):
         assert_equal(game.cash, expected.float_at("cash"))
     if expected.has_field("debt"):
-        assert_equal(game.debt, expected.float_at("debt"))
+        assert_equal(Float64(game.total_debt()), expected.float_at("debt"))
     if expected.has_field("bank"):
         assert_equal(game.bank, expected.float_at("bank"))
     if expected.has_field("health"):

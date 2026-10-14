@@ -112,11 +112,12 @@ forced by `docs/layer-boundaries.md` or by the frozen ABI.
   round-trip through JSON in JS. Core produces an opaque byte buffer, which is
   what `dw_world_dump`/`dw_world_load` hand to the game layer. Floats go through
   `floatbits.mojo`, so a save/load cycle is bit-exact.
-- **Money stays float64.** `cash`, `bank`, `debt` and `avgPrice` are `Float64`
-  because the oracle's are (`bank` goes 5500 → 5610 → 5722.2). The ABI's
-  `dw_state_view` exposes `bank`/`debt` as `int64_t`, so those view fields are a
-  lossy display projection; persistence is unaffected because the dump keeps the
-  raw float64. TASK-001.05 owns pinning the view-rounding rule.
+- **Money stays float64.** `cash`, `bank` and `avgPrice` are `Float64`
+  because the oracle's are. Loan balances are `Int64` whole dollars and debt is their sum
+  (`loans_test.mojo`). The ABI's `dw_state_view` exposes `bank` as `int64_t`, so
+  that view field is a lossy display projection; persistence is unaffected
+  because the dump keeps the raw float64. TASK-001.05 owns pinning the
+  view-rounding rule.
 
 ## Adding a test
 

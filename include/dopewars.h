@@ -81,6 +81,7 @@ uint32_t dw_abi_version(void);
  * Every ABI struct below is sized against these. */
 #define DW_NUM_LOCATIONS 6u
 #define DW_NUM_DRUGS 13u
+#define DW_NUM_SHARKS 5u
 #define DW_MAX_HIGHSCORES 10u
 
 /* Maximum length (bytes, including the trailing NUL) of the fixed-size
@@ -89,6 +90,7 @@ uint32_t dw_abi_version(void);
 #define DW_MAX_LOCATION_NAME_LEN 32u
 #define DW_MAX_DRUG_ID_LEN 32u
 #define DW_MAX_DRUG_NAME_LEN 32u
+#define DW_MAX_SHARK_NAME_LEN 32u
 #define DW_MAX_HIGHSCORE_NAME_LEN 32u
 
 /* ---------------------------------------------------------------------- */
@@ -145,6 +147,11 @@ enum {
      * recorded (docs/beermat-re.md M-13). *out_count and scores are left
      * unchanged. */
     DW_ERR_SCORE_TOO_LOW = 14,
+    /* dw_borrow: the shark is not making an offer -- still in jail, or already
+     * owed money. */
+    DW_ERR_NOT_OFFERED = 15,
+    /* dw_repay: no loan is owed to that shark. */
+    DW_ERR_NO_SUCH_LOAN = 16,
 };
 
 /* ---------------------------------------------------------------------- */
@@ -186,12 +193,11 @@ enum {
     DW_PRICE_EVENT_VET = 3,
 };
 
-/* dw_finances action selector. */
+/* dw_finances action selector. Loans are repaid with dw_repay. */
 typedef uint8_t dw_finances_action;
 enum {
     DW_FINANCES_DEPOSIT = 0,
     DW_FINANCES_WITHDRAW = 1,
-    DW_FINANCES_PAY_LOAN = 2,
 };
 
 /* ---------------------------------------------------------------------- */
@@ -252,7 +258,7 @@ typedef struct dw_state_view {
     uint32_t num_days;         /* copied from dw_config or the ruleset default */
     int32_t  cash;
     int64_t  bank;             /* accrues compound interest; may exceed int32 */
-    int64_t  debt;             /* accrues compound interest; may exceed int32 */
+    int64_t  debt;             /* total owed over every loan; may exceed int32 */
     int32_t  health;           /* 0..100 */
     int32_t  coat_capacity;    /* current total slots (starts at 100) */
     int32_t  coat_used;        /* denormalized for query convenience */
@@ -263,6 +269,42 @@ typedef struct dw_state_view {
     uint8_t  _pad0[2];         /* specified-zero */
 } dw_state_view;
 DW_STATIC_ASSERT(sizeof(dw_state_view) == 56, "dw_state_view layout changed");
+
+/* One loan shark (docs/beermat-2.1-re.md, "Loan sharks"), from the rule
+ * table. `multiplier` is the borrow limit as a multiple of cash plus bank. */
+typedef struct dw_shark_view {
+    char     name[DW_MAX_SHARK_NAME_LEN];
+    uint32_t rate_percent;     /* interest per day, compounded */
+    uint32_t duration_days;
+    uint32_t multiplier;
+    uint32_t bruisers;
+    uint8_t  female;           /* 0 or 1 */
+    uint8_t  _pad0[3];         /* specified-zero */
+} dw_shark_view;
+DW_STATIC_ASSERT(sizeof(dw_shark_view) == 52, "dw_shark_view layout changed");
+
+/* One entry in a two-call loan copy, in the order the loans were taken.
+ * `payoff` is what dw_repay would charge now: the balance once the loan is due
+ * (days_left <= 0), otherwise the balance plus 30% of the interest still to
+ * come. days_left goes negative once the loan is past due. */
+typedef struct dw_loan_view {
+    int64_t  balance;
+    int64_t  payoff;
+    int32_t  days_left;
+    uint32_t shark_index;      /* < DW_NUM_SHARKS */
+} dw_loan_view;
+DW_STATIC_ASSERT(sizeof(dw_loan_view) == 24, "dw_loan_view layout changed");
+
+/* One entry in a two-call offer copy: a shark that is out of jail and owed
+ * nothing, in shark index order. `max_amount` is what dw_borrow accepts right
+ * now (multiplier * (cash + bank), capped at 1,000,000 minus total debt) and
+ * is 0 when the cap is used up. */
+typedef struct dw_offer_view {
+    uint32_t shark_index;      /* < DW_NUM_SHARKS */
+    uint8_t  _pad0[4];         /* specified-zero */
+    int64_t  max_amount;
+} dw_offer_view;
+DW_STATIC_ASSERT(sizeof(dw_offer_view) == 16, "dw_offer_view layout changed");
 
 /* One entry in a two-call inventory copy. Slots with qty == 0 are
  * omitted from the copy (the required length is the count of live
@@ -423,12 +465,13 @@ DW_STATIC_ASSERT(sizeof(dw_highscore_entry) == 48, "dw_highscore_entry layout ch
 
 uint32_t dw_rules_default_num_days(void);
 int32_t  dw_rules_default_start_cash(void);
+/* The principal of the starter loan from the first shark. */
 int64_t  dw_rules_default_start_debt(void);
 int32_t  dw_rules_default_start_health(void);
 int32_t  dw_rules_default_start_coat_capacity(void);
 int32_t  dw_rules_default_start_location_index(void);
-/* Fixed-point interest rates: numerator over 10000. debt = 1000 -> 10.00%. */
-uint32_t dw_rules_debt_interest_bp(void);
+/* Fixed-point interest rate: numerator over 10000. bank = 500 -> 5.00%. Loan
+ * rates are per shark; see dw_rules_sharks_copy. */
 uint32_t dw_rules_bank_interest_bp(void);
 /* Cheap/expensive event multipliers. */
 uint32_t dw_rules_cheap_divide(void);
@@ -439,6 +482,10 @@ uint32_t dw_rules_expensive_multiply(void);
  * out_capacity is smaller (still setting *out_required). */
 dw_result dw_rules_locations_copy(dw_location_view *out_locations, size_t out_capacity, size_t *out_required);
 dw_result dw_rules_drugs_copy(dw_drug_view *out_drugs, size_t out_capacity, size_t *out_required);
+
+/* The loan shark table, same two-call convention; the required length is
+ * always DW_NUM_SHARKS. */
+dw_result dw_rules_sharks_copy(dw_shark_view *out_sharks, size_t out_capacity, size_t *out_required);
 
 /* Length queries for the two copies above, as free functions.
  *
@@ -576,21 +623,53 @@ dw_result dw_buy(dw_world *world, uint32_t drug_index, uint32_t qty);
 dw_result dw_sell(dw_world *world, uint32_t drug_index, uint32_t qty);
 
 /* Travel to `dest_location_index` (`index.html:802-814`): advances the
- * day counter, applies debt/bank compound interest (whole dollars, rounded
- * ties-to-even as Beermat does, skipped at a balance of 0 or less), moves the player,
+ * day counter, compounds the bank at 5% and every loan at its shark's rate
+ * (whole dollars, as Beermat 2.1 rounds them), counts each loan's days_left down, moves the player,
  * and calls dw_generate_prices for the new day. Returns
  * DW_ERR_UNKNOWN_LOCATION if the index is out of range, DW_ERR_GAME_OVER
  * on the last day, DW_ERR_DEAD if the player is dead, or
  * DW_ERR_INVALID_ARGUMENT if dest equals the current location. */
 dw_result dw_travel(dw_world *world, uint32_t dest_location_index);
 
-/* Bank/loan action (`index.html:816-834`). `amount` is truncated to the
- * available cash/bank/debt on the applicable side; *out_actual receives
+/* Bank action (`index.html:816-834`). `amount` is truncated to the
+ * available cash/bank on the applicable side; *out_actual receives
  * the amount actually moved. Never returns
  * DW_ERR_INSUFFICIENT_* — insufficient balance clamps to zero and
  * succeeds with *out_actual == 0. Returns DW_ERR_INVALID_ARGUMENT for an
  * unknown action. */
 dw_result dw_finances(dw_world *world, dw_finances_action action, int64_t amount, int64_t *out_actual);
+
+/* ---------------------------------------------------------------------- */
+/* Loan sharks (docs/beermat-2.1-re.md, "Loan sharks")                     */
+/* ---------------------------------------------------------------------- */
+
+/* The loans owed, in the order they were taken (at most one per shark), and
+ * the sharks making an offer. Both are two-call length-then-fill; an empty
+ * list is length 0 with DW_OK. */
+dw_result dw_loans_copy(const dw_world *world, dw_loan_view *out_loans, size_t out_capacity, size_t *out_required);
+dw_result dw_offers_copy(const dw_world *world, dw_offer_view *out_offers, size_t out_capacity, size_t *out_required);
+
+/* Borrow `amount` from a shark: cash rises by amount and a loan of that
+ * balance is taken with the shark's duration. Returns DW_ERR_INVALID_ARGUMENT
+ * for an unknown shark, or an amount that is not above 0 or is above the
+ * offer's max_amount, and DW_ERR_NOT_OFFERED when the shark is in jail or is
+ * already owed. On failure, world state is unchanged. */
+dw_result dw_borrow(dw_world *world, uint32_t shark_index, int64_t amount);
+
+/* Settle the loan owed to a shark in full, paying the dw_loan_view payoff from
+ * cash only (never the bank); *out_paid receives that payoff. Returns
+ * DW_ERR_INVALID_ARGUMENT for an unknown shark, DW_ERR_NO_SUCH_LOAN when none
+ * is owed to them and DW_ERR_INSUFFICIENT_CASH when cash is short, leaving
+ * the world unchanged. */
+dw_result dw_repay(dw_world *world, uint32_t shark_index, int64_t *out_paid);
+
+/* Roll the jail release for one non-chase arrival (docs/beermat-2.1-re.md,
+ * N-09): while any shark is still in jail, Random(7) < 3 releases one chosen
+ * by drawing Random(5) until it lands on a shark still in jail. *out_shark
+ * receives the released shark's index, or -1 when none was released. Draws
+ * nothing once all DW_NUM_SHARKS are out. Not called by dw_travel; the
+ * caller sequences it ahead of the dealer roll. */
+dw_result dw_roll_shark_release(dw_world *world, int32_t *out_shark);
 
 /* ---------------------------------------------------------------------- */
 /* Arrival / dealer events                                                 */

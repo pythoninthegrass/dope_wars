@@ -1,21 +1,13 @@
 # tests/mojo/interest_test.mojo — Beermat's daily interest (docs/beermat-re.md, M-10).
 #
 # Bank interest follows the 2.1 rule `Round(bank * 0.05)` (docs/beermat-2.1-re.md, N-33):
-# the rate is a double, so an exact .5 tie rounds up. Debt interest is the 1.2 rule.
+# the rate is a double, so an exact .5 tie rounds up. Loan interest is covered in loans_test.mojo.
 
 import interest
 import rules
 import world
 import travel
 from std.testing import assert_equal, TestSuite
-
-
-def test_debt_interest_rounds_ties_to_even() raises:
-    assert_equal(interest.debt_after_interest(6655), 7320)
-    assert_equal(interest.debt_after_interest(5), 6)
-    assert_equal(interest.debt_after_interest(15), 16)
-    assert_equal(interest.debt_after_interest(5500), 6050)
-    assert_equal(interest.debt_after_interest(7320), 8052)
 
 
 def test_bank_interest_rounds_to_whole_dollars() raises:
@@ -35,19 +27,19 @@ def test_bank_interest_rounds_ties_up() raises:
 
 
 def test_interest_skipped_at_zero_or_below() raises:
-    assert_equal(interest.debt_after_interest(0), 0)
-    assert_equal(interest.debt_after_interest(-100), -100)
+    assert_equal(interest.loan_after_interest(0, 15), 0)
+    assert_equal(interest.loan_after_interest(-100, 15), -100)
     assert_equal(interest.bank_after_interest(0), 0)
     assert_equal(interest.bank_after_interest(-100), -100)
 
 
 def test_travel_applies_interest() raises:
     var game = world.new_game(UInt32(1), 0, -1)
-    game.debt = 6655.0
+    game.loan_balance[0] = 6655
     game.bank = 30.0
     var dest = 1 if game.location_index == 0 else 0
     _ = travel.travel(game, dest)
-    assert_equal(game.debt, 7320.0)
+    assert_equal(game.loan_balance[0], 7653)
     assert_equal(game.bank, 32.0)
 
 

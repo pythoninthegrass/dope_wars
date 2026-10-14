@@ -16,10 +16,10 @@
 # The default game length; 2.1 also offers 15, 60 and 90 (docs/beermat-2.1-re.md, N-01).
 comptime NUM_DAYS = 30
 comptime START_CASH = 2000
+# The principal of the starter loan from the first shark.
 comptime START_DEBT = 5500
 comptime START_HEALTH = 100
 comptime START_COAT_CAPACITY = 100
-comptime DEBT_INTEREST = 0.10
 comptime BANK_INTEREST = 0.05  # beermat-verified (TASK-009): was 0.02
 comptime START_LOCATION = "bronx"
 comptime CHEAP_DIVIDE = 10

@@ -41,6 +41,7 @@ const EXPECTED_ASSERTIONS := {
 	"prev_prices": 8,
 	"dealer_visits": 14,
 	"chase_resolution": 7,
+	"loan_sharks": 23,
 }
 
 ## Coarse backstop for the harness itself: if every case reports but the total
@@ -77,6 +78,8 @@ func _initialize() -> void:
 	_test_prev_prices()
 	_case("dealer_visits")
 	_test_dealer_visits()
+	_case("loan_sharks")
+	_test_loan_sharks()
 	_case("chase_resolution")
 	_test_chase_resolution()
 	_finish()
@@ -193,13 +196,58 @@ func _test_game_step_sequence() -> void:
 	var after_travel: Dictionary = world.state_get()
 	_assert(after_travel["day"] == 2, "travel should advance the day")
 	_assert(after_travel["location_index"] == 2, "travel should move the player")
-	_assert(after_travel["debt"] == 6050, "travel should compound debt by 10%")
+	_assert(after_travel["debt"] == 6325, "travel should compound the starter loan by 15%")
 
 	# Finances move money between cash, bank and debt.
 	var deposit: Dictionary = world.finances(SimWorld.FINANCES_DEPOSIT, 500)
 	_assert(deposit["result"] == SimWorld.OK, "deposit should succeed")
 	_assert(deposit["actual"] == 500, "deposit should move 500")
 	_assert(world.state_get()["bank"] == 500, "bank should hold the deposit")
+
+
+## The loan shark surface end to end: the starter loan, the shark table, release
+## until every shark is out, borrow, repay, and a dump that round-trips.
+func _test_loan_sharks() -> void:
+	var world := _new_world()
+	var sharks: Array = world.rules_sharks()
+	_assert(sharks.size() == 5, "the shark table should have 5 sharks")
+	_assert(sharks[0]["name"] == "Honest Harry" and sharks[0]["rate_percent"] == 15, "shark 0 should be Honest Harry at 15%")
+	_assert(sharks[3]["duration_days"] == 1 and sharks[4]["multiplier"] == 100, "the table should carry duration and multiplier")
+
+	var loans: Array = world.loans_copy()
+	_assert(loans.size() == 1, "a fresh game owes exactly the starter loan")
+	_assert(loans[0]["shark_index"] == 0 and loans[0]["balance"] == 5500 and loans[0]["days_left"] == 10, "the starter loan is 5500 from Harry with 10 days left")
+	_assert(world.offers_copy().is_empty(), "no shark is offering at the start")
+	_assert(world.borrow(1, 100) == SimWorld.ERR_NOT_OFFERED, "borrowing from a shark still in jail should be refused")
+	_assert(world.repay(0)["result"] == SimWorld.ERR_INSUFFICIENT_CASH, "repaying 10525 with 2000 cash should be refused")
+
+	var released := 0
+	var rolls_ok := true
+	for _roll in range(500):
+		var roll: Dictionary = world.roll_shark_release()
+		rolls_ok = rolls_ok and roll["result"] == SimWorld.OK
+		if int(roll["shark_index"]) >= 0:
+			released += 1
+	_assert(rolls_ok, "every release roll should succeed")
+	_assert(released == 4, "rolling until the jail is empty should release the 4 other sharks, got %d" % released)
+	var offers: Array = world.offers_copy()
+	_assert(offers.size() == 4 and offers[0]["shark_index"] == 1, "every released shark but Harry should offer")
+	_assert(offers[0]["max_amount"] == 40000, "Sandy Schwing lends 20x of 2000 cash")
+
+	_assert(world.borrow(1, 40001) == SimWorld.ERR_INVALID_ARGUMENT, "borrowing past the offer should be refused")
+	_assert(world.borrow(1, 1000) == SimWorld.OK, "borrowing 1000 from Sandy should succeed")
+	_assert(world.state_get()["cash"] == 3000 and world.state_get()["debt"] == 6500, "borrowing should add the cash and the debt")
+	_assert(world.offers_copy().size() == 3, "a shark owed money stops offering")
+
+	var bytes: PackedByteArray = world.world_dump()["bytes"]
+	var restored := _new_world(99)
+	_assert(restored.world_load(bytes) == SimWorld.OK, "a dump with loans should load")
+	_assert(restored.loans_copy() == world.loans_copy(), "loaded loans should match")
+	_assert(restored.world_dump()["bytes"] == bytes, "dump, load and dump should be byte identical")
+
+	var repaid: Dictionary = world.repay(1)
+	_assert(repaid["result"] == SimWorld.OK and repaid["paid"] > 1000, "repaying early should cost more than the balance")
+	_assert(world.loans_copy().size() == 1 and world.offers_copy().size() == 4, "a repaid loan leaves the list and the shark offers again")
 
 
 ## A partial sell. Every other sell in this suite sold the whole holding,

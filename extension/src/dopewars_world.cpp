@@ -60,6 +60,11 @@ void DopeWarsWorld::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("sell", "drug_index", "qty"), &DopeWarsWorld::sell);
 	ClassDB::bind_method(D_METHOD("travel", "dest_location_index"), &DopeWarsWorld::travel);
 	ClassDB::bind_method(D_METHOD("finances", "action", "amount"), &DopeWarsWorld::finances);
+	ClassDB::bind_method(D_METHOD("loans_copy"), &DopeWarsWorld::loans_copy);
+	ClassDB::bind_method(D_METHOD("offers_copy"), &DopeWarsWorld::offers_copy);
+	ClassDB::bind_method(D_METHOD("borrow", "shark_index", "amount"), &DopeWarsWorld::borrow);
+	ClassDB::bind_method(D_METHOD("repay", "shark_index"), &DopeWarsWorld::repay);
+	ClassDB::bind_method(D_METHOD("roll_shark_release"), &DopeWarsWorld::roll_shark_release);
 
 	ClassDB::bind_method(D_METHOD("roll_arrival_event"), &DopeWarsWorld::roll_arrival_event);
 	ClassDB::bind_method(D_METHOD("roll_dealer_visit"), &DopeWarsWorld::roll_dealer_visit);
@@ -85,13 +90,13 @@ void DopeWarsWorld::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("rules_locations"), &DopeWarsWorld::rules_locations);
 	ClassDB::bind_method(D_METHOD("rules_drugs"), &DopeWarsWorld::rules_drugs);
+	ClassDB::bind_method(D_METHOD("rules_sharks"), &DopeWarsWorld::rules_sharks);
 	ClassDB::bind_static_method(get_class_static(), D_METHOD("rules_default_num_days"), &DopeWarsWorld::rules_default_num_days);
 	ClassDB::bind_static_method(get_class_static(), D_METHOD("rules_default_start_cash"), &DopeWarsWorld::rules_default_start_cash);
 	ClassDB::bind_static_method(get_class_static(), D_METHOD("rules_default_start_debt"), &DopeWarsWorld::rules_default_start_debt);
 	ClassDB::bind_static_method(get_class_static(), D_METHOD("rules_default_start_health"), &DopeWarsWorld::rules_default_start_health);
 	ClassDB::bind_static_method(get_class_static(), D_METHOD("rules_default_start_coat_capacity"), &DopeWarsWorld::rules_default_start_coat_capacity);
 	ClassDB::bind_static_method(get_class_static(), D_METHOD("rules_default_start_location_index"), &DopeWarsWorld::rules_default_start_location_index);
-	ClassDB::bind_static_method(get_class_static(), D_METHOD("rules_debt_interest_bp"), &DopeWarsWorld::rules_debt_interest_bp);
 	ClassDB::bind_static_method(get_class_static(), D_METHOD("rules_bank_interest_bp"), &DopeWarsWorld::rules_bank_interest_bp);
 	ClassDB::bind_static_method(get_class_static(), D_METHOD("rules_cheap_divide"), &DopeWarsWorld::rules_cheap_divide);
 	ClassDB::bind_static_method(get_class_static(), D_METHOD("rules_expensive_multiply"), &DopeWarsWorld::rules_expensive_multiply);
@@ -121,6 +126,8 @@ void DopeWarsWorld::_bind_methods() {
 	BIND_CONSTANT(DW_ERR_DEAD);
 	BIND_CONSTANT(DW_ERR_SERIALIZATION_FAILED);
 	BIND_CONSTANT(DW_ERR_SCORE_TOO_LOW);
+	BIND_CONSTANT(DW_ERR_NOT_OFFERED);
+	BIND_CONSTANT(DW_ERR_NO_SUCH_LOAN);
 
 	BIND_CONSTANT(DW_ARRIVAL_NONE);
 	BIND_CONSTANT(DW_ARRIVAL_MUGGED);
@@ -139,7 +146,6 @@ void DopeWarsWorld::_bind_methods() {
 
 	BIND_CONSTANT(DW_FINANCES_DEPOSIT);
 	BIND_CONSTANT(DW_FINANCES_WITHDRAW);
-	BIND_CONSTANT(DW_FINANCES_PAY_LOAN);
 }
 
 // ---------------------------------------------------------------------------
@@ -378,6 +384,89 @@ Dictionary DopeWarsWorld::finances(int action, int64_t amount) {
 	dw_result result = dw_finances(world_, static_cast<dw_finances_action>(action), amount, &actual);
 	out["result"] = result;
 	out["actual"] = actual;
+	return out;
+}
+
+// ---------------------------------------------------------------------------
+// Loan sharks
+// ---------------------------------------------------------------------------
+
+Array DopeWarsWorld::loans_copy() {
+	Array out;
+	if (!is_ready()) {
+		return out;
+	}
+	size_t required = 0;
+	dw_loans_copy(world_, nullptr, 0, &required);
+	std::vector<dw_loan_view> loans(required);
+	size_t actual = 0;
+	dw_result result = dw_loans_copy(world_, loans.data(), loans.size(), &actual);
+	if (result != DW_OK) {
+		return out;
+	}
+	for (size_t i = 0; i < actual; i++) {
+		Dictionary entry;
+		entry["shark_index"] = loans[i].shark_index;
+		entry["balance"] = loans[i].balance;
+		entry["payoff"] = loans[i].payoff;
+		entry["days_left"] = loans[i].days_left;
+		out.push_back(entry);
+	}
+	return out;
+}
+
+Array DopeWarsWorld::offers_copy() {
+	Array out;
+	if (!is_ready()) {
+		return out;
+	}
+	size_t required = 0;
+	dw_offers_copy(world_, nullptr, 0, &required);
+	std::vector<dw_offer_view> offers(required);
+	size_t actual = 0;
+	dw_result result = dw_offers_copy(world_, offers.data(), offers.size(), &actual);
+	if (result != DW_OK) {
+		return out;
+	}
+	for (size_t i = 0; i < actual; i++) {
+		Dictionary entry;
+		entry["shark_index"] = offers[i].shark_index;
+		entry["max_amount"] = offers[i].max_amount;
+		out.push_back(entry);
+	}
+	return out;
+}
+
+int DopeWarsWorld::borrow(int shark_index, int64_t amount) {
+	if (!is_ready() || shark_index < 0) {
+		return DW_ERR_INVALID_ARGUMENT;
+	}
+	return dw_borrow(world_, static_cast<uint32_t>(shark_index), amount);
+}
+
+Dictionary DopeWarsWorld::repay(int shark_index) {
+	Dictionary out;
+	if (!is_ready() || shark_index < 0) {
+		out["result"] = DW_ERR_INVALID_ARGUMENT;
+		return out;
+	}
+	int64_t paid = 0;
+	out["result"] = dw_repay(world_, static_cast<uint32_t>(shark_index), &paid);
+	out["paid"] = paid;
+	return out;
+}
+
+Dictionary DopeWarsWorld::roll_shark_release() {
+	Dictionary out;
+	out["shark_index"] = -1;
+	if (!is_ready()) {
+		out["result"] = DW_ERR_INVALID_ARGUMENT;
+		return out;
+	}
+	int32_t shark = -1;
+	dw_result result = dw_roll_shark_release(world_, &shark);
+	out["result"] = result;
+	out["shark_index"] = shark;
 	return out;
 }
 
@@ -743,6 +832,29 @@ Array DopeWarsWorld::rules_drugs() {
 	return out;
 }
 
+Array DopeWarsWorld::rules_sharks() {
+	Array out;
+	size_t required = 0;
+	dw_rules_sharks_copy(nullptr, 0, &required);
+	std::vector<dw_shark_view> sharks(required);
+	size_t actual = 0;
+	dw_result result = dw_rules_sharks_copy(sharks.data(), sharks.size(), &actual);
+	if (result != DW_OK) {
+		return out;
+	}
+	for (size_t i = 0; i < actual; i++) {
+		Dictionary entry;
+		entry["name"] = String::utf8(sharks[i].name, static_cast<int>(strnlen(sharks[i].name, DW_MAX_SHARK_NAME_LEN)));
+		entry["rate_percent"] = sharks[i].rate_percent;
+		entry["duration_days"] = sharks[i].duration_days;
+		entry["multiplier"] = sharks[i].multiplier;
+		entry["bruisers"] = sharks[i].bruisers;
+		entry["female"] = sharks[i].female;
+		out.push_back(entry);
+	}
+	return out;
+}
+
 int DopeWarsWorld::rules_default_num_days() {
 	return static_cast<int>(dw_rules_default_num_days());
 }
@@ -765,10 +877,6 @@ int DopeWarsWorld::rules_default_start_coat_capacity() {
 
 int DopeWarsWorld::rules_default_start_location_index() {
 	return dw_rules_default_start_location_index();
-}
-
-int DopeWarsWorld::rules_debt_interest_bp() {
-	return static_cast<int>(dw_rules_debt_interest_bp());
 }
 
 int DopeWarsWorld::rules_bank_interest_bp() {

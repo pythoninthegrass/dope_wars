@@ -47,7 +47,7 @@ def test_the_game_runs_to_the_last_day() raises:
 def test_finish_scores_cash_plus_bank_minus_debt() raises:
     var game = _play(UInt32(12345))
     var outcome = score.finish(game)
-    assert_equal(outcome.score, game.cash + game.bank - game.debt)
+    assert_equal(outcome.score, game.cash + game.bank - Float64(game.total_debt()))
     assert_equal(outcome.day, game.day)
 
 

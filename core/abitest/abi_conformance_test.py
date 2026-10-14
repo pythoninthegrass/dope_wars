@@ -68,7 +68,6 @@ EXPECTED_RULES = {
     "dw_rules_default_start_health": (ctypes.c_int32, 100),
     "dw_rules_default_start_coat_capacity": (ctypes.c_int32, 100),
     "dw_rules_default_start_location_index": (ctypes.c_int32, 0),  # bronx
-    "dw_rules_debt_interest_bp": (ctypes.c_uint32, 1000),
     "dw_rules_bank_interest_bp": (ctypes.c_uint32, 500),
     "dw_rules_cheap_divide": (ctypes.c_uint32, 10),
     "dw_rules_expensive_multiply": (ctypes.c_uint32, 5),
@@ -246,17 +245,17 @@ def test_dump_len_is_a_fixed_positive_size(abi: Abi, report: Report) -> None:
     than truncating saved games at runtime.
 
     The floor is the scalar block plus the three ordered maps and the price
-    events: seed/rng/day/num_days (24B), cash/debt/bank/start_cash as exact
-    float decompositions (4x17B), health/coat/guns/location (4x8B), two flags,
+    events: seed/rng/day/num_days (24B), cash/bank/start_cash as exact
+    float decompositions (3x17B), health/coat/guns/location (4x8B), two flags,
     then each order list as count+DW_NUM_DRUGS slots (3x16B), the price/prev/inv
     dense slots (13x10B, 13x9B, 13x26B), 13 price-event slots (4+13x16B), and
     the roll history (13x8B last price, 13B last event, 13x8B seen price, 13B
-    direction) = 1208. core/src/serialize.mojo pins the same number as DUMP_LEN and asserts
+    direction), then the loans (4B count, 5x17B slots, 5B released flags) = 1285. core/src/serialize.mojo pins the same number as DUMP_LEN and asserts
     it at runtime, so the format and this test move together or not at all.
     """
     got = abi.call("dw_world_dump_len")
     report.expect("dw_world_dump_len() >= 396", got >= 396, f"got {got}")
-    report.expect("dw_world_dump_len() == 1208", got == 1208, f"got {got}")
+    report.expect("dw_world_dump_len() == 1285", got == 1285, f"got {got}")
 
 
 def test_world_align_is_a_power_of_two(abi: Abi, report: Report) -> None:
@@ -305,9 +304,12 @@ def test_header_struct_sizes_are_sane(abi: Abi, report: Report) -> None:
         "dw_highscore_entry",
         "dw_inventory_slot",
         "dw_location_view",
+        "dw_loan_view",
+        "dw_offer_view",
         "dw_price_event",
         "dw_price_slot",
         "dw_run_result",
+        "dw_shark_view",
         "dw_stay_result",
         "dw_state_view",
     }

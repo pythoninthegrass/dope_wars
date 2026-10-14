@@ -29,6 +29,7 @@
 import prices
 import rules
 import rng as rng_mod
+import sharks
 
 
 # Six spike drugs and five crash drugs can all fire in one roll.
@@ -62,7 +63,6 @@ struct World:
     # same fresh game without the caller re-supplying the config. Never mutated
     # after construction.
     var start_cash: Float64
-    var debt: Float64
     var bank: Float64
     var health: Int64
     var coat_capacity: Int64
@@ -70,6 +70,15 @@ struct World:
     var location_index: Int
     var dead: Bool
     var last_day_warned: Bool
+
+    # Loans in the order they were taken, at most one per shark. Balance is whole dollars and
+    # days_left goes negative once a loan is past due.
+    var loan_count: Int
+    var loan_shark: Array[UInt8, sharks.NUM_SHARKS]
+    var loan_balance: Array[Int64, sharks.NUM_SHARKS]
+    var loan_days_left: Array[Int64, sharks.NUM_SHARKS]
+    # Sharks out of jail; only released sharks who are not owed money make an offer.
+    var shark_released: Array[UInt8, sharks.NUM_SHARKS]
 
     # Current prices, keyed by drug index.
     var price_value: Array[Int64, rules.NUM_DRUGS]
@@ -114,7 +123,6 @@ struct World:
         self.num_days = num_days
         self.cash = start_cash
         self.start_cash = start_cash
-        self.debt = Float64(rules.START_DEBT)
         self.bank = 0.0
         self.health = rules.START_HEALTH
         self.coat_capacity = rules.START_COAT_CAPACITY
@@ -122,6 +130,18 @@ struct World:
         self.location_index = rules.find_location_index(rules.START_LOCATION)
         self.dead = False
         self.last_day_warned = False
+
+        self.loan_count = 0
+        self.loan_shark = Array[UInt8, sharks.NUM_SHARKS]()
+        self.loan_balance = Array[Int64, sharks.NUM_SHARKS]()
+        self.loan_days_left = Array[Int64, sharks.NUM_SHARKS]()
+        self.shark_released = Array[UInt8, sharks.NUM_SHARKS]()
+        # The starter debt is a real loan from the first shark (N-06).
+        self.shark_released[0] = 1
+        self.loan_shark[0] = 0
+        self.loan_balance[0] = Int64(rules.START_DEBT)
+        self.loan_days_left[0] = sharks.shark(0).duration
+        self.loan_count = 1
 
         self.price_value = Array[Int64, rules.NUM_DRUGS]()
         self.price_present = Array[UInt8, rules.NUM_DRUGS]()
@@ -147,6 +167,37 @@ struct World:
 
         self.price_events = Array[PriceEvent, MAX_PRICE_EVENTS](fill=PriceEvent())
         self.price_events_len = 0
+
+    # ---- loans ------------------------------------------------------------
+
+    def total_debt(ref self) -> Int64:
+        var total: Int64 = 0
+        for i in range(self.loan_count):
+            total += self.loan_balance[i]
+        return total
+
+    # The slot of the loan owed to this shark, or -1.
+    def loan_slot_of(ref self, shark_index: Int) -> Int:
+        for i in range(self.loan_count):
+            if Int(self.loan_shark[i]) == shark_index:
+                return i
+        return -1
+
+    def add_loan(mut self, shark_index: Int, balance: Int64, days_left: Int64):
+        self.loan_shark[self.loan_count] = UInt8(shark_index)
+        self.loan_balance[self.loan_count] = balance
+        self.loan_days_left[self.loan_count] = days_left
+        self.loan_count += 1
+
+    def remove_loan(mut self, slot: Int):
+        for i in range(slot, self.loan_count - 1):
+            self.loan_shark[i] = self.loan_shark[i + 1]
+            self.loan_balance[i] = self.loan_balance[i + 1]
+            self.loan_days_left[i] = self.loan_days_left[i + 1]
+        self.loan_count -= 1
+        self.loan_shark[self.loan_count] = 0
+        self.loan_balance[self.loan_count] = 0
+        self.loan_days_left[self.loan_count] = 0
 
     # ---- prices -----------------------------------------------------------
 

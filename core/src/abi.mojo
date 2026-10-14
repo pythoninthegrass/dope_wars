@@ -1,7 +1,7 @@
 # core/src/abi.mojo — the only file in core/ that declares @export symbols.
 #
 # Every game rule lives in a sibling module (rng, rules, world, prices, trade,
-# travel, finances, events, dealers, combat, score, serialize) and is plain Mojo
+# travel, finances, loans, events, dealers, combat, score, serialize) and is plain Mojo
 # with no C ABI of its own. This file is the single seam where those functions
 # are re-exported as the `dw_*` symbols declared in include/dopewars.h. The
 # export-surface gate (tools/validate_abi_exporter.py) fails if any other file
@@ -22,12 +22,14 @@ import dealers
 import events
 import finances
 import jsmath
+import loans
 import prices
 import result
 import rng as rng_mod
 import rules
 import score
 import serialize
+import sharks
 import trade
 import travel
 import world as world_mod
@@ -51,10 +53,11 @@ comptime DW_ERR_GAME_OVER = Int32(11)
 comptime DW_ERR_DEAD = Int32(12)
 comptime DW_ERR_SERIALIZATION_FAILED = Int32(13)
 comptime DW_ERR_SCORE_TOO_LOW = Int32(14)
+comptime DW_ERR_NOT_OFFERED = Int32(15)
+comptime DW_ERR_NO_SUCH_LOAN = Int32(16)
 
 comptime DW_FINANCES_DEPOSIT = UInt8(0)
 comptime DW_FINANCES_WITHDRAW = UInt8(1)
-comptime DW_FINANCES_PAY_LOAN = UInt8(2)
 
 comptime DW_MAX_HIGHSCORES = 10
 
@@ -77,6 +80,32 @@ struct Config(Copyable, Movable):
 struct LocationView(Copyable, Movable):
     var id: Array[UInt8, 32]
     var name: Array[UInt8, 32]
+
+
+@fieldwise_init
+struct SharkView(Copyable, Movable):
+    var name: Array[UInt8, 32]
+    var rate_percent: UInt32
+    var duration_days: UInt32
+    var multiplier: UInt32
+    var bruisers: UInt32
+    var female: UInt8
+    var _pad0: Array[UInt8, 3]
+
+
+@fieldwise_init
+struct LoanView(Copyable, Movable):
+    var balance: Int64
+    var payoff: Int64
+    var days_left: Int32
+    var shark_index: UInt32
+
+
+@fieldwise_init
+struct OfferView(Copyable, Movable):
+    var shark_index: UInt32
+    var _pad0: Array[UInt8, 4]
+    var max_amount: Int64
 
 
 @fieldwise_init
@@ -220,6 +249,9 @@ def _assert_layouts():
     comptime assert size_of[Config]() == 16, "dw_config layout changed"
     comptime assert size_of[LocationView]() == 64, "dw_location_view layout changed"
     comptime assert size_of[DrugView]() == 76, "dw_drug_view layout changed"
+    comptime assert size_of[SharkView]() == 52, "dw_shark_view layout changed"
+    comptime assert size_of[LoanView]() == 24, "dw_loan_view layout changed"
+    comptime assert size_of[OfferView]() == 16, "dw_offer_view layout changed"
     comptime assert size_of[StateView]() == 56, "dw_state_view layout changed"
     comptime assert size_of[InventorySlot]() == 16, "dw_inventory_slot layout changed"
     comptime assert size_of[PriceSlot]() == 12, "dw_price_slot layout changed"
@@ -281,6 +313,18 @@ def _map_trade_code(code: Int) -> Int32:
         return DW_ERR_INSUFFICIENT_SPACE
     if code == result.ERR_INSUFFICIENT_INVENTORY:
         return DW_ERR_INSUFFICIENT_INVENTORY
+    return DW_ERR_INVALID_ARGUMENT
+
+
+def _map_loan_code(code: Int) -> Int32:
+    if code == result.OK:
+        return DW_OK
+    if code == result.ERR_NOT_OFFERED:
+        return DW_ERR_NOT_OFFERED
+    if code == result.ERR_NO_SUCH_LOAN:
+        return DW_ERR_NO_SUCH_LOAN
+    if code == result.ERR_INSUFFICIENT_CASH:
+        return DW_ERR_INSUFFICIENT_CASH
     return DW_ERR_INVALID_ARGUMENT
 
 
@@ -383,11 +427,6 @@ def dw_rules_default_start_location_index() abi("C") -> Int32:
     return Int32(rules.find_location_index(rules.START_LOCATION))
 
 
-@export("dw_rules_debt_interest_bp")
-def dw_rules_debt_interest_bp() abi("C") -> UInt32:
-    return UInt32(jsmath.js_round(rules.DEBT_INTEREST * 10000.0))
-
-
 @export("dw_rules_bank_interest_bp")
 def dw_rules_bank_interest_bp() abi("C") -> UInt32:
     return UInt32(jsmath.js_round(rules.BANK_INTEREST * 10000.0))
@@ -450,6 +489,34 @@ def dw_rules_drugs_copy(
             UInt8(1) if table[i].cheap else UInt8(0),
             UInt8(1) if table[i].expensive else UInt8(0),
             Array[UInt8, 2](fill=0),
+        )
+    return DW_OK
+
+
+@export("dw_rules_sharks_copy")
+def dw_rules_sharks_copy(
+    out_sharks: OptionalPointer[SharkView, origin=MutUntrackedOrigin],
+    out_capacity: UInt,
+    out_required: OptionalPointer[UInt, origin=MutUntrackedOrigin],
+) abi("C") -> Int32:
+    if not out_required:
+        return DW_ERR_INVALID_ARGUMENT
+    var required = UInt(sharks.NUM_SHARKS)
+    out_required.value()[] = required
+    if not out_sharks or out_capacity == 0:
+        return DW_OK
+    if out_capacity < required:
+        return DW_ERR_BUFFER_TOO_SMALL
+    for i in range(sharks.NUM_SHARKS):
+        var row = sharks.shark(i)
+        out_sharks.value()[unsafe_offset=i] = SharkView(
+            _cstr_array[32](row.name),
+            UInt32(row.rate),
+            UInt32(row.duration),
+            UInt32(row.multiplier),
+            UInt32(row.bruisers),
+            UInt8(1) if row.female else UInt8(0),
+            Array[UInt8, 3](fill=0),
         )
     return DW_OK
 
@@ -578,7 +645,7 @@ def dw_state_get(
             UInt32(game.num_days),
             Int32(game.cash),
             Int64(game.bank),
-            Int64(game.debt),
+            game.total_debt(),
             Int32(game.health),
             Int32(game.coat_capacity),
             Int32(game.coat_used()),
@@ -830,13 +897,111 @@ def dw_finances(
         core_action = finances.ACTION_DEPOSIT
     elif action == DW_FINANCES_WITHDRAW:
         core_action = finances.ACTION_WITHDRAW
-    elif action == DW_FINANCES_PAY_LOAN:
-        core_action = finances.ACTION_PAY_LOAN
     if core_action < 0:
         return DW_ERR_INVALID_ARGUMENT
     try:
         var outcome = finances.finances(world.value()[], core_action, Float64(amount))
         out_actual.value()[] = outcome.amount
+        return DW_OK
+    except:
+        return DW_ERR_INVALID_ARGUMENT
+
+
+# ---------------------------------------------------------------------------
+# Loan sharks
+# ---------------------------------------------------------------------------
+
+
+@export("dw_loans_copy")
+def dw_loans_copy(
+    world: OptionalPointer[world_mod.World, origin=ImmUntrackedOrigin],
+    out_loans: OptionalPointer[LoanView, origin=MutUntrackedOrigin],
+    out_capacity: UInt,
+    out_required: OptionalPointer[UInt, origin=MutUntrackedOrigin],
+) abi("C") -> Int32:
+    if not world or not out_required:
+        return DW_ERR_INVALID_ARGUMENT
+    ref game = world.value()[]
+    var required = UInt(game.loan_count)
+    out_required.value()[] = required
+    if not out_loans or out_capacity == 0:
+        return DW_OK
+    if out_capacity < required:
+        return DW_ERR_BUFFER_TOO_SMALL
+    for i in range(game.loan_count):
+        var shark_index = Int(game.loan_shark[i])
+        out_loans.value()[unsafe_offset=i] = LoanView(
+            game.loan_balance[i],
+            loans.payoff(game, shark_index),
+            Int32(game.loan_days_left[i]),
+            UInt32(shark_index),
+        )
+    return DW_OK
+
+
+@export("dw_offers_copy")
+def dw_offers_copy(
+    world: OptionalPointer[world_mod.World, origin=ImmUntrackedOrigin],
+    out_offers: OptionalPointer[OfferView, origin=MutUntrackedOrigin],
+    out_capacity: UInt,
+    out_required: OptionalPointer[UInt, origin=MutUntrackedOrigin],
+) abi("C") -> Int32:
+    if not world or not out_required:
+        return DW_ERR_INVALID_ARGUMENT
+    ref game = world.value()[]
+    var required = UInt(0)
+    for i in range(sharks.NUM_SHARKS):
+        if loans.is_offered(game, i):
+            required += 1
+    out_required.value()[] = required
+    if not out_offers or out_capacity == 0:
+        return DW_OK
+    if out_capacity < required:
+        return DW_ERR_BUFFER_TOO_SMALL
+    var written = 0
+    for i in range(sharks.NUM_SHARKS):
+        if loans.is_offered(game, i):
+            out_offers.value()[unsafe_offset=written] = OfferView(
+                UInt32(i), Array[UInt8, 4](fill=0), loans.borrow_limit(game, i)
+            )
+            written += 1
+    return DW_OK
+
+
+@export("dw_borrow")
+def dw_borrow(
+    world: OptionalPointer[world_mod.World, origin=MutUntrackedOrigin],
+    shark_index: UInt32,
+    amount: Int64,
+) abi("C") -> Int32:
+    if not world:
+        return DW_ERR_INVALID_ARGUMENT
+    return _map_loan_code(loans.borrow(world.value()[], Int(shark_index), amount).code)
+
+
+@export("dw_repay")
+def dw_repay(
+    world: OptionalPointer[world_mod.World, origin=MutUntrackedOrigin],
+    shark_index: UInt32,
+    out_paid: OptionalPointer[Int64, origin=MutUntrackedOrigin],
+) abi("C") -> Int32:
+    if not world or not out_paid:
+        return DW_ERR_INVALID_ARGUMENT
+    var outcome = loans.repay(world.value()[], Int(shark_index))
+    if outcome.ok():
+        out_paid.value()[] = outcome.amount
+    return _map_loan_code(outcome.code)
+
+
+@export("dw_roll_shark_release")
+def dw_roll_shark_release(
+    world: OptionalPointer[world_mod.World, origin=MutUntrackedOrigin],
+    out_shark: OptionalPointer[Int32, origin=MutUntrackedOrigin],
+) abi("C") -> Int32:
+    if not world or not out_shark:
+        return DW_ERR_INVALID_ARGUMENT
+    try:
+        out_shark.value()[] = Int32(loans.roll_release(world.value()[]))
         return DW_OK
     except:
         return DW_ERR_INVALID_ARGUMENT

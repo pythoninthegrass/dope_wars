@@ -30,7 +30,6 @@ const ABI = {
 	"rules_default_start_health": {"value": 100, "c_type": "int32_t", "width": "int32"},
 	"rules_default_start_coat_capacity": {"value": 100, "c_type": "int32_t", "width": "int32"},
 	"rules_default_start_location_index": {"value": 0, "c_type": "int32_t", "width": "int32"},
-	"rules_debt_interest_bp": {"value": 1000, "c_type": "uint32_t", "width": "uint32"},
 	"rules_bank_interest_bp": {"value": 500, "c_type": "uint32_t", "width": "uint32"},
 	"rules_cheap_divide": {"value": 10, "c_type": "uint32_t", "width": "uint32"},
 	"rules_expensive_multiply": {"value": 5, "c_type": "uint32_t", "width": "uint32"},
