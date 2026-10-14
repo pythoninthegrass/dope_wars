@@ -80,7 +80,7 @@ uint32_t dw_abi_version(void);
 /* Frozen simulation dimensions, mirroring `index.html:641-681`'s RULES.
  * Every ABI struct below is sized against these. */
 #define DW_NUM_LOCATIONS 6u
-#define DW_NUM_DRUGS 12u
+#define DW_NUM_DRUGS 13u
 #define DW_MAX_HIGHSCORES 10u
 
 /* Maximum length (bytes, including the trailing NUL) of the fixed-size
@@ -175,12 +175,15 @@ enum {
 
 /* dw_price_event.kind. CHEAP is a price crash (div 10), EXPENSIVE a spike
  * (x5) announced with the "addicts" text, BUST a spike announced with the
- * "cops made a big bust" text. See docs/beermat-re.md (M-02). */
+ * "cops made a big bust" text, and VET a Special K spike announced with the
+ * "local vet" text. See docs/beermat-re.md (M-02) and docs/beermat-2.1-re.md,
+ * "Price roll". */
 typedef uint8_t dw_price_event_kind;
 enum {
     DW_PRICE_EVENT_CHEAP = 0,
     DW_PRICE_EVENT_EXPENSIVE = 1,
     DW_PRICE_EVENT_BUST = 2,
+    DW_PRICE_EVENT_VET = 3,
 };
 
 /* dw_finances action selector. */
@@ -210,7 +213,7 @@ typedef struct dw_config {
     uint16_t abi_version;  /* must equal DW_ABI_VERSION */
     uint16_t _pad0;         /* specified-zero; pads rng_seed to a 4-byte offset */
     uint32_t rng_seed;      /* mulberry32 seed; may be any uint32_t */
-    uint32_t num_days;      /* 0 means "use the ruleset default of 31" */
+    uint32_t num_days;      /* 0 means "use the ruleset default of 30" */
     int32_t  start_cash;    /* negative sentinel (-1) means "use ruleset default" */
 } dw_config;
 DW_STATIC_ASSERT(sizeof(dw_config) == 16, "dw_config layout changed");
@@ -275,12 +278,15 @@ DW_STATIC_ASSERT(sizeof(dw_inventory_slot) == 16, "dw_inventory_slot layout chan
 /* One entry in a two-call price-list copy. Only drugs actually traded at
  * the current location this turn appear; the required length is the
  * count of traded drugs. `was_event` marks a slot whose price came from
- * a cheap/expensive event roll rather than the normal min..max band. */
+ * a cheap/expensive event roll rather than the normal min..max band.
+ * `direction` is the price arrow, 0 on an event price and on a previous-turn
+ * copy (dw_prev_prices_copy). */
 typedef struct dw_price_slot {
     uint32_t drug_index;       /* < DW_NUM_DRUGS */
     int32_t  price;
     uint8_t  was_event;        /* 0 or 1 */
-    uint8_t  _pad0[3];         /* specified-zero */
+    int8_t   direction;        /* -1 down, 0 flat or no basis, 1 up against the last day the drug was on sale */
+    uint8_t  _pad0[2];         /* specified-zero */
 } dw_price_slot;
 DW_STATIC_ASSERT(sizeof(dw_price_slot) == 12, "dw_price_slot layout changed");
 
@@ -402,7 +408,8 @@ typedef struct dw_highscore_entry {
     int64_t score;
     uint32_t day;
     uint8_t  dead;
-    uint8_t  _pad0[3]; /* specified-zero */
+    uint8_t  _pad0;    /* specified-zero */
+    uint16_t num_days; /* game length the score was played at; 0 when unrecorded */
 } dw_highscore_entry;
 DW_STATIC_ASSERT(sizeof(dw_highscore_entry) == 48, "dw_highscore_entry layout changed");
 
@@ -628,8 +635,8 @@ dw_result dw_accept_gun_offer(dw_world *world, const dw_gun_offer *offer);
 /* ---------------------------------------------------------------------- */
 
 /* Roll whether a cop chase starts on arrival, per `docs/beermat-2.1-re.md`
- * (N-22): Random(8) == 0 (1 in 8), but not on the last two days (day >= limit -
- * 1). Draws one value. */
+ * (N-22): Random(8) == 0 (1 in 8), but a chase does not start on the last two
+ * days (day >= limit - 1). Always draws one value. */
 dw_result dw_should_start_chase(dw_world *world, uint8_t *out_should_start);
 
 /* Populate *out_chase for a chase that dw_should_start_chase just

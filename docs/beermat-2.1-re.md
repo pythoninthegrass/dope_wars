@@ -78,6 +78,12 @@ It runs after the day advance, interest and the arrival events (see "Travel"), s
    4. Crash drugs. `Random(40) == 0` under the same availability and flag conditions divides the price by 10 (integer division), sets the flag to 2 and shows the drug's fixed text. The roll is drawn for every crash drug whether or not it can apply.
    5. The day's price and flag are copied into the history arrays.
 
+Implementation (TASK-013.02.03, `core/src/prices.mojo`): the core keeps one recorded price and event flag per drug whether or not the drug was for sale (`last_price`, `last_event`), because the keep rule reads yesterday's record, not the market. Day 1 means `game.day == 1`. Not modelled yet, each owned by its slice: the tip drug (Old Lady, arrest), which forces a spike and keeps the drug available, and the hospital multiplier, whose `Random(9)` is drawn and discarded. The roll runs in Beermat slot order, so the roster comes out in that order; `rules.drugs()` keeps its own index order (`rules.beermat_slot_drug_index` maps a slot to it) and the 1.2 ids `smack` and `shrooms` became `mda` and `mushrooms` in place.
+
+### Direction arrow (`0x004c0034`)
+
+The drug list draws one of four icons per drug, and only in a registered copy. For a drug on sale: an event today (flag not 0) gets icon 3; on day 1 icon 0; otherwise the price is compared with the price recorded on the most recent earlier day on which the drug was on sale (`+0x193 + day` is the per-day availability history), icon 1 when higher, icon 2 when lower, icon 0 when equal or when it was never on sale before. The core computes the same thing as `price_direction` (-1, 0, 1) from `seen_price` and exposes it as `dw_price_slot.direction`. Simplifications: icon 3 (spike or crash) is not drawn, so an event price shows the flat glyph; which icon index is which glyph is inferred from the order of the comparison branches (1 up, 2 down) and was not checked against the image list.
+
 Peyote and Mushrooms therefore never spike or crash. Spike drugs are drawn `Random(40)` once; crash drugs once; an unflagged drug draws only the price and availability rolls.
 
 Spike news, all via `TDWForm_AddNews`: "Cops made a big `<drug>` bust! Prices are outrageous!" (`0x004bc2cb`), "Addicts are buying `<drug>` at outrageous prices!" (`0x004bc317`) and, for Special K only, "Cops put the local vet out of business! The price of `<drug>` is astronomical!" (`0x004bc247`). This answers the per-drug pairing question: the pairing is not per drug. The bust/Addicts choice is `Random(2)` for every spike drug except Special K, which always shows the vet text.
@@ -110,7 +116,7 @@ Spike news, all via `TDWForm_AddNews`: "Cops made a big `<drug>` bust! Prices ar
 
 | Rule | VA | Beermat | Engine | Class |
 | --- | --- | --- | --- | --- |
-| Game length | `0x004c2a0c`-`0x004c2a44` | 15, 30, 60 or 90 days, chosen at new game; `DAT_004e20f0` holds the limit | `numDays` | changed, N-01 |
+| Game length | `0x004c2a0c`-`0x004c2a44` | 15, 30, 60 or 90 days, chosen at new game; `DAT_004e20f0` holds the limit | `num_days`, default 30, chosen at new game (TASK-013.02.02); the registration gate is an intentional delta, `docs/parity-deltas.md` section 9 | match |
 | Start state | `0x004b9ac0` | cash 2000, one starter loan of 5500 from the first shark (10 days, 15%), bank 0, health 100, kidneys 2, coat 100 | `startCash`, `startDebt`, `startHealth`, `startCoatCapacity` | match for the numbers; the starter loan carries a rate and a due date, N-06 |
 | Chase start chance | `0x004bc9d4` | `Random(8) == 0`, 1 in 8, only while `day < limit - 1` | `randInt(0, 5) === 0` | mismatch, N-22 |
 | New Game gate | `0x004bc9d4` | New Game enabled once the day reaches 5 (after the increment), so usable from day 5 | New Game available any time | intentional, `docs/parity-deltas.md` section 6 |
@@ -531,5 +537,5 @@ Rows not listed under "Verification on the 2.1 build" were read from decompiled 
 | N-31 | Nasty doctor (partly decoded) | Hospital | TASK-013.02.10 |
 | N-32 | Old Lady tip forces a spike | Old Lady | TASK-013.02.11 |
 | N-33 | Bank interest 5% with the 2.1 rounding | Interest | TASK-013.02.04 |
-| N-34 | 13-drug table and flags | Drug table | TASK-013.02.03 |
-| N-35 | Flat price model, 1 in 40 spike and crash, Special K text | Price roll | TASK-013.02.03 |
+| N-34 | 13-drug table and flags | Drug table | TASK-013.02.03, done |
+| N-35 | Flat price model, 1 in 40 spike and crash, Special K text | Price roll | TASK-013.02.03, done |

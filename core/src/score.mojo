@@ -27,15 +27,24 @@ struct HighScore(Copyable, Movable):
     var day: Int64
     var dead: Bool
     var date: String
+    # The game length the score was played at; 0 when unrecorded.
+    var num_days: Int64
 
     def __init__(
-        out self, name: String, score: Float64, day: Int64, dead: Bool, date: String
+        out self,
+        name: String,
+        score: Float64,
+        day: Int64,
+        dead: Bool,
+        date: String,
+        num_days: Int64 = 0,
     ):
         self.name = name
         self.score = score
         self.day = day
         self.dead = dead
         self.date = date
+        self.num_days = num_days
 
 
 comptime MAX_HIGH_SCORES = 10

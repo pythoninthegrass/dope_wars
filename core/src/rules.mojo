@@ -13,7 +13,8 @@
 # dw_find_location_index in include/dopewars.h. -1 means "not found", which is
 # the Mojo equivalent of the JS findDrug/findLocation returning undefined.
 
-comptime NUM_DAYS = 31
+# The default game length; 2.1 also offers 15, 60 and 90 (docs/beermat-2.1-re.md, N-01).
+comptime NUM_DAYS = 30
 comptime START_CASH = 2000
 comptime START_DEBT = 5500
 comptime START_HEALTH = 100
@@ -24,7 +25,12 @@ comptime START_LOCATION = "bronx"
 comptime CHEAP_DIVIDE = 10
 comptime EXPENSIVE_MULTIPLY = 5
 comptime ABSENT_ODDS = 8
-comptime EVENT_ODDS = 20
+# A drug that sold at a spike or crash price rolls Random(SPIKE_CRASH_ODDS) == 0 (2.1, N-35).
+comptime SPIKE_CRASH_ODDS = 40
+# A price is kept from the previous roll on Random(PRICE_KEEP_ODDS) == 0 (2.1, N-35).
+comptime PRICE_KEEP_ODDS = 5
+# Each price roll opens with Random(HOSPITAL_MULTIPLIER_RANGE), the hospital price multiplier minus one.
+comptime HOSPITAL_MULTIPLIER_RANGE = 9
 
 # The arrival event fires on Random(ARRIVAL_EVENT_ODDS) == 0, and always (as the mugging) above the wealth cap.
 comptime ARRIVAL_EVENT_ODDS = 14
@@ -32,6 +38,8 @@ comptime EVENT_WEALTH_CAP = 99999999.0
 # Found and given drugs are drawn over Beermat's first 11 drug slots, so the last slot (weed) never turns up.
 comptime GIFT_DRUG_RANGE = 11
 comptime DOG_DROP_CAP = 10
+# Police dogs pick the held drug over Beermat's first 12 slots, so Special K is never the one chased.
+comptime HELD_DRUG_SLOTS = 12
 
 comptime COAT_MIN_POCKETS = 11
 comptime COAT_MAX_POCKETS = 20
@@ -48,7 +56,7 @@ comptime DEALER_ODDS = 15
 comptime COAT_DAY_OFFSET = 150
 
 comptime NUM_LOCATIONS = 6
-comptime NUM_DRUGS = 12
+comptime NUM_DRUGS = 13
 
 
 struct Location:
@@ -100,16 +108,17 @@ def drugs() -> List[Drug]:
     return [
         Drug("acid", "Acid", 1000, 4500, True, False),
         Drug("cocaine", "Cocaine", 15000, 30000, False, True),
-        Drug("crack", "Crack", 1000, 3500, False, False),
+        Drug("crack", "Crack", 1000, 3500, True, False),
         Drug("ecstasy", "Ecstasy", 10, 60, True, False),
         Drug("hashish", "Hashish", 450, 1350, True, False),
         Drug("heroin", "Heroin", 5000, 14000, False, True),
         Drug("opium", "Opium", 500, 1300, False, True),
         Drug("peyote", "Peyote", 200, 700, False, False),
-        Drug("shrooms", "Shrooms", 600, 1350, False, False),
-        Drug("smack", "Smack", 1500, 4500, False, False),
+        Drug("mushrooms", "Mushrooms", 600, 1350, False, False),
+        Drug("mda", "MDA", 1500, 4500, False, True),
         Drug("speed", "Speed", 70, 250, False, True),
         Drug("weed", "Weed", 300, 900, True, False),
+        Drug("specialk", "Special K", 450, 1450, False, True),
     ]
 
 
@@ -132,7 +141,7 @@ def find_drug_index(id: String) -> Int:
 # Beermat's drug order, which its arrival-event rejection loops draw slots over.
 def beermat_slot_drug_index(slot: Int) -> Int:
     var order = [
-        "acid", "cocaine", "hashish", "heroin", "ecstasy", "smack",
-        "opium", "crack", "peyote", "shrooms", "speed", "weed",
+        "acid", "cocaine", "hashish", "heroin", "ecstasy", "mda", "opium",
+        "crack", "peyote", "mushrooms", "speed", "weed", "specialk",
     ]
     return find_drug_index(order[slot])

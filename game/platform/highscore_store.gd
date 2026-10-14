@@ -2,12 +2,12 @@ class_name HighscoreStore
 extends RefCounted
 
 ## The localStorage key 'dopewars.highscores' from `index.html:1557`, as JSON
-## under user://. Each record is {name, score, day, dead, date}.
+## under user://. Each record is {name, score, day, dead, num_days, date}.
 ##
 ## Ordering and the top-10 truncation are the core's job, not this file's:
 ## dw_insert_highscore sorts by score descending and cuts to
 ## DW_MAX_HIGHSCORES, and it drops any key outside
-## {name, score, day, dead}. The date is therefore the one field the core
+## {name, score, day, dead, num_days}. The date is therefore the one field the core
 ## cannot carry, and it round-trips through this store instead.
 ##
 ## A date is a wall-clock fact about when a run was recorded, not a fact about
@@ -45,6 +45,7 @@ func load_all() -> Array[Dictionary]:
 			"score": int(row["score"]),
 			"day": int(row["day"]),
 			"dead": bool(row["dead"]),
+			"num_days": int(row.get("num_days", 0)),
 			"date": String(row.get("date", "")),
 		})
 	return records
@@ -86,6 +87,7 @@ func insert(world: SimWorld, entry: Dictionary, today: String = "") -> Dictionar
 			"score": int(row["score"]),
 			"day": int(row["day"]),
 			"dead": bool(row["dead"]),
+			"num_days": int(row["num_days"]),
 			"date": String(dates.get(_tuple(row), "")),
 		})
 	_write(table)
@@ -102,6 +104,7 @@ static func _core_row(row: Dictionary) -> Dictionary:
 		"score": int(row["score"]),
 		"day": int(row["day"]),
 		"dead": bool(row["dead"]),
+		"num_days": int(row.get("num_days", 0)),
 	}
 
 
@@ -118,11 +121,12 @@ const _SEPARATOR := 0x1f
 
 
 static func _tuple(row: Dictionary) -> String:
-	return "%s%s%d%s%d%s%s" % [
+	return "%s%s%d%s%d%s%s%s%d" % [
 		String(row["name"]), char(_SEPARATOR),
 		int(row["score"]), char(_SEPARATOR),
 		int(row["day"]), char(_SEPARATOR),
-		str(bool(row["dead"])),
+		str(bool(row["dead"])), char(_SEPARATOR),
+		int(row.get("num_days", 0)),
 	]
 
 

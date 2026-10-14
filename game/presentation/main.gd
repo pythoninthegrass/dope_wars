@@ -398,6 +398,7 @@ func _show_score(result: Dictionary) -> void:
 	var score := int(result.get("score", 0))
 	var day := int(result.get("day", 1))
 	var dead := bool(result.get("dead", false))
+	var num_days := int(_world.state_get().get("num_days", 0))
 	var was_death := dead
 	var dialog := HighscoreDialog.new().present(score, day, dead)
 	_dialogs.open(dialog, func(key: String) -> void:
@@ -408,6 +409,7 @@ func _show_score(result: Dictionary) -> void:
 				"score": score,
 				"day": day,
 				"dead": dead,
+				"num_days": num_days,
 			})
 			if not bool(outcome.get("inserted", false)):
 				_alert(Copy.DLG_GAME_OVER, Copy.score_not_high_enough(name), AlertDialog.ICON_SKULL, func() -> void: _after_score(was_death))
@@ -437,7 +439,7 @@ func _show_scores() -> void:
 
 
 func _show_help() -> void:
-	var num_days := 31
+	var num_days := _world.rules_default_num_days()
 	if _world.is_ready():
 		num_days = int(_world.state_get().get("num_days", num_days))
 	_alert(Copy.DLG_HOW_TO_PLAY, Copy.how_to_play(num_days), AlertDialog.ICON_QUESTION)

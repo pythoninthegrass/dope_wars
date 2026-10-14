@@ -69,6 +69,6 @@ The table above is the read-only classification. This section records what was d
 
 ### Rules with no entry point yet
 
-These 2.1 rules cannot be written as tests against today's API. Their tests arrive with the API: loan records, interest per loan and early payoff (N-06, N-30), the weapon set and the Super Store (N-11, N-12), fight accuracy, stay arrest and the cash reward (N-25, N-26, N-27), game length (N-01) and the 13-drug price roll (N-34, N-35).
+These 2.1 rules cannot be written as tests against today's API. Their tests arrive with the API: loan records, interest per loan and early payoff (N-06, N-30), the weapon set and the Super Store (N-11, N-12), fight accuracy, stay arrest and the cash reward (N-25, N-26, N-27), the 13-drug price roll (N-34, N-35).
 
 Owners of the pending tests in `tests/mojo/pending_2_1_test.mojo`: N-19 (TASK-013.02.02), N-23 and N-24 (TASK-013.02.09), N-34 (TASK-013.02.03), N-33 (TASK-013.02.19), N-22 and N-28 (TASK-013.02.20), N-21 and the wealth cap removal (TASK-013.02.21). The slice that implements a rule un-skips its test.

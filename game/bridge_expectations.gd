@@ -24,7 +24,7 @@ class_name BridgeExpectations
 # rather than a script parse error.
 const ABI = {
 	"abi_version": {"c_type": "uint32_t", "width": "uint32"},
-	"rules_default_num_days": {"value": 31, "c_type": "uint32_t", "width": "uint32"},
+	"rules_default_num_days": {"value": 30, "c_type": "uint32_t", "width": "uint32"},
 	"rules_default_start_cash": {"value": 2000, "c_type": "int32_t", "width": "int32"},
 	"rules_default_start_debt": {"value": 5500, "c_type": "int64_t", "width": "int64"},
 	"rules_default_start_health": {"value": 100, "c_type": "int32_t", "width": "int32"},
@@ -35,7 +35,7 @@ const ABI = {
 	"rules_cheap_divide": {"value": 10, "c_type": "uint32_t", "width": "uint32"},
 	"rules_expensive_multiply": {"value": 5, "c_type": "uint32_t", "width": "uint32"},
 	"rules_locations_len": {"value": 6, "c_type": "uint32_t", "width": "uint32"},
-	"rules_drugs_len": {"value": 12, "c_type": "uint32_t", "width": "uint32"},
+	"rules_drugs_len": {"value": 13, "c_type": "uint32_t", "width": "uint32"},
 	"world_size": {"c_type": "size_t", "width": "size"},
 	"world_align": {"c_type": "size_t", "width": "size"},
 	"world_dump_len": {"c_type": "size_t", "width": "size"},

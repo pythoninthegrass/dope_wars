@@ -1,9 +1,12 @@
 class_name NewGameDialog
 extends DopeDialog
 
-## The new-game form (index.html:1608-1627): days and starting cash, with the
-## same floor-and-default clamping the prototype does on Start rather than on
-## the input.
+## The new-game form: game length and starting cash.
+##
+## The length is one of Beermat 2.1's four (15, 30, 60, 90 days; docs/parity-deltas.md
+## records that the registration gate on all but 30 is not ported), picked from a
+## selector rather than typed. Starting cash keeps the prototype's floor-and-default
+## clamping on Start rather than on the input (index.html:1608-1627).
 ##
 ## The seed is not a field. The prototype rolls a fresh one
 ## (`Math.random() * 2^31`, index.html:1625); `requested_seed()` exists so a
@@ -12,23 +15,18 @@ extends DopeDialog
 
 ## `default_days` / `default_cash` are the ruleset defaults, passed in from
 ## whoever owns the world rather than read off a throwaway instance here.
-## index.html:1612-1613: the input bounds and the values the prototype
-## substitutes when the field is blank or unparseable.
-const DAYS_MIN := 5
-const DAYS_MAX := 99
+const GAME_LENGTHS: Array[int] = [15, 30, 60, 90]
 const CASH_MIN := 500
 const CASH_MAX := 100000
 
-var _days: SpinBox
+var _days: OptionButton
 var _cash: SpinBox
-var _default_days := 31
 var _default_cash := 2000
 var _seed := -1
 
 
 func present(default_days: int, default_cash: int) -> NewGameDialog:
 	setup(Copy.DLG_NEW_GAME)
-	_default_days = default_days
 	_default_cash = default_cash
 
 	_field(tr(Copy.LBL_NUM_DAYS), _make_days(default_days))
@@ -39,17 +37,12 @@ func present(default_days: int, default_cash: int) -> NewGameDialog:
 	return self
 
 
-## index.html:1622-1623 in full: `Math.max(5, parseInt(value) || 31)`. The
-## minimum wins over the field, and a field that does not parse falls back to
-## the prototype's default rather than to zero, which is why the defaults the
-## form was presented with are remembered instead of hard-coded.
 func num_days() -> int:
-	var typed := _days.get_line_edit().text
-	if typed.is_empty():
-		return _default_days
-	if not typed.is_valid_int():
-		return _default_days
-	return maxi(DAYS_MIN, int(typed))
+	return GAME_LENGTHS[_days.selected]
+
+
+func length_options() -> Array[int]:
+	return GAME_LENGTHS
 
 
 func start_cash() -> int:
@@ -70,8 +63,7 @@ func requested_seed() -> int:
 ## cannot meaningfully be typed into from a script. The values are mirrored into
 ## the fields so the text and the value cannot disagree.
 func set_values(days: int, cash: int, seed_value: int = -1) -> NewGameDialog:
-	_days.value = days
-	_days.get_line_edit().text = str(days)
+	_days.select(GAME_LENGTHS.find(days))
 	_cash.value = cash
 	_cash.get_line_edit().text = str(cash)
 	_seed = seed_value
@@ -90,15 +82,11 @@ func _field(label_text: String, editor: Control) -> void:
 	body().add_child(row)
 
 
-func _make_days(default_days: int) -> SpinBox:
-	_days = SpinBox.new()
-	_days.min_value = DAYS_MIN
-	_days.max_value = DAYS_MAX
-	_days.step = 1
-	# The prototype's default is the ruleset's 31, not the field's midpoint.
-	_days.value = default_days
-	_days.select_all_on_focus = true
-	bind_spinner(_days)
+func _make_days(default_days: int) -> OptionButton:
+	_days = OptionButton.new()
+	for length in GAME_LENGTHS:
+		_days.add_item(str(length))
+	_days.select(maxi(GAME_LENGTHS.find(default_days), 0))
 	return _days
 
 

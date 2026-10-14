@@ -119,7 +119,8 @@ struct PriceSlot(Copyable, Movable):
     var drug_index: UInt32
     var price: Int32
     var was_event: UInt8
-    var _pad0: Array[UInt8, 3]
+    var direction: Int8
+    var _pad0: Array[UInt8, 2]
 
 
 @fieldwise_init
@@ -209,7 +210,8 @@ struct HighscoreEntryView(Copyable, Movable):
     var score: Int64
     var day: UInt32
     var dead: UInt8
-    var _pad0: Array[UInt8, 3]
+    var _pad0: UInt8
+    var num_days: UInt16
 
 
 # The Mojo-side twin of the header's DW_STATIC_ASSERT. Called from the exported
@@ -297,6 +299,7 @@ def _highscore_from_view(view: HighscoreEntryView) -> score.HighScore:
         Int64(view.day),
         view.dead != 0,
         "",
+        Int64(view.num_days),
     )
 
 
@@ -306,7 +309,8 @@ def _view_from_highscore(entry: score.HighScore) -> HighscoreEntryView:
         Int64(entry.score),
         UInt32(entry.day),
         UInt8(1) if entry.dead else UInt8(0),
-        Array[UInt8, 3](fill=0),
+        UInt8(0),
+        UInt16(entry.num_days),
     )
 
 
@@ -621,7 +625,8 @@ def dw_prices_copy(
             UInt32(drug_index),
             Int32(game.price_value[drug_index]),
             UInt8(1) if game.price_was_event[drug_index] != 0 else UInt8(0),
-            Array[UInt8, 3](fill=0),
+            game.price_direction[drug_index],
+            Array[UInt8, 2](fill=0),
         )
     return DW_OK
 
@@ -652,7 +657,8 @@ def dw_prev_prices_copy(
             UInt32(drug_index),
             Int32(game.prev_price_value[drug_index]),
             UInt8(0),
-            Array[UInt8, 3](fill=0),
+            Int8(0),
+            Array[UInt8, 2](fill=0),
         )
     return DW_OK
 

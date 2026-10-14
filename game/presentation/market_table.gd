@@ -3,13 +3,8 @@ extends VBoxContainer
 
 ## The "Available drugs" table (index.html:1166-1193): one row per drug traded
 ## at the current location, showing its price and -- from day 2 on -- a trend
-## glyph against last turn's price.
-##
-## The two price lists come from separate ABI calls and the drug sets need not
-## match, so they are intersected on drug_index rather than zipped by position
-## (index.html:1174 looks up by id for the same reason). A drug with no
-## previous price gets the neutral glyph, which is what the prototype renders
-## for a null prevPrice (index.html:1182).
+## glyph. The glyph is the core's price direction, which compares with the last
+## day the drug was on sale; a drug with no earlier price gets the neutral glyph.
 ##
 ## A Tree rather than a column of Buttons: it is a two-column table with a
 ## sticky header, and rebuilding the rows on every render is what the
@@ -87,14 +82,15 @@ func refresh(world: SimWorld, selected: int, show_trend: bool) -> void:
 	_items.clear()
 	var root := _tree.create_item()
 	var current := world.prices_copy()
-	var previous := _previous_by_drug(world)
 	var drugs := Roster.drugs()
 
 	for drug_index in Roster.sorted_drug_indices():
 		var price := -1
+		var direction := 0
 		for slot in current:
 			if int(slot["drug_index"]) == drug_index:
 				price = int(slot["price"])
+				direction = int(slot["direction"])
 				break
 		if price < 0:
 			continue
@@ -112,10 +108,10 @@ func refresh(world: SimWorld, selected: int, show_trend: bool) -> void:
 		if show_trend:
 			# index.html:480-498: the glyph is its own color and its own
 			# smaller size, so the price next to it stays black.
-			item.set_text(1, Copy.trend(price, previous.get(drug_index)))
+			item.set_text(1, Copy.trend(direction))
 			item.set_custom_font(1, Win98Theme.trend_font())
 			item.set_custom_font_size(1, Win98Theme.FONT_TREND)
-			item.set_custom_color(1, _trend_color(price, previous.get(drug_index)))
+			item.set_custom_color(1, _trend_color(direction))
 		_items[drug_index] = item
 
 	selected_changed(selected)
@@ -176,19 +172,10 @@ func trend_text(drug_index: int) -> String:
 	return (_items[drug_index] as TreeItem).get_text(1)
 
 
-static func _previous_by_drug(world: SimWorld) -> Dictionary:
-	var by_drug := {}
-	for slot in world.prev_prices_copy():
-		by_drug[int(slot["drug_index"])] = int(slot["price"])
-	return by_drug
-
-
-static func _trend_color(price: int, previous: Variant) -> Color:
-	if previous == null:
-		return Palette.TREND_NEUTRAL
-	if price > int(previous):
+static func _trend_color(direction: int) -> Color:
+	if direction > 0:
 		return Palette.TREND_UP
-	if price < int(previous):
+	if direction < 0:
 		return Palette.TREND_DOWN
 	return Palette.TREND_NEUTRAL
 

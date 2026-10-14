@@ -159,6 +159,11 @@ direction.
 - **v9** — TASK-010.02.08: Beermat's interest rounding. `dw_travel` rounds
   debt and bank interest to whole dollars (ties to even) and skips a balance
   of 0 or less. No signature, layout or dump-length change.
+- **Beermat 2.1 slices, no version bump** — TASK-013.02.02 adds
+  `dw_highscore_entry.num_days` and a default game length of 30;
+  TASK-013.02.03 makes the roster 13 drugs, adds the roll history to the world
+  state (dump 846 -> 1208 bytes), `dw_price_slot.direction` and
+  `DW_PRICE_EVENT_VET`. Details in `docs/abi-contract.md`.
 
 ## Mojo LOC share
 

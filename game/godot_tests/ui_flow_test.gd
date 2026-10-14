@@ -67,7 +67,7 @@ const CASES := [
 	"linux_display_driver",
 	"window_pinned",
 	"capture_states",
-	"tables_fit_twelve_drugs",
+	"tables_fit_all_drugs",
 	"chase_and_doctor",
 	"dealer_dialogs",
 	"travel_arrival_outcomes",
@@ -87,17 +87,17 @@ const CASE_FLOORS := {
 	"keyboard_shortcuts": 21,
 	"buy_sell_round_trip": 18,
 	"click_rebuilds_table": 11,
-	"travel_advances_day": 11,
+	"travel_advances_day": 12,
 	"persistence_round_trip": 16,
 	"finances": 7,
 	"typed_quantity": 21,
-	"endgame_and_highscores": 22,
-	"new_game_dialog": 9,
+	"endgame_and_highscores": 24,
+	"new_game_dialog": 11,
 	"win98_chrome": 82,
 	"linux_display_driver": 1,
 	"window_pinned": 5,
 	"capture_states": 17,
-	"tables_fit_twelve_drugs": 4,
+	"tables_fit_all_drugs": 4,
 	"chase_and_doctor": 12,
 	"dealer_dialogs": 14,
 	"travel_arrival_outcomes": 12,
@@ -141,8 +141,8 @@ func _run() -> void:
 	_test_window_pinned()
 	_case("capture_states")
 	await _test_capture_states()
-	_case("tables_fit_twelve_drugs")
-	await _test_tables_fit_twelve_drugs()
+	_case("tables_fit_all_drugs")
+	await _test_tables_fit_all_drugs()
 	_case("chase_and_doctor")
 	await _test_chase_and_doctor()
 	_case("dealer_dialogs")
@@ -201,7 +201,7 @@ func _test_new_game_boot() -> void:
 
 	_assert(
 		hud.title_text() == "Day %d of %d" % [state["day"], state["num_days"]],
-		"the day readout should read 'Day 1 of 31', got '%s'" % hud.title_text()
+		"the day readout should read 'Day 1 of 30', got '%s'" % hud.title_text()
 	)
 	_assert(hud.led_text("cash") == "2.000", "cash LED should be 2.000, got '%s'" % hud.led_text("cash"))
 	_assert(hud.led_text("bank") == "0", "bank LED should be 0, got '%s'" % hud.led_text("bank"))
@@ -441,7 +441,7 @@ func _test_travel_advances_day() -> void:
 	_assert(int(world.state_get()["day"]) == from_day + 1, "travel should advance the day")
 	_assert(int(world.state_get()["location_index"]) == destination, "travel should move the player")
 	_assert(
-		hud.title_text() == "Day %d of 31" % (from_day + 1),
+		hud.title_text() == "Day %d of 30" % (from_day + 1),
 		"the day readout should show the new day, got '%s'" % hud.title_text()
 	)
 	_assert(hud.selected_buy_drug == -1 and hud.selected_sell_drug == -1, "travel should clear both selections (index.html:1372-1373)")
@@ -458,6 +458,11 @@ func _test_travel_advances_day() -> void:
 		]:
 			with_glyph += 1
 	_assert(with_glyph == traded.size(), "every day-2 price should carry a trend glyph")
+	var glyph_matches := 0
+	for slot in traded:
+		if hud.market_table().trend_text(int(slot["drug_index"])) == Copy.trend(int(slot["direction"])):
+			glyph_matches += 1
+	_assert(glyph_matches == traded.size(), "each trend glyph should follow the core's price direction")
 
 	# The arrival sequence: price-event toasts, at most one arrival event, then
 	# at most one dealer per roll. Confirming each dialog drains it.
@@ -798,6 +803,7 @@ func _test_endgame_and_highscores() -> void:
 		_assert(int(table[0]["score"]) == expected, "the persisted score should be %d, got %s" % [expected, table[0]["score"]])
 		_assert(int(table[0]["day"]) == int(world.state_get()["day"]), "the persisted day should match the run")
 		_assert(not bool(table[0]["dead"]), "a clean finish should not be recorded as dead")
+		_assert(int(table[0]["num_days"]) == int(world.state_get()["num_days"]), "the persisted row should carry the game length, got %s" % table[0].get("num_days"))
 		_assert(String(table[0]["date"]) == Time.get_date_string_from_system(true), "the date should be today's UTC date")
 
 	# index.html:1592-1606 -- the Scores menu renders the table back.
@@ -805,6 +811,7 @@ func _test_endgame_and_highscores() -> void:
 	await _idle()
 	_assert(_main.dialogs().current() is ScoresDialog, "the Scores menu should open a scores dialog")
 	_assert(_copy_text(_main.dialogs().current()).contains("Player"), "the scores dialog should list the saved name")
+	_assert(_copy_text(_main.dialogs().current()).contains(str(int(world.state_get()["num_days"]))), "the scores dialog should show the game length")
 	_main.dialogs().cancel()
 	await _idle()
 
@@ -852,25 +859,23 @@ func _test_new_game_dialog() -> void:
 	_assert(dialog != null, "the new game dialog should open")
 	if dialog == null:
 		return
-	_assert(dialog.num_days() == 31, "the days field should default to the ruleset's 31, got %d" % dialog.num_days())
+	_assert(dialog.num_days() == 30, "the length selector should default to the ruleset's 30, got %d" % dialog.num_days())
+	_assert(dialog.length_options() == [15, 30, 60, 90], "the selector should offer 15, 30, 60 and 90 days, got %s" % [dialog.length_options()])
 	_assert(dialog.start_cash() == 2000, "the cash field should default to the ruleset's 2000, got %d" % dialog.start_cash())
 	_assert(dialog.requested_seed() == -1, "a new game with no seed asked for should report -1")
 
-	# index.html:1622-1623 -- a blank field falls back to the prototype's
-	# default (31 / 2000), not to the field's minimum. This is the typed path
-	# the set_values() below bypasses, so it needs its own check.
-	_spinbox_of(dialog).get_line_edit().text = ""
-	_assert(dialog.num_days() == 31, "a blank days field should read 31, got %d" % dialog.num_days())
-
-	dialog.set_values(7, 5000, 999)
+	dialog.set_values(90, 5000, 999)
+	_assert(dialog.num_days() == 90, "selecting 90 days should read back 90, got %d" % dialog.num_days())
+	dialog.set_values(15, 5000, 999)
+	_assert(dialog.num_days() == 15, "selecting 15 days should read back 15, got %d" % dialog.num_days())
 	_main.dialogs().confirm()
 	await _idle()
 
 	var world := _main.simulation()
-	_assert(int(world.state_get()["num_days"]) == 7, "starting a new game should apply the day count")
+	_assert(int(world.state_get()["num_days"]) == 15, "starting a new game should apply the day count")
 	_assert(int(world.state_get()["cash"]) == 5000, "starting a new game should apply the starting cash")
 	_assert(int(world.state_get()["day"]) == 1, "a new game should start on day 1")
-	_assert(_main.hud().title_text() == "Day 1 of 7", "the day readout should show the new game's length, got '%s'" % _main.hud().title_text())
+	_assert(_main.hud().title_text() == "Day 1 of 15", "the day readout should show the new game's length, got '%s'" % _main.hud().title_text())
 
 
 # index.html:253-270, :45-63. The reference's chrome is a 2px two-tone border
@@ -974,7 +979,7 @@ func _test_win98_chrome() -> void:
 
 # The window is one fixed size on both axes: the Win98 chrome is fixed-width so
 # widening would only stretch it, and nothing needs extra height (see
-# _test_tables_fit_twelve_drugs). Resizing is also visibly broken on macOS --
+# _test_tables_fit_all_drugs). Resizing is also visibly broken on macOS --
 # Godot renders into an unflipped view's CAMetalLayer, so a height change shows
 # one frame of displaced content -- which is why this is pinned rather than
 # merely bounded. See TASK-005.
@@ -1042,10 +1047,10 @@ func _test_capture_states() -> void:
 
 
 # The reason the window needs no resizing: every borough can trade all
-# DW_NUM_DRUGS at once (each drug is absent only 1 time in 8), and the coat holds one row per drug, so twelve
-# rows is the largest either table ever renders. Asserting it fits without
+# DW_NUM_DRUGS at once (each drug is absent only 1 time in 8), and the coat holds one row per drug, so
+# DW_NUM_DRUGS rows is the largest either table ever renders. Asserting it fits without
 # scrolling is what keeps the pinned height honest if a row's height changes.
-func _test_tables_fit_twelve_drugs() -> void:
+func _test_tables_fit_all_drugs() -> void:
 	var seed_with_full_market := 0
 	for candidate in range(1, 400):
 		_main.start_new_game(candidate)
@@ -1067,7 +1072,7 @@ func _test_tables_fit_twelve_drugs() -> void:
 	var area := tree.get_item_area_rect(last)
 	_assert(
 		area.position.y + area.size.y <= tree.size.y,
-		"twelve market rows should fit the table without scrolling: last row ends at %d, table is %d tall" % [area.position.y + area.size.y, tree.size.y]
+		"all market rows should fit the table without scrolling: last row ends at %d, table is %d tall" % [area.position.y + area.size.y, tree.size.y]
 	)
 	_assert(tree.get_scroll().y == 0.0, "a full twelve-drug market should not scroll, got scroll y=%d" % tree.get_scroll().y)
 

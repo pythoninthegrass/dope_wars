@@ -89,7 +89,7 @@ func _init() -> void:
 func refresh(world: SimWorld) -> void:
 	var state := world.state_get()
 	var day := int(state.get("day", 1))
-	var num_days := int(state.get("num_days", 31))
+	var num_days := int(state.get("num_days", world.rules_default_num_days()))
 	var dead := bool(state.get("dead", false))
 
 	_title.text = Copy.day_of(day, num_days)

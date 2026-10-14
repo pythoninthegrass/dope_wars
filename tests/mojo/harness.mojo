@@ -105,7 +105,9 @@ def assert_price_events_match(ref game: world.World, ref expected: record.Group)
     assert_price_event_list_match(events, expected.children("priceEvents"))
 
 
-def assert_state_matches(ref game: world.World, ref expected: record.Group) raises:
+def assert_state_matches(
+    ref game: world.World, ref expected: record.Group, with_prices: Bool = True
+) raises:
     # A fixture's stateFields projection leaves some fields out of the record;
     # only the fields the record carries are compared.
     if expected.has_field("seed"):
@@ -137,7 +139,7 @@ def assert_state_matches(ref game: world.World, ref expected: record.Group) rais
         )
     if expected.has_field("rngState"):
         assert_equal(Int64(game.rng.get_state()), expected.int_at("rngState"))
-    if expected.has_field("prices"):
+    if with_prices and expected.has_field("prices"):
         assert_prices_match(game, expected)
     if expected.has_field("prevPrices"):
         assert_prev_prices_match(game, expected)

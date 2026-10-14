@@ -44,6 +44,7 @@ const DEALER_GUN := DopeWarsWorld.DW_DEALER_GUN
 const PRICE_EVENT_CHEAP := DopeWarsWorld.DW_PRICE_EVENT_CHEAP
 const PRICE_EVENT_EXPENSIVE := DopeWarsWorld.DW_PRICE_EVENT_EXPENSIVE
 const PRICE_EVENT_BUST := DopeWarsWorld.DW_PRICE_EVENT_BUST
+const PRICE_EVENT_VET := DopeWarsWorld.DW_PRICE_EVENT_VET
 
 const FINANCES_DEPOSIT := DopeWarsWorld.DW_FINANCES_DEPOSIT
 const FINANCES_WITHDRAW := DopeWarsWorld.DW_FINANCES_WITHDRAW
@@ -221,7 +222,7 @@ func finish() -> Dictionary:
 	return _world.finish()
 
 
-## `scores` and `entry` are arrays/dicts of {name, score, day, dead}. Returns
+## `scores` and `entry` are arrays/dicts of {name, score, day, dead, num_days}. Returns
 ## {result, scores, count}, sorted by score descending and truncated to
 ## MAX_HIGHSCORES. Keys outside that set are dropped, so a caller cannot smuggle
 ## extra per-row state through here.
