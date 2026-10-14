@@ -597,6 +597,13 @@ func _test_finances() -> void:
 	_assert(_main.dialogs().current() is FinancesDialog, "the finances dialog should re-open after a deposit (index.html:1348)")
 	_assert(_main.hud().led_text("bank") == "400", "the bank LED should follow the deposit")
 
+	_main._on_finances_action("finWithdrawAll")
+	await _idle()
+	_assert(int(world.state_get()["bank"]) == 0, "Withdraw All should empty the bank")
+	_assert(int(world.state_get()["cash"]) == cash_before, "Withdraw All should return the whole balance to cash")
+	_assert(_main.dialogs().current() is FinancesDialog, "the finances dialog should re-open after Withdraw All")
+	_assert((_find_named(_main.dialogs().current(), "finWithdrawAll") as Button).disabled, "Withdraw All should disable with an empty bank")
+
 
 # TASK-013.02.06. Deposit All But.. deposits cash minus the withhold amount set
 # in the Options dialog, acts at once with no quantity prompt, and does nothing
@@ -1361,14 +1368,23 @@ func _test_loan_sharks() -> void:
 	_assert(dialog != null, "Finances should open a finances dialog")
 	if dialog == null:
 		return
-	_assert(_find_named(dialog, "finRepay0") != null, "the starter loan from Honest Harry should list a Repay button")
-	_assert(_find_named(dialog, "finBorrow0") == null and _find_named(dialog, "finBorrow1") == null, "no shark offers while all but Harry are in jail")
-	_assert((_find_named(dialog, "finRepay0") as Button).text == "Repay $10,525", "Repay should show the early payoff, got '%s'" % (_find_named(dialog, "finRepay0") as Button).text)
-	_assert((_find_named(dialog, "finRepay0") as Button).disabled, "Repay should be disabled without the cash to settle")
+	var loans := _find_named(dialog, "LoansTree") as Tree
+	var offers := _find_named(dialog, "OffersTree") as Tree
+	_assert(loans != null and offers != null, "Finances should list loans and offers in two tables")
+	if loans == null or offers == null:
+		return
+	_assert(_tree_rows(loans) == [["Honest Harry", "5,500", "15", "10 days left"]], "the loans table should list the starter loan, got %s" % [_tree_rows(loans)])
+	_assert(_tree_rows(offers).is_empty(), "no shark offers while all but Harry are in jail")
+	var repay := _find_named(dialog, "finRepay") as Button
+	_assert(repay != null and repay.disabled, "Repay Loan should be disabled until a loan is selected")
+	_assert((_find_named(dialog, "finBorrow") as Button).disabled, "Borrow should be disabled with no offer selected")
+	loans.get_root().get_child(0).select(0)
+	_assert(repay.text == "Repay $10,525", "a selected loan should show the early payoff, got '%s'" % repay.text)
+	_assert(repay.disabled, "Repay should be disabled without the cash to settle")
 	var text := _copy_text(dialog)
-	_assert(text.contains("Honest Harry: $5,500, 10 days left"), "the loan row should name the shark, balance and days left, got '%s'" % text)
-	_assert(text.contains("Nobody is lending right now."), "an empty offer list should say so")
+	_assert(text.contains("Outstanding Loans: $5,500"), "the loans heading should total the debt, got '%s'" % text)
 	_assert(text.contains("Note: Your maximum TOTAL debt cannot exceed 1,000,000"), "the dialog should carry the debt cap note")
+	_assert(text.contains("How much to borrow?"), "the dialog should ask how much to borrow")
 	_main.dialogs().close()
 
 	var guard := 0
@@ -1382,41 +1398,47 @@ func _test_loan_sharks() -> void:
 	_main._do_finances()
 	await _idle()
 	dialog = _main.dialogs().current() as FinancesDialog
-	var borrow_button := _find_named(dialog, "finBorrow%d" % shark_index) as Button
-	_assert(borrow_button != null, "a released shark should list a Borrow button")
+	loans = _find_named(dialog, "LoansTree") as Tree
+	offers = _find_named(dialog, "OffersTree") as Tree
+	var offer_row: Array = _tree_rows(offers)[0]
 	_assert(
-		borrow_button.text == "%s  %d%%  %d days  %dx" % [shark["name"], shark["rate_percent"], shark["duration_days"], shark["multiplier"]],
-		"the offer should show name, rate, duration and multiplier, got '%s'" % borrow_button.text
+		offer_row == [shark["name"], str(shark["rate_percent"]), "%d days" % shark["duration_days"], Copy.fmt(int(offer["max_amount"]))],
+		"the offer should show name, rate, duration and amount, got %s" % [offer_row]
 	)
+	var borrow := _find_named(dialog, "finBorrow") as Button
+	_assert(borrow.disabled, "Borrow should wait for a selected offer")
+	offers.get_root().get_child(0).select(0)
+	_assert(not borrow.disabled, "selecting an offer should enable Borrow")
+	var spinner := _find_named(dialog, "BorrowSpinner") as SpinBox
+	_assert(int(spinner.max_value) == int(offer["max_amount"]), "the borrow spinner should cap at the offer, got %d" % int(spinner.max_value))
 
 	var cash_before := int(world.state_get()["cash"])
-	_main._on_finances_action("finBorrow%d" % shark_index)
-	await _idle()
-	var amount := _main.dialogs().current() as QuantityDialog
-	_assert(amount != null, "Borrow should open a quantity dialog")
-	if amount == null:
-		return
-	_assert(amount.max_value() == int(offer["max_amount"]), "the borrow spinner should cap at the offer, got %d" % amount.max_value())
-	amount.set_value(1000)
-	_main.dialogs().confirm()
+	spinner.get_line_edit().text = "1000"
+	borrow.pressed.emit()
 	await _idle()
 	_assert(int(world.state_get()["cash"]) == cash_before + 1000, "borrowing 1000 should add 1000 cash")
 	_assert(int(world.state_get()["debt"]) == 6500, "borrowing 1000 should raise the debt to 6500")
 	_assert(_main.hud().led_text("debt") == Copy.led_fmt(6500), "the debt LED should follow the loan")
 	dialog = _main.dialogs().current() as FinancesDialog
 	_assert(dialog != null, "the finances dialog should re-open after borrowing")
-	_assert(_find_named(dialog, "finBorrow%d" % shark_index) == null, "a shark owed money should stop offering")
-	_assert(_find_named(dialog, "finRepay%d" % shark_index) != null, "the new loan should list a Repay button")
-	_assert(_copy_text(dialog).contains("%s: $1,000, %s" % [shark["name"], Copy.loan_days(int(shark["duration_days"]))]), "the new loan row should show its days left")
+	loans = _find_named(dialog, "LoansTree") as Tree
+	offers = _find_named(dialog, "OffersTree") as Tree
+	_assert(_tree_rows(offers).is_empty(), "a shark owed money should stop offering")
+	_assert(_tree_rows(loans).size() == 2, "the new loan should join the loans table")
+	_assert(
+		_tree_rows(loans)[1] == [shark["name"], "1,000", str(shark["rate_percent"]), Copy.loan_days(int(shark["duration_days"]))],
+		"the new loan row should show amount, rate and days left, got %s" % [_tree_rows(loans)[1]]
+	)
 
 	var payoff := int(world.loans_copy()[1]["payoff"])
 	cash_before = int(world.state_get()["cash"])
-	_main._on_finances_action("finRepay%d" % shark_index)
+	loans.get_root().get_child(1).select(0)
+	(_find_named(dialog, "finRepay") as Button).pressed.emit()
 	await _idle()
 	_assert(int(world.state_get()["cash"]) == cash_before - payoff, "repaying should take the payoff out of cash")
 	_assert(world.loans_copy().size() == 1, "a repaid loan should leave the list")
 	dialog = _main.dialogs().current() as FinancesDialog
-	_assert(dialog != null and _find_named(dialog, "finBorrow%d" % shark_index) != null, "a repaid shark should offer again")
+	_assert(dialog != null and _tree_rows(_find_named(dialog, "OffersTree") as Tree).size() == 1, "a repaid shark should offer again")
 	_main.dialogs().close()
 
 	_assert(Copy.loan_days(1) == "1 day left" and Copy.loan_days(0) == "Due today", "the days column should read 1 day left and Due today")
@@ -1987,6 +2009,19 @@ static func _brightness(color: Color) -> float:
 
 ## A descendant by node name, for assertions that read the dialog's own
 ## structure rather than a test-only accessor.
+## A Tree's rows as arrays of column text, in order.
+static func _tree_rows(tree: Tree) -> Array:
+	var rows: Array = []
+	var item := tree.get_root().get_first_child() if tree.get_root() != null else null
+	while item != null:
+		var row: Array = []
+		for column in tree.columns:
+			row.append(item.get_text(column))
+		rows.append(row)
+		item = item.get_next()
+	return rows
+
+
 static func _find_named(node: Node, what: String) -> Node:
 	if node.name == what:
 		return node

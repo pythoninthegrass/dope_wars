@@ -325,7 +325,13 @@ func _on_finances_action(key: String) -> void:
 	if not key.begins_with("fin") or key == "finClose":
 		return
 	if key.begins_with("finBorrow"):
-		_borrow_from(int(key.trim_prefix("finBorrow")))
+		var parts := key.trim_prefix("finBorrow").split(":")
+		_borrow_from(int(parts[0]), int(parts[1]) if parts.size() > 1 else 0)
+		return
+	if key == "finWithdrawAll":
+		_world.finances(SimWorld.FINANCES_WITHDRAW, int(_world.state_get().get("bank", 0)))
+		_refresh()
+		_do_finances()
 		return
 	if key == "finDepositAllBut":
 		var cash := int(_world.state_get().get("cash", 0))
@@ -356,23 +362,20 @@ func _on_finances_action(key: String) -> void:
 	)
 
 
-## The borrow quantity dialog for one shark's offer, capped at what the core
-## says they will lend right now.
-func _borrow_from(shark_index: int) -> void:
+## Borrows the amount typed into the finances dialog's spinner from one shark,
+## capped at what the core says they will lend right now.
+func _borrow_from(shark_index: int, requested: int) -> void:
 	var limit := -1
 	for offer in _world.offers_copy():
 		if int(offer["shark_index"]) == shark_index:
 			limit = int(offer["max_amount"])
 	if limit <= 0:
 		return
-	var prompt := tr(Copy.MSG_BORROW_PROMPT).format([Roster.shark_name(shark_index), Copy.fmt(limit)])
-	var amount := QuantityDialog.new().present(Copy.DLG_BORROW, prompt, limit)
-	_dialogs.open(amount, func(confirm_key: String) -> void:
-		if confirm_key == "qtyOk" and amount.value() > 0:
-			_world.borrow(shark_index, amount.value())
-		_refresh()
-		_do_finances()
-	)
+	var amount := mini(requested, limit)
+	if amount > 0:
+		_world.borrow(shark_index, amount)
+	_refresh()
+	_do_finances()
 
 
 static func _finances_action_for(key: String) -> int:

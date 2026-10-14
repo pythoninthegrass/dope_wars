@@ -47,7 +47,6 @@ DLG_FINANCES,Finances
 DLG_DEPOSIT,Deposit
 DLG_WITHDRAW,Withdraw
 DLG_OPTIONS,Options
-DLG_BORROW,Borrow
 DLG_WORD_ON_THE_STREET,Word on the street
 DLG_RANDOM_EVENT,Random Event
 DLG_COAT_DEALER,Coat Dealer
@@ -77,15 +76,20 @@ BTN_REPAY,Repay ${0}
 MSG_DEPOSIT_PROMPT,Deposit how much of your ${0} cash?
 MSG_WITHDRAW_PROMPT,Withdraw how much of your ${0} bank balance?
 MSG_WITHHOLD_PROMPT,"Set the amount to withhold when you press the 'Deposit All But..' button in Finances (max ${0}):"
-MSG_BORROW_PROMPT,Borrow how much from {0}? They will lend up to ${1}.
-FIN_SHARKS,Loan Sharks
-FIN_SHARK_COLUMNS,"Name, % Rate, Duration, Amount"
-FIN_NO_OFFERS,Nobody is lending right now.
-FIN_LOANS,Outstanding Loans
-FIN_NO_LOANS,You owe nothing.
+FIN_LOANS_TOTAL,"Outstanding Loans: ${0}"
+FIN_OFFERINGS,Loan Shark offerings:
+FIN_COL_SHARK_NAME,Shark Name
+FIN_COL_NAME,Name
+FIN_COL_AMOUNT,Amount
+FIN_COL_RATE,% Rate
+FIN_COL_DAYS_LEFT,Days Left
+FIN_COL_DURATION,Duration
+MSG_DURATION_DAYS,{0} days
+FIN_BORROW_PROMPT,How much to borrow?
+BTN_REPAY_LOAN,Repay Loan
+BTN_BORROW,Borrow
+BTN_WITHDRAW_ALL,Withdraw All
 FIN_DEBT_CAP_NOTE,"Note: Your maximum TOTAL debt cannot exceed 1,000,000"
-MSG_SHARK_OFFER,{0}  {1}%  {2} days  {3}x
-MSG_LOAN_ROW,"{0}: ${1}, {2}"
 MSG_LOAN_DAYS_LEFT,{0} days left
 MSG_LOAN_ONE_DAY_LEFT,1 day left
 MSG_LOAN_DUE_TODAY,Due today
