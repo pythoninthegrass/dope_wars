@@ -103,7 +103,7 @@ const CASE_FLOORS := {
 	"chase_and_doctor": 12,
 	"dealer_dialogs": 14,
 	"travel_arrival_outcomes": 12,
-	"loan_sharks": 26,
+	"loan_sharks": 24,
 	"loan_shark_visits": 79,
 	"finances_layout": 48,
 	"sound_cues": 7,
@@ -1445,9 +1445,6 @@ func _test_loan_sharks() -> void:
 	_assert(dialog != null and _tree_rows(_find_named(dialog, "OffersTree") as Tree).size() == 1, "a repaid shark should offer again")
 	_main.dialogs().close()
 
-	_assert(Copy.loan_days(1) == "1 day left" and Copy.loan_days(0) == "Due today", "the days column should read 1 day left and Due today")
-	_assert(Copy.loan_days(-1) == "1 day past due" and Copy.loan_days(-3) == "3 days past due", "a late loan should count days past due")
-
 	# The arrival flow rolls the release itself and announces it.
 	var announced := false
 	for seed_value in range(1, 200):
@@ -1534,7 +1531,7 @@ func _test_finances_layout() -> void:
 	_assert(dialog.default_key() == "finOk", "OK should be the dialog's default action")
 	_assert(shark_label.text == "Loan Sharks", "with no selection the label should read Loan Sharks, got '%s'" % shark_label.text)
 
-	for pair in [["finDeposit", "Deposit cash in the bank"], ["finWithdraw", "Withdraw cash from the bank"], ["finDepositAllBut", "Deposit all you cash, except the amount specified in the Options window"], ["finWithdrawAll", "Withdraw all cash from the bank"], ["finRepay", "Repay a loan"], ["finBorrow", "Borrow from selected shark"]]:
+	for pair in [["finDeposit", "Deposit cash in the bank"], ["finWithdraw", "Withdraw cash from the bank"], ["finDepositAllBut", "Deposit all your cash, except the amount specified in the Options window"], ["finWithdrawAll", "Withdraw all cash from the bank"], ["finRepay", "Repay a loan"], ["finBorrow", "Borrow from selected shark"]]:
 		var button := _find_named(dialog, String(pair[0])) as Button
 		_assert(button != null and button.tooltip_text == String(pair[1]), "%s should carry the form's hint as its tooltip, got '%s'" % [pair[0], "" if button == null else button.tooltip_text])
 

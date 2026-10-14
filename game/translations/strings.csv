@@ -68,7 +68,6 @@ MSG_UNITS_AT,units @ ${0}
 MSG_SCORE_NOT_HIGH_ENOUGH,"{0} was not good enough to get on your highest score list."
 FIN_CASH,Cash
 FIN_BANK,Bank
-FIN_DEBT,Debt
 BTN_DEPOSIT,Deposit
 BTN_WITHDRAW,Withdraw
 BTN_DEPOSIT_ALL_BUT,Deposit All But..
@@ -93,15 +92,10 @@ FIN_DEBT_CAP_NOTE,"Note: Your maximum TOTAL debt cannot exceed 1,000,000"
 FIN_SHARKS_LABEL,Loan Sharks
 HINT_DEPOSIT,Deposit cash in the bank
 HINT_WITHDRAW,Withdraw cash from the bank
-HINT_DEPOSIT_ALL_BUT,"Deposit all you cash, except the amount specified in the Options window"
+HINT_DEPOSIT_ALL_BUT,"Deposit all your cash, except the amount specified in the Options window"
 HINT_WITHDRAW_ALL,Withdraw all cash from the bank
 HINT_REPAY_LOAN,Repay a loan
 HINT_BORROW,Borrow from selected shark
-MSG_LOAN_DAYS_LEFT,{0} days left
-MSG_LOAN_ONE_DAY_LEFT,1 day left
-MSG_LOAN_DUE_TODAY,Due today
-MSG_LOAN_DAYS_PAST_DUE,{0} days past due
-MSG_LOAN_ONE_DAY_PAST_DUE,1 day past due
 MSG_SHARK_RELEASED,{0} was released from jail today!
 DLG_LOAN_SHARK,Loan Shark
 BTN_PAY_NOW,Pay Now

@@ -99,7 +99,6 @@ const MSG_SCORE_NOT_HIGH_ENOUGH := "MSG_SCORE_NOT_HIGH_ENOUGH"
 
 const FIN_CASH := "FIN_CASH"
 const FIN_BANK := "FIN_BANK"
-const FIN_DEBT := "FIN_DEBT"
 const BTN_DEPOSIT := "BTN_DEPOSIT"
 const BTN_WITHDRAW := "BTN_WITHDRAW"
 const BTN_DEPOSIT_ALL_BUT := "BTN_DEPOSIT_ALL_BUT"
@@ -128,11 +127,6 @@ const HINT_DEPOSIT_ALL_BUT := "HINT_DEPOSIT_ALL_BUT"
 const HINT_WITHDRAW_ALL := "HINT_WITHDRAW_ALL"
 const HINT_REPAY_LOAN := "HINT_REPAY_LOAN"
 const HINT_BORROW := "HINT_BORROW"
-const MSG_LOAN_DAYS_LEFT := "MSG_LOAN_DAYS_LEFT"
-const MSG_LOAN_ONE_DAY_LEFT := "MSG_LOAN_ONE_DAY_LEFT"
-const MSG_LOAN_DUE_TODAY := "MSG_LOAN_DUE_TODAY"
-const MSG_LOAN_DAYS_PAST_DUE := "MSG_LOAN_DAYS_PAST_DUE"
-const MSG_LOAN_ONE_DAY_PAST_DUE := "MSG_LOAN_ONE_DAY_PAST_DUE"
 const MSG_SHARK_RELEASED := "MSG_SHARK_RELEASED"
 const DLG_LOAN_SHARK := "DLG_LOAN_SHARK"
 const BTN_PAY_NOW := "BTN_PAY_NOW"
@@ -283,20 +277,6 @@ static func trend(direction: int) -> String:
 	return TREND_NEUTRAL
 
 
-## "units @ $1,234" (index.html:1302).
-## The days-left column of an outstanding loan; a loan past due counts up.
-static func loan_days(days_left: int) -> String:
-	if days_left == 0:
-		return t(MSG_LOAN_DUE_TODAY)
-	if days_left == 1:
-		return t(MSG_LOAN_ONE_DAY_LEFT)
-	if days_left > 1:
-		return t(MSG_LOAN_DAYS_LEFT).format([days_left])
-	if days_left == -1:
-		return t(MSG_LOAN_ONE_DAY_PAST_DUE)
-	return t(MSG_LOAN_DAYS_PAST_DUE).format([-days_left])
-
-
 ## The first line of a shark's visit: due today, due yesterday, or N days past due.
 static func visit_status(days_left: int) -> String:
 	if days_left >= 0:
@@ -325,6 +305,7 @@ static func visit_beating(message: int, shark_name: String, female: bool) -> Str
 	return t(key).format([shark_name, t(PRONOUN_HER if female else PRONOUN_HIS)])
 
 
+## "units @ $1,234" (index.html:1302).
 static func units_at(price: float) -> String:
 	return t(MSG_UNITS_AT).format([fmt(price)])
 
