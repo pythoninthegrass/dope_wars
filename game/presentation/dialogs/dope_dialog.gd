@@ -84,12 +84,15 @@ func body() -> VBoxContainer:
 ## Adds a button to the dialog's button row and returns it. The first one added
 ## becomes the default, matching the prototype's reading order -- its
 ## `[id$="Ok"]` query also picks the first match in document order.
-func add_button(key: String, label_key: String, is_cancel: bool = false) -> Button:
+## `parent` places the button somewhere in the body instead of the button row
+## (the two-column Finances layout); it still counts toward the default and
+## cancel keys.
+func add_button(key: String, label_key: String, is_cancel: bool = false, parent: Container = null) -> Button:
 	var button := Button.new()
 	button.name = key
 	button.text = tr(label_key)
 	button.custom_minimum_size = Vector2(84, 0)
-	_buttons.add_child(button)
+	(parent if parent != null else _buttons).add_child(button)
 	if _default_key.is_empty():
 		_default_key = key
 	if is_cancel:
@@ -120,11 +123,9 @@ func focus_default() -> void:
 		_primary_field.grab_focus()
 		_primary_field.select_all()
 		return
-	for child in _buttons.get_children():
-		var button := child as Button
-		if button != null and button.name == _default_key:
-			button.grab_focus()
-			return
+	var button := find_child(_default_key, true, false) as Button
+	if button != null:
+		button.grab_focus()
 
 
 ## Registers `edit` as the field that gets keyboard focus (and its text
