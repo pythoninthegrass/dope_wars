@@ -130,6 +130,8 @@ func _run() -> void:
 	await _test_persistence_round_trip()
 	_case("finances")
 	await _test_finances()
+	_case("deposit_all_but")
+	await _test_deposit_all_but()
 	_case("typed_quantity")
 	await _test_typed_quantity()
 	_case("endgame_and_highscores")
@@ -594,6 +596,69 @@ func _test_finances() -> void:
 	_assert(int(world.state_get()["cash"]) == cash_before - 400, "depositing 400 should take 400 out of cash")
 	_assert(_main.dialogs().current() is FinancesDialog, "the finances dialog should re-open after a deposit (index.html:1348)")
 	_assert(_main.hud().led_text("bank") == "400", "the bank LED should follow the deposit")
+
+
+# TASK-013.02.06. Deposit All But.. deposits cash minus the withhold amount set
+# in the Options dialog, acts at once with no quantity prompt, and does nothing
+# when cash is at or below the withhold. The withhold defaults to 1,000, caps at
+# 1,000,000 and persists through a fresh WithholdSettingsStore read.
+func _test_deposit_all_but() -> void:
+	WithholdSettingsStore.new().clear()
+	var world := _fresh(SEED, 5000)
+	_assert(
+		_main.hud().find_child("Menu" + Copy.MENU_TOOLS, true, false) != null,
+		"the menu bar should carry a Tools menu for Options"
+	)
+
+	_main._do_finances()
+	await _idle()
+	var button := _main.dialogs().current().find_child("finDepositAllBut", true, false) as Button
+	_assert(button != null, "Finances should offer a Deposit All But button")
+	if button == null:
+		return
+	_assert(not button.disabled, "Deposit All But should be enabled with 5,000 against a 1,000 withhold")
+
+	_main._on_finances_action("finDepositAllBut")
+	await _idle()
+	_assert(int(world.state_get()["bank"]) == 4000, "Deposit All But should bank cash minus the default 1,000 withhold")
+	_assert(int(world.state_get()["cash"]) == 1000, "Deposit All But should leave the withhold in cash")
+	_assert(_main.dialogs().current() is FinancesDialog, "the finances dialog should re-open after Deposit All But")
+	button = _main.dialogs().current().find_child("finDepositAllBut", true, false) as Button
+	_assert(button.disabled, "Deposit All But should disable once cash is at the withhold")
+
+	_main._on_finances_action("finDepositAllBut")
+	await _idle()
+	_assert(int(world.state_get()["bank"]) == 4000, "Deposit All But at the withhold should deposit nothing")
+	_assert(int(world.state_get()["cash"]) == 1000, "Deposit All But at the withhold should leave cash alone")
+
+	_main._show_options()
+	await _idle()
+	var options := _main.dialogs().current() as QuantityDialog
+	_assert(options != null, "Options should open a spinner dialog")
+	if options == null:
+		return
+	_assert(options.max_value() == 1000000, "the withhold spinner should cap at 1,000,000")
+	_assert(options.value() == 1000, "the withhold spinner should start at the stored 1,000")
+	options.set_value(2000000)
+	_assert(options.value() == 1000000, "a withhold above the cap should clamp to 1,000,000")
+	options.set_value(250)
+	_main.dialogs().confirm()
+	await _idle()
+	_assert(WithholdSettingsStore.new().load_withhold() == 250, "the withhold should persist to disk")
+
+	_main._on_finances_action("finDepositAllBut")
+	await _idle()
+	_assert(int(world.state_get()["bank"]) == 4750, "Deposit All But should use the 250 withhold")
+	_assert(int(world.state_get()["cash"]) == 250, "Deposit All But should leave 250 in cash")
+
+	_main._show_options()
+	await _idle()
+	(_main.dialogs().current() as QuantityDialog).set_value(9)
+	_main.dialogs().cancel()
+	await _idle()
+	_assert(WithholdSettingsStore.new().load_withhold() == 250, "cancelling Options should keep the stored withhold")
+	await _drain()
+	WithholdSettingsStore.new().clear()
 
 
 # The typed-text path every other case skips. set_value() writes the Range

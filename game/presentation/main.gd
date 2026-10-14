@@ -27,6 +27,7 @@ var _scores := HighscoreStore.new()
 var _arrival := ArrivalFlow.new()
 var _sound := SoundPlayer.new()
 var _sound_settings := SoundSettingsStore.new()
+var _withhold_settings := WithholdSettingsStore.new()
 
 ## Guards a second finish() -- the prototype disables the Finish button
 ## instead (index.html:1635), and dw_finish is const so calling it twice is
@@ -199,6 +200,7 @@ func _connect_hud() -> void:
 	_hud.new_game_requested.connect(_show_new_game_dialog)
 	_hud.scores_requested.connect(_show_scores)
 	_hud.help_requested.connect(_show_help)
+	_hud.options_requested.connect(_show_options)
 	_hud.exit_requested.connect(_do_exit)
 	_hud.alert_last_day.connect(_show_last_day_alert)
 	_hud.selection_changed.connect(_refresh)
@@ -312,7 +314,9 @@ func _do_finances() -> void:
 	var bank := int(state.get("bank", 0))
 	var debt := int(state.get("debt", 0))
 	_dialogs.open(
-		FinancesDialog.new().present(cash, bank, debt, _world.offers_copy(), _world.loans_copy()),
+		FinancesDialog.new().present(
+			cash, bank, debt, _world.offers_copy(), _world.loans_copy(), _withhold_settings.load_withhold()
+		),
 		_on_finances_action
 	)
 
@@ -322,6 +326,14 @@ func _on_finances_action(key: String) -> void:
 		return
 	if key.begins_with("finBorrow"):
 		_borrow_from(int(key.trim_prefix("finBorrow")))
+		return
+	if key == "finDepositAllBut":
+		var cash := int(_world.state_get().get("cash", 0))
+		var amount := cash - _withhold_settings.load_withhold()
+		if amount > 0:
+			_world.finances(SimWorld.FINANCES_DEPOSIT, amount)
+		_refresh()
+		_do_finances()
 		return
 	if key.begins_with("finRepay"):
 		_world.repay(int(key.trim_prefix("finRepay")))
@@ -463,6 +475,18 @@ func _show_new_game_dialog() -> void:
 
 func _show_scores() -> void:
 	_dialogs.open(ScoresDialog.new().present(_scores.load_all()), func(_key: String) -> void: pass)
+
+
+## Tools > Options.. holds the one setting the port has so far besides sound:
+## the amount Finances' Deposit All But.. leaves in cash.
+func _show_options() -> void:
+	var prompt := tr(Copy.MSG_WITHHOLD_PROMPT).format([Copy.fmt(WithholdSettingsStore.MAX_WITHHOLD)])
+	var amount := QuantityDialog.new().present(Copy.DLG_OPTIONS, prompt, WithholdSettingsStore.MAX_WITHHOLD)
+	amount.set_value(_withhold_settings.load_withhold())
+	_dialogs.open(amount, func(confirm_key: String) -> void:
+		if confirm_key == "qtyOk":
+			_withhold_settings.save_withhold(amount.value())
+	)
 
 
 func _show_help() -> void:

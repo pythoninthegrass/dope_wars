@@ -23,6 +23,7 @@ signal travel_requested(location_index: int)
 signal new_game_requested()
 signal scores_requested()
 signal help_requested()
+signal options_requested()
 signal exit_requested()
 signal buy_drug_selected(drug_index: int)
 signal sell_drug_selected(drug_index: int)
@@ -321,6 +322,9 @@ func _build_menubar() -> Control:
 		[Copy.ITEM_HIGH_SCORES, "_on_scores"],
 	]))
 	bar.add_child(_build_sounds_menu())
+	bar.add_child(_menu_button(Copy.MENU_TOOLS, [
+		[Copy.ITEM_OPTIONS, "_on_options"],
+	]))
 	bar.add_child(_menu_button(Copy.MENU_HELP, [
 		[Copy.ITEM_HOW_TO_PLAY, "_on_help"],
 	]))
@@ -394,6 +398,10 @@ func _on_scores() -> void:
 
 func _on_help() -> void:
 	help_requested.emit()
+
+
+func _on_options() -> void:
+	options_requested.emit()
 
 
 func _build_top_row() -> Control:

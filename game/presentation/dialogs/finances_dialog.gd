@@ -19,7 +19,7 @@ var pending_action := -1
 var pending_max := 0
 
 
-func present(cash: int, bank: int, debt: int, offers: Array, loans: Array) -> FinancesDialog:
+func present(cash: int, bank: int, debt: int, offers: Array, loans: Array, withhold: int) -> FinancesDialog:
 	setup(Copy.DLG_FINANCES)
 
 	_field(tr(Copy.FIN_CASH), Copy.money(cash))
@@ -38,6 +38,9 @@ func present(cash: int, bank: int, debt: int, offers: Array, loans: Array) -> Fi
 	# dollar.
 	var deposit := add_button("finDeposit", Copy.BTN_DEPOSIT)
 	deposit.disabled = cash <= 0
+	# 2.1's Deposit All But.. acts at once, so it is disabled when it would move nothing.
+	var deposit_all_but := add_button("finDepositAllBut", Copy.BTN_DEPOSIT_ALL_BUT)
+	deposit_all_but.disabled = cash <= withhold
 	var withdraw := add_button("finWithdraw", Copy.BTN_WITHDRAW)
 	withdraw.disabled = bank <= 0
 	add_button("finClose", Copy.BTN_CLOSE, true)

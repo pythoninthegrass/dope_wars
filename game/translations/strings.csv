@@ -4,12 +4,14 @@ DOPE_WARS_DAY_OF,Day {0} of {1}
 MENU_FILE,File
 MENU_SCORES,Scores
 MENU_SOUNDS,Sounds
+MENU_TOOLS,Tools
 MENU_HELP,Help
 ITEM_ALLOW_SOUND,Allow Sound
 ITEM_NEW_GAME,New Game
 ITEM_EXIT,Exit
 ITEM_HIGH_SCORES,High Scores
 ITEM_HOW_TO_PLAY,How to play
+ITEM_OPTIONS,Options...
 LED_CASH,Cash:
 LED_BANK,Bank:
 LED_DEBT,Debt:
@@ -44,6 +46,7 @@ DLG_SELL,Sell
 DLG_FINANCES,Finances
 DLG_DEPOSIT,Deposit
 DLG_WITHDRAW,Withdraw
+DLG_OPTIONS,Options
 DLG_BORROW,Borrow
 DLG_WORD_ON_THE_STREET,Word on the street
 DLG_RANDOM_EVENT,Random Event
@@ -69,9 +72,11 @@ FIN_BANK,Bank
 FIN_DEBT,Debt
 BTN_DEPOSIT,Deposit
 BTN_WITHDRAW,Withdraw
+BTN_DEPOSIT_ALL_BUT,Deposit All But..
 BTN_REPAY,Repay ${0}
 MSG_DEPOSIT_PROMPT,Deposit how much of your ${0} cash?
 MSG_WITHDRAW_PROMPT,Withdraw how much of your ${0} bank balance?
+MSG_WITHHOLD_PROMPT,"Set the amount to withhold when you press the 'Deposit All But..' button in Finances (max ${0}):"
 MSG_BORROW_PROMPT,Borrow how much from {0}? They will lend up to ${1}.
 FIN_SHARKS,Loan Sharks
 FIN_SHARK_COLUMNS,"Name, % Rate, Duration, Amount"
