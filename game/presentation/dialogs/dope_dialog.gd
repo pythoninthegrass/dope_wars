@@ -101,6 +101,11 @@ func add_button(key: String, label_key: String, is_cancel: bool = false, parent:
 	return button
 
 
+## The key of the button Enter runs, which is also the dialog's default action.
+func default_key() -> String:
+	return _default_key
+
+
 ## Runs the primary action. Bound to Enter.
 func confirm() -> void:
 	_fire(_default_key)

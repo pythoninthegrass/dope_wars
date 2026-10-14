@@ -90,6 +90,13 @@ BTN_REPAY_LOAN,Repay Loan
 BTN_BORROW,Borrow
 BTN_WITHDRAW_ALL,Withdraw All
 FIN_DEBT_CAP_NOTE,"Note: Your maximum TOTAL debt cannot exceed 1,000,000"
+FIN_SHARKS_LABEL,Loan Sharks
+HINT_DEPOSIT,Deposit cash in the bank
+HINT_WITHDRAW,Withdraw cash from the bank
+HINT_DEPOSIT_ALL_BUT,"Deposit all you cash, except the amount specified in the Options window"
+HINT_WITHDRAW_ALL,Withdraw all cash from the bank
+HINT_REPAY_LOAN,Repay a loan
+HINT_BORROW,Borrow from selected shark
 MSG_LOAN_DAYS_LEFT,{0} days left
 MSG_LOAN_ONE_DAY_LEFT,1 day left
 MSG_LOAN_DUE_TODAY,Due today

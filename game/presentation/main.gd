@@ -322,7 +322,7 @@ func _do_finances() -> void:
 
 
 func _on_finances_action(key: String) -> void:
-	if not key.begins_with("fin") or key == "finClose":
+	if not key.begins_with("fin") or key == "finOk":
 		return
 	if key.begins_with("finBorrow"):
 		var parts := key.trim_prefix("finBorrow").split(":")

@@ -72,6 +72,7 @@ const CASES := [
 	"dealer_dialogs",
 	"travel_arrival_outcomes",
 	"loan_sharks",
+	"finances_layout",
 	"sound_cues",
 	"allow_sound_toggle",
 ]
@@ -104,6 +105,7 @@ const CASE_FLOORS := {
 	"travel_arrival_outcomes": 12,
 	"loan_sharks": 26,
 	"loan_shark_visits": 79,
+	"finances_layout": 48,
 	"sound_cues": 7,
 	"allow_sound_toggle": 8,
 }
@@ -158,6 +160,8 @@ func _run() -> void:
 	await _test_loan_sharks()
 	_case("loan_shark_visits")
 	await _test_loan_shark_visits()
+	_case("finances_layout")
+	await _test_finances_layout()
 	_case("sound_cues")
 	await _test_sound_cues()
 	_case("allow_sound_toggle")
@@ -1373,7 +1377,7 @@ func _test_loan_sharks() -> void:
 	_assert(loans != null and offers != null, "Finances should list loans and offers in two tables")
 	if loans == null or offers == null:
 		return
-	_assert(_tree_rows(loans) == [["Honest Harry", "5,500", "15", "10 days left"]], "the loans table should list the starter loan, got %s" % [_tree_rows(loans)])
+	_assert(_tree_rows(loans) == [["Honest Harry", "5,500", "15", "10"]], "the loans table should list the starter loan, got %s" % [_tree_rows(loans)])
 	_assert(_tree_rows(offers).is_empty(), "no shark offers while all but Harry are in jail")
 	var repay := _find_named(dialog, "finRepay") as Button
 	_assert(repay != null and repay.disabled, "Repay Loan should be disabled until a loan is selected")
@@ -1426,7 +1430,7 @@ func _test_loan_sharks() -> void:
 	_assert(_tree_rows(offers).is_empty(), "a shark owed money should stop offering")
 	_assert(_tree_rows(loans).size() == 2, "the new loan should join the loans table")
 	_assert(
-		_tree_rows(loans)[1] == [shark["name"], "1,000", str(shark["rate_percent"]), Copy.loan_days(int(shark["duration_days"]))],
+		_tree_rows(loans)[1] == [shark["name"], "1,000", str(shark["rate_percent"]), str(int(shark["duration_days"]))],
 		"the new loan row should show amount, rate and days left, got %s" % [_tree_rows(loans)[1]]
 	)
 
@@ -1463,6 +1467,120 @@ func _test_loan_sharks() -> void:
 		if announced:
 			break
 	_assert(announced, "some seed should release a shark on the first arrival and announce it")
+	_main.dialogs().close()
+
+
+# TASK-013.02.22. The dialog's shape is the oracle's FinanceDlg form
+# (vendor/dopewars-2001/re/forms/FinanceDlg.dfm): a bevelled money panel, two
+# captioned group boxes, and a right column carrying the shark name and OK.
+func _test_finances_layout() -> void:
+	var world := _fresh(SEED)
+	var cash := int(world.state_get()["cash"])
+	_main._do_finances()
+	await _idle()
+	var dialog := _main.dialogs().current() as FinancesDialog
+	_assert(dialog != null, "Finances should open a finances dialog")
+	if dialog == null:
+		return
+
+	var money := _find_named(dialog, "MoneyPanel") as PanelContainer
+	_assert(money != null, "the money panel should be a bevelled panel of its own")
+	if money == null:
+		return
+	var cash_box := _find_named(money, "CashValue") as LineEdit
+	var bank_box := _find_named(money, "BankValue") as LineEdit
+	_assert(cash_box != null and bank_box != null, "Cash and Bank should be value boxes in the money panel")
+	if cash_box == null or bank_box == null:
+		return
+	_assert(not cash_box.editable and not bank_box.editable, "the value boxes should be read-only, as the oracle's are")
+	_assert(cash_box.text == Copy.money(cash), "the cash box should show the cash on hand, got '%s'" % cash_box.text)
+	_assert(bank_box.text == Copy.money(0), "the bank box should show the bank balance, got '%s'" % bank_box.text)
+	var panel_text := _copy_text(money)
+	_assert(panel_text.contains("Cash") and panel_text.contains("Bank"), "the value boxes should carry their own labels, got '%s'" % panel_text)
+	for key in ["finDeposit", "finDepositAllBut", "finWithdraw", "finWithdrawAll"]:
+		_assert(_find_named(money, key) != null, "%s should sit in the money panel beside the values" % key)
+	var grid := _first_grid(money)
+	_assert(grid != null and grid.columns == 4, "the panel should hold a label, a value and two buttons per row, as the form's 2x2 arrangement does")
+
+	var loans_group := _find_named(dialog, "LoansGroup")
+	_assert(loans_group != null, "the loans table should be enclosed in a group box")
+	var offers_group := _find_named(dialog, "OffersGroup")
+	_assert(offers_group != null, "the offerings should be enclosed in a group box")
+	if loans_group == null or offers_group == null:
+		return
+	var loans := _find_named(loans_group, "LoansTree") as Tree
+	_assert(loans != null and _find_named(loans_group, "finRepay") != null, "the loans group should hold the table and Repay Loan")
+	var offers := _find_named(offers_group, "OffersTree") as Tree
+	_assert(offers != null, "the offerings group should hold the offerings table")
+	_assert(_find_named(offers_group, "BorrowSpinner") != null and _find_named(offers_group, "finBorrow") != null, "the offerings group should hold the spinner and Borrow")
+	if loans == null or offers == null:
+		return
+	_assert((_find_named(dialog, "LoansGroupCaption") as Label).text == "Outstanding Loans: $5,500", "the loans group should be captioned with the outstanding total")
+	_assert((_find_named(dialog, "OffersGroupCaption") as Label).text == "Loan Shark offerings:", "the offerings group should be captioned 'Loan Shark offerings:'")
+	var offers_text := _copy_text(offers_group)
+	_assert(offers_text.contains("Note: Your maximum TOTAL debt cannot exceed 1,000,000"), "the debt cap note belongs to the offerings group, got '%s'" % offers_text)
+	_assert(offers_text.contains("How much to borrow?"), "the borrow prompt belongs to the offerings group, got '%s'" % offers_text)
+
+	var right := _find_named(dialog, "RightColumn")
+	_assert(right != null, "the dialog should be laid out in two columns")
+	if right == null:
+		return
+	var shark_label := _find_named(right, "SharkNameLabel") as Label
+	var ok_button := _find_named(right, "finOk") as Button
+	_assert(shark_label != null, "the shark name label belongs to the right column")
+	_assert(ok_button != null and ok_button.text == "OK", "the accept button should be captioned OK and sit in the right column")
+	if shark_label == null or ok_button == null:
+		return
+	_assert(dialog.default_key() == "finOk", "OK should be the dialog's default action")
+	_assert(shark_label.text == "Loan Sharks", "with no selection the label should read Loan Sharks, got '%s'" % shark_label.text)
+
+	for pair in [["finDeposit", "Deposit cash in the bank"], ["finWithdraw", "Withdraw cash from the bank"], ["finDepositAllBut", "Deposit all you cash, except the amount specified in the Options window"], ["finWithdrawAll", "Withdraw all cash from the bank"], ["finRepay", "Repay a loan"], ["finBorrow", "Borrow from selected shark"]]:
+		var button := _find_named(dialog, String(pair[0])) as Button
+		_assert(button != null and button.tooltip_text == String(pair[1]), "%s should carry the form's hint as its tooltip, got '%s'" % [pair[0], "" if button == null else button.tooltip_text])
+
+	_assert(_tree_rows(loans)[0] == ["Honest Harry", "5,500", "15", "10"], "Days Left should be a bare day count, got %s" % [_tree_rows(loans)[0]])
+	for tree in [loans, offers]:
+		for column in tree.columns:
+			var title: String = tree.get_column_title(column)
+			var needed := Win98Theme.bold_font().get_string_size(title, HORIZONTAL_ALIGNMENT_LEFT, -1, Win98Theme.FONT_TABLE).x + 12
+			_assert(float(tree.get_column_width(column)) >= needed, "the '%s' column is too narrow for its title (%d < %d)" % [title, tree.get_column_width(column), int(needed)])
+
+	loans.get_root().get_child(0).select(0)
+	_assert(shark_label.text == "Honest Harry", "selecting a loan should name its shark, got '%s'" % shark_label.text)
+	_main.dialogs().close()
+
+	var guard := 0
+	while world.offers_copy().is_empty() and guard < 200:
+		guard += 1
+		world.roll_shark_release()
+	_assert(not world.offers_copy().is_empty(), "rolling the jail release should bring out a shark")
+	var offer: Dictionary = world.offers_copy()[0]
+	var shark: Dictionary = Roster.sharks()[int(offer["shark_index"])]
+	_main._do_finances()
+	await _idle()
+	dialog = _main.dialogs().current() as FinancesDialog
+	offers = _find_named(dialog, "OffersTree") as Tree
+	shark_label = _find_named(dialog, "SharkNameLabel") as Label
+	offers.get_root().get_child(0).select(0)
+	_assert(shark_label.text == String(shark["name"]), "selecting an offer should name its shark, got '%s'" % shark_label.text)
+
+	# The form's OnDblClick handlers: a double-clicked offer borrows and a
+	# double-clicked loan repays.
+	var debt_before := int(world.state_get()["debt"])
+	(_find_named(dialog, "BorrowSpinner") as SpinBox).get_line_edit().text = "1000"
+	offers.item_activated.emit()
+	await _idle()
+	_assert(int(world.state_get()["debt"]) == debt_before + 1000, "double-clicking an offer should borrow the typed amount")
+	dialog = _main.dialogs().current() as FinancesDialog
+	loans = _find_named(dialog, "LoansTree") as Tree
+	_assert(_tree_rows(loans).size() == 2, "the borrowed loan should join the loans table")
+	var payoff := int(world.loans_copy()[1]["payoff"])
+	var cash_before := int(world.state_get()["cash"])
+	loans.get_root().get_child(1).select(0)
+	loans.item_activated.emit()
+	await _idle()
+	_assert(int(world.state_get()["cash"]) == cash_before - payoff, "double-clicking a loan should repay it")
+	_assert(world.loans_copy().size() == 1, "a repaid loan should leave the table")
 	_main.dialogs().close()
 
 
@@ -2020,6 +2138,18 @@ static func _tree_rows(tree: Tree) -> Array:
 		rows.append(row)
 		item = item.get_next()
 	return rows
+
+
+## The first GridContainer under `node`, for assertions about a laid-out block
+## rather than its individual widgets.
+static func _first_grid(node: Node) -> GridContainer:
+	if node is GridContainer:
+		return node
+	for child in node.get_children():
+		var found := _first_grid(child)
+		if found != null:
+			return found
+	return null
 
 
 static func _find_named(node: Node, what: String) -> Node:
