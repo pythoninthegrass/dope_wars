@@ -74,6 +74,7 @@ const CASES := [
 	"travel_arrival_outcomes",
 	"loan_sharks",
 	"finances_layout",
+	"finances_lists_fit_all_sharks",
 	"sound_cues",
 	"allow_sound_toggle",
 ]
@@ -108,6 +109,7 @@ const CASE_FLOORS := {
 	"loan_sharks": 24,
 	"loan_shark_visits": 79,
 	"finances_layout": 61,
+	"finances_lists_fit_all_sharks": 9,
 	"sound_cues": 7,
 	"allow_sound_toggle": 8,
 }
@@ -166,6 +168,8 @@ func _run() -> void:
 	await _test_loan_shark_visits()
 	_case("finances_layout")
 	await _test_finances_layout()
+	_case("finances_lists_fit_all_sharks")
+	await _test_finances_lists_fit_all_sharks()
 	_case("sound_cues")
 	await _test_sound_cues()
 	_case("allow_sound_toggle")
@@ -1660,6 +1664,88 @@ func _test_finances_layout() -> void:
 	_assert(int(world.state_get()["cash"]) == cash_before - payoff, "double-clicking a loan should repay it")
 	_assert(world.loans_copy().size() == 1, "a repaid loan should leave the table")
 	_main.dialogs().close()
+
+
+## Both finances lists have to show every shark there is -- NUM_SHARKS is five --
+## with nothing below the fold. The dialog used to hold the lists at 90px, which
+## is the 22px header strip plus three 20px rows, so the fourth shark scrolled
+## out of sight and the fifth with it. Both lists are checked at their full five
+## rows rather than the one or two a fresh game has.
+func _test_finances_lists_fit_all_sharks() -> void:
+	# Every shark owes a loan before any is borrowed and stops offering while it
+	# is owed one (loans.is_offered), so the loans list is fullest with the
+	# starting loan plus four borrows, and the offers list only after those are
+	# all repaid. Both need money the default 2,000 does not cover.
+	var world := _fresh(SEED, 500000)
+	var guard := 0
+	while world.loans_copy().size() < 5 and guard < 200:
+		guard += 1
+		world.roll_shark_release()
+		for offer in world.offers_copy():
+			if not _has_loan(world, int(offer["shark_index"])):
+				world.borrow(int(offer["shark_index"]), mini(1000, int(offer["max_amount"])))
+		await _idle()
+	_assert(world.loans_copy().size() == 5, "five loan sharks should be on the books, got %d" % world.loans_copy().size())
+
+	_main._do_finances()
+	await _idle()
+	var dialog := _main.dialogs().current() as FinancesDialog
+	_assert(dialog != null, "Finances should open a finances dialog")
+	if dialog == null:
+		return
+	_assert_list_fits(_find_named(dialog, "LoansTree") as Tree, "LoansTree", 5)
+
+	_main.dialogs().close()
+	for loan in world.loans_copy():
+		world.repay(int(loan["shark_index"]))
+	guard = 0
+	while world.offers_copy().size() < 5 and guard < 200:
+		guard += 1
+		world.roll_shark_release()
+		await _idle()
+	_assert(world.offers_copy().size() == 5, "five loan sharks should be offering, got %d" % world.offers_copy().size())
+
+	_main._do_finances()
+	await _idle()
+	dialog = _main.dialogs().current() as FinancesDialog
+	_assert(dialog != null, "Finances should reopen after the loans are repaid")
+	if dialog == null:
+		return
+	_assert_list_fits(_find_named(dialog, "OffersTree") as Tree, "OffersTree", 5)
+
+	# The two 122px lists are what grew the dialog, and the window is pinned at
+	# 704x620 (project.godot), so the taller dialog still has to fit.
+	var room := Vector2(
+		ProjectSettings.get_setting("display/window/size/viewport_width"),
+		ProjectSettings.get_setting("display/window/size/viewport_height")
+	)
+	_assert(dialog.size.y <= room.y, "a full finances dialog should fit the game window, got %s in %s" % [dialog.size, room])
+	_main.dialogs().close()
+
+
+## A list holds `expected` rows and none of them is below the fold: the last
+## row's own box has to end inside the list, which is what "shows without
+## scrolling" means for a Tree.
+func _assert_list_fits(tree: Tree, node_name: String, expected: int) -> void:
+	if tree == null:
+		_assert(false, "%s should exist" % node_name)
+		return
+	var root := tree.get_root()
+	_assert(root.get_child_count() == expected, "%s should hold %d rows, got %d" % [node_name, expected, root.get_child_count()])
+	if root.get_child_count() < expected:
+		return
+	var last := tree.get_item_area_rect(root.get_child(expected - 1))
+	_assert(
+		last.end.y <= tree.size.y,
+		"%s row %d should be on screen, its box ends at %f in a %f-tall list" % [node_name, expected, last.end.y, tree.size.y]
+	)
+
+
+static func _has_loan(world: SimWorld, shark_index: int) -> bool:
+	for loan in world.loans_copy():
+		if int(loan["shark_index"]) == shark_index:
+			return true
+	return false
 
 
 ## Overdue loan shark visits run before the day advances, one dialog per loan.

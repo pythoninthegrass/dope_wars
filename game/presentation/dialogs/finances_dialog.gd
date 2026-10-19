@@ -25,9 +25,12 @@ const LEFT_WEIGHT := 352.0
 ## 2.1 paints there, which the port does not draw, and the left column needs the
 ## width for the debt cap note to read on one line as the oracle's does.
 const RIGHT_WEIGHT := 170.0
-## The form's lists are 100 tall in a 446-tall dialog; the port's window leaves
-## less room once its larger type is counted.
-const TABLE_HEIGHT := 90.0
+## The height of a list tall enough to hold every shark there is -- five of them
+## (NUM_SHARKS) -- without scrolling, which is the whole point of the dialog. At
+## FONT_TABLE the theme measures a 22px header strip and 20px rows, so 22 + 5*20;
+## the ui_flow_test finances_lists_fit_all_sharks case is what holds this number
+## to the theme's metrics rather than the other way round.
+const TABLE_HEIGHT := 122.0
 
 ## The column widths the form gives each list, in the order its columns appear.
 const LOAN_COLUMNS := [142, 80, 50, 64]
@@ -61,7 +64,10 @@ func present(cash: int, bank: int, debt: int, offers: Array, loans: Array, withh
 
 	var left := VBoxContainer.new()
 	left.name = "LeftColumn"
-	left.add_theme_constant_override("separation", 10)
+	# The 10px the other containers separate by does not fit beside two
+	# five-row tables; 4 keeps the sections apart without pushing the dialog
+	# past the pinned window height.
+	left.add_theme_constant_override("separation", 4)
 	left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	left.size_flags_stretch_ratio = LEFT_WEIGHT
 	columns.add_child(left)
