@@ -651,6 +651,19 @@ dw_result dw_price_events_drain(const dw_world *world, dw_price_event *out_event
  * state is unchanged. */
 dw_result dw_buy(dw_world *world, uint32_t drug_index, uint32_t qty);
 
+/* Buy `qty` health points at the current per-point price (dw_health_price),
+ * capped at full health (100) and at what cash allows. Returns DW_OK with
+ * *out_bought set to the points actually bought (0 when already at full
+ * health); DW_ERR_INSUFFICIENT_CASH when a point cannot be afforded;
+ * DW_ERR_INVALID_ARGUMENT for qty == 0. On failure, world state is
+ * unchanged. May trigger the "nasty doctor" (docs/beermat-2.1-re.md,
+ * "Hospital"). */
+dw_result dw_buy_health(dw_world *world, uint32_t qty, int64_t *out_bought);
+
+/* The current per-point hospital price (50..450), rolled daily with the
+ * prices. Returns DW_OK and *out_price. */
+dw_result dw_health_price(const dw_world *world, int32_t *out_price);
+
 /* Sell `qty` units of `drug_index` at the current location's price.
  * Returns DW_ERR_UNKNOWN_DRUG, DW_ERR_NOT_TRADED_HERE,
  * DW_ERR_INSUFFICIENT_INVENTORY, or DW_ERR_INVALID_ARGUMENT (qty == 0)

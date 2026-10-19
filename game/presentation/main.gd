@@ -195,6 +195,7 @@ func _connect_hud() -> void:
 	_hud.buy_pressed.connect(_do_buy)
 	_hud.sell_pressed.connect(_do_sell)
 	_hud.finances_pressed.connect(_do_finances)
+	_hud.hospital_pressed.connect(_do_hospital)
 	_hud.finish_pressed.connect(_do_finish)
 	_hud.travel_requested.connect(_do_travel)
 	_hud.new_game_requested.connect(_show_new_game_dialog)
@@ -298,6 +299,28 @@ func _do_sell() -> void:
 	_dialogs.open(dialog, func(key: String) -> void:
 		if key == "qtyOk" and dialog.value() > 0:
 			_world.sell(drug_index, dialog.value())
+			_sound.play(SoundPlayer.Cue.CASH_REG)
+		_refresh()
+	)
+
+
+## index.html:1328-1365's hospital: the dialog shows the current per-point price
+## and the cost to top up to 100, the spinner caps at what cash and the remaining
+## health allow, and Buy pays and restores. A purchase of 0 (full health, or cash
+## that affords no point) is a clean no-op reported by the core; the nasty-doctor
+## outcome the core rolls after a purchase is surfaced here.
+func _do_hospital() -> void:
+	var state := _world.state_get()
+	var health := int(state.get("health", 0))
+	var cash := int(state.get("cash", 0))
+	var price_result := _world.health_price()
+	var price := int(price_result.get("price", 0))
+	var points_to_100 := mini(100 - health, int(floor(float(cash) / float(price))))
+	var limit := maxi(0, points_to_100)
+	var dialog := HospitalDialog.new().present(health, price, limit)
+	_dialogs.open(dialog, func(key: String) -> void:
+		if key == "hospitalBuy" and dialog.value() > 0:
+			_world.buy_health(dialog.value())
 			_sound.play(SoundPlayer.Cue.CASH_REG)
 		_refresh()
 	)

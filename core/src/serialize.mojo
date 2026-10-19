@@ -32,9 +32,10 @@ import world
 # + prev_price_order(4+12) + prev price slots(12*9) + inv_order(4+12)
 # + inv slots(12*26) + price_events(4+8*16) with 12 drugs and 8 events; now 13 drugs and
 # 13 events, plus last_price/seen_price(13*8 each) and last_event/price_direction(13 each), then the
-# loans: count(4), 5 slots of shark(1) + balance(8) + days_left(8), and 5 released flags.
+# loans: count(4), 5 slots of shark(1) + balance(8) + days_left(8), and 5 released flags,
+# plus health_price_multiplier(8) and infected(1).
 comptime LOAN_COUNT_OFFSET = 1191
-comptime DUMP_LEN = 1285
+comptime DUMP_LEN = 1294
 
 
 struct ByteWriter:
@@ -167,6 +168,9 @@ def dump(ref game: world.World) raises -> List[UInt8]:
     for i in range(sharks.NUM_SHARKS):
         writer.u8(game.shark_released[i])
 
+    writer.i64(game.health_price_multiplier)
+    writer.boolean(game.infected)
+
     if len(writer.bytes) != DUMP_LEN:
         raise Error(
             "serialized world is "
@@ -241,5 +245,8 @@ def load(bytes: List[UInt8]) raises -> world.World:
         game.loan_days_left[i] = reader.i64()
     for i in range(sharks.NUM_SHARKS):
         game.shark_released[i] = reader.u8()
+
+    game.health_price_multiplier = reader.i64()
+    game.infected = reader.boolean()
 
     return game^

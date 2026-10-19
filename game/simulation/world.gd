@@ -145,6 +145,18 @@ func sell(drug_index: int, qty: int) -> int:
 	return _world.sell(drug_index, qty)
 
 
+## Buy `qty` health points at the hospital's current per-point price. Returns
+## {result, bought}; `bought` is the points actually bought (0 at full health).
+func buy_health(qty: int) -> Dictionary:
+	return _world.buy_health(qty)
+
+
+## The current per-point hospital price (50..450), rolled daily. Returns
+## {result, price}.
+func health_price() -> Dictionary:
+	return _world.health_price()
+
+
 func travel(dest_location_index: int) -> int:
 	return _world.travel(dest_location_index)
 

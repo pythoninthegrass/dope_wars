@@ -27,6 +27,7 @@ COL_QTY,Qty
 BTN_BUY,Buy
 BTN_SELL,Sell
 BTN_FINANCES,Finances
+BTN_HOSPITAL,Hospital
 BTN_FINISH,Finish
 BTN_OK,OK
 BTN_CANCEL,Cancel
@@ -53,6 +54,7 @@ DLG_COAT_DEALER,Coat Dealer
 DLG_GUN_DEALER,Gun Dealer
 DLG_COP_CHASE,Cop Chase!
 DLG_DOCTOR,Confirm
+DLG_HOSPITAL,Hospital
 DLG_YOU_DIED,You Died
 DLG_GAME_OVER,Game Over
 DLG_HIGH_SCORES,High Scores
@@ -137,6 +139,7 @@ MSG_CHASE_COPS_MISSED,"They're firing on you, man! They missed!"
 MSG_CHASE_COPS_HIT,"They're firing on you, man! You've been hit!"
 MSG_CHASE_WON,You killed them all!
 MSG_DOCTOR_OFFER,"You find a gun and ${0} on Officer Hardass' carcass. Will you pay ${1} to have a doctor sew you up?"
+MSG_HOSPITAL_OFFER,"Health: ${0} of 100 (a point costs ${1}, to 100 costs ${2})"
 MSG_YOU_DIED,You have been killed. Game over.
 MSG_FINAL_SCORE,Final score: ${0}
 MSG_FINAL_SCORE_DEAD,{0} (dead)

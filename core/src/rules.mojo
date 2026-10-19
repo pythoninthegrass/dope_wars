@@ -31,6 +31,10 @@ comptime SPIKE_CRASH_ODDS = 40
 comptime PRICE_KEEP_ODDS = 5
 # Each price roll opens with Random(HOSPITAL_MULTIPLIER_RANGE), the hospital price multiplier minus one.
 comptime HOSPITAL_MULTIPLIER_RANGE = 9
+# The hospital price multiplier's additive base: the per-point cost is (multiplier) * HOSPITAL_MULTIPLIER_BASE, so the multiplier is (Random(9)+1) and a point costs 50..450.
+comptime HOSPITAL_MULTIPLIER_BASE = 50
+# The nasty-doctor health cap: a purchase that draws the cap outcome drops health below this (2.1 says "below 80").
+comptime INFECTION_HEALTH_CAP = 79
 
 # The arrival event fires on Random(ARRIVAL_EVENT_ODDS) == 0, and always (as the mugging) above the wealth cap.
 comptime ARRIVAL_EVENT_ODDS = 14

@@ -47,6 +47,7 @@ const COL_QTY := "COL_QTY"
 const BTN_BUY := "BTN_BUY"
 const BTN_SELL := "BTN_SELL"
 const BTN_FINANCES := "BTN_FINANCES"
+const BTN_HOSPITAL := "BTN_HOSPITAL"
 const BTN_FINISH := "BTN_FINISH"
 const BTN_OK := "BTN_OK"
 const BTN_CANCEL := "BTN_CANCEL"
@@ -80,6 +81,7 @@ const DLG_COAT_DEALER := "DLG_COAT_DEALER"
 const DLG_GUN_DEALER := "DLG_GUN_DEALER"
 const DLG_COP_CHASE := "DLG_COP_CHASE"
 const DLG_DOCTOR := "DLG_DOCTOR"
+const DLG_HOSPITAL := "DLG_HOSPITAL"
 const DLG_YOU_DIED := "DLG_YOU_DIED"
 const DLG_GAME_OVER := "DLG_GAME_OVER"
 const DLG_HIGH_SCORES := "DLG_HIGH_SCORES"
@@ -173,6 +175,7 @@ const MSG_CHASE_COPS_MISSED := "MSG_CHASE_COPS_MISSED"
 const MSG_CHASE_COPS_HIT := "MSG_CHASE_COPS_HIT"
 const MSG_CHASE_WON := "MSG_CHASE_WON"
 const MSG_DOCTOR_OFFER := "MSG_DOCTOR_OFFER"
+const MSG_HOSPITAL_OFFER := "MSG_HOSPITAL_OFFER"
 const MSG_YOU_DIED := "MSG_YOU_DIED"
 
 const MSG_FINAL_SCORE := "MSG_FINAL_SCORE"
@@ -359,6 +362,15 @@ static func fight_message(cop_hit: bool) -> String:
 ## have a doctor sew you up?" (the totals are the plain integers Beermat shows).
 static func doctor_offer(reward: int, price: int) -> String:
 	return t(MSG_DOCTOR_OFFER).format([reward, price])
+
+
+## "Health: $0 of 100 (a point costs $1, to 100 costs $2)." The first number is
+## the current health, the second is the daily per-point cost the hospital
+## rolled, and the third is the cost to full health (points * price) — Beermat
+## 2.1 N-10 shows the per-point price and the total to top up.
+static func hospital_offer(health: int, price: int, points_to_100: int) -> String:
+	var cost := price * points_to_100
+	return t(MSG_HOSPITAL_OFFER).format([health, price, cost])
 
 
 ## "Final score: $12,345 (dead)" (index.html:1573).

@@ -62,6 +62,8 @@ public:
 	Array price_events_drain();
 	int buy(int drug_index, int qty);
 	int sell(int drug_index, int qty);
+	Dictionary buy_health(int qty);
+	Dictionary health_price();
 	int travel(int dest_location_index);
 	Dictionary finances(int action, int64_t amount);
 	Array loans_copy();

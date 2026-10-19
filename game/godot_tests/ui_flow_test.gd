@@ -60,6 +60,7 @@ const CASES := [
 	"travel_advances_day",
 	"persistence_round_trip",
 	"finances",
+	"hospital",
 	"typed_quantity",
 	"endgame_and_highscores",
 	"new_game_dialog",
@@ -92,6 +93,7 @@ const CASE_FLOORS := {
 	"travel_advances_day": 12,
 	"persistence_round_trip": 16,
 	"finances": 7,
+	"hospital": 8,
 	"typed_quantity": 21,
 	"endgame_and_highscores": 24,
 	"new_game_dialog": 11,
@@ -132,6 +134,8 @@ func _run() -> void:
 	await _test_persistence_round_trip()
 	_case("finances")
 	await _test_finances()
+	_case("hospital")
+	await _test_hospital()
 	_case("deposit_all_but")
 	await _test_deposit_all_but()
 	_case("typed_quantity")
@@ -607,6 +611,48 @@ func _test_finances() -> void:
 	_assert(int(world.state_get()["cash"]) == cash_before, "Withdraw All should return the whole balance to cash")
 	_assert(_main.dialogs().current() is FinancesDialog, "the finances dialog should re-open after Withdraw All")
 	_assert((_find_named(_main.dialogs().current(), "finWithdrawAll") as Button).disabled, "Withdraw All should disable with an empty bank")
+
+
+# TASK-013.02.07. The hospital opens on its own button, shows the current
+# per-point price and the cost to top up to 100, caps the spinner at what cash
+# and the remaining health allow, buys for the price and restores health, and
+# reports a no-op (full health) without touching cash.
+func _test_hospital() -> void:
+	var world := _fresh(SEED)
+	var health_before := int(world.state_get()["health"])
+	world.apply_damage(10)
+	health_before = int(world.state_get()["health"])
+	var cash_before := int(world.state_get()["cash"])
+	_assert(health_before < 100, "the hospital dialog should open when health is below 100")
+
+	_main._do_hospital()
+	await _idle()
+	var dialog := _main.dialogs().current() as HospitalDialog
+	_assert(dialog != null, "the hospital button should open a hospital dialog")
+	if dialog == null:
+		return
+	_assert(dialog.max_value() > 0, "the hospital spinner should cap above zero when health is below 100")
+	var price := dialog.price()
+	_assert(price >= 50 and price <= 450, "the per-point price should be 50..450, got %d" % price)
+	var text := _copy_text(dialog)
+	_assert(text.contains("$%d" % price), "the offer should name the per-point price, got '%s'" % text)
+
+	dialog.set_value(1)
+	_main.dialogs().confirm()
+	await _idle()
+	_assert(int(world.state_get()["health"]) == health_before + 1, "buying 1 point should raise health by 1")
+	_assert(int(world.state_get()["cash"]) == cash_before - price, "buying 1 point should charge the per-point price")
+
+	# A purchase of 0 at full health is a no-op: drive the dialog with health 100
+	# and confirm should leave cash and health unchanged.
+	var full := HospitalDialog.new().present(100, price, 0)
+	full.set_value(10)
+	var answers: Array[String] = []
+	full.action.connect(func(key: String) -> void: answers.append(key))
+	full.confirm()
+	_assert(answers == ["hospitalBuy"], "Buy should commit the hospitalBuy key")
+	_assert(full.value() == 0, "a full-health dialog should report 0 points, got %d" % full.value())
+	full.free()
 
 
 # TASK-013.02.06. Deposit All But.. deposits cash minus the withhold amount set

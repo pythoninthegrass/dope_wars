@@ -58,6 +58,8 @@ void DopeWarsWorld::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("price_events_drain"), &DopeWarsWorld::price_events_drain);
 	ClassDB::bind_method(D_METHOD("buy", "drug_index", "qty"), &DopeWarsWorld::buy);
 	ClassDB::bind_method(D_METHOD("sell", "drug_index", "qty"), &DopeWarsWorld::sell);
+	ClassDB::bind_method(D_METHOD("buy_health", "qty"), &DopeWarsWorld::buy_health);
+	ClassDB::bind_method(D_METHOD("health_price"), &DopeWarsWorld::health_price);
 	ClassDB::bind_method(D_METHOD("travel", "dest_location_index"), &DopeWarsWorld::travel);
 	ClassDB::bind_method(D_METHOD("finances", "action", "amount"), &DopeWarsWorld::finances);
 	ClassDB::bind_method(D_METHOD("loans_copy"), &DopeWarsWorld::loans_copy);
@@ -369,6 +371,33 @@ int DopeWarsWorld::buy(int drug_index, int qty) {
 	}
 	return dw_buy(world_, static_cast<uint32_t>(drug_index), static_cast<uint32_t>(qty));
 }
+
+Dictionary DopeWarsWorld::buy_health(int qty) {
+	Dictionary out;
+	if (!is_ready()) {
+		out["result"] = DW_ERR_INVALID_ARGUMENT;
+		return out;
+	}
+	int64_t bought = 0;
+	dw_result result = dw_buy_health(world_, static_cast<uint32_t>(qty), &bought);
+	out["result"] = result;
+	out["bought"] = bought;
+	return out;
+}
+
+Dictionary DopeWarsWorld::health_price() {
+	Dictionary out;
+	if (!is_ready()) {
+		out["result"] = DW_ERR_INVALID_ARGUMENT;
+		return out;
+	}
+	int32_t price = 0;
+	dw_result result = dw_health_price(world_, &price);
+	out["result"] = result;
+	out["price"] = price;
+	return out;
+}
+
 
 int DopeWarsWorld::sell(int drug_index, int qty) {
 	if (!is_ready()) {

@@ -47,7 +47,7 @@ def generate_prices(mut game: world.World) raises -> List[world.PriceEvent]:
     var table = rules.drugs()
     var special_k = rules.find_drug_index("specialk")
 
-    _ = rng_mod.rand_int(game.rng, 0, Int64(rules.HOSPITAL_MULTIPLIER_RANGE - 1))
+    game.health_price_multiplier = rng_mod.rand_int(game.rng, 0, Int64(rules.HOSPITAL_MULTIPLIER_RANGE - 1)) + 1
 
     for slot in range(rules.NUM_DRUGS):
         var drug_index = rules.beermat_slot_drug_index(slot)

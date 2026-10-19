@@ -21,6 +21,7 @@ import combat
 import dealers
 import events
 import finances
+import hospital
 import jsmath
 import loans
 import prices
@@ -837,6 +838,33 @@ def dw_price_events_drain(
             Array[UInt8, 3](fill=0),
             UInt32(game.price_events[i].drug_index),
         )
+    return DW_OK
+
+
+@export("dw_buy_health")
+def dw_buy_health(
+    world: OptionalPointer[world_mod.World, origin=MutUntrackedOrigin],
+    qty: UInt32,
+    out_bought: OptionalPointer[Int64, origin=MutUntrackedOrigin],
+) abi("C") -> Int32:
+    if not world or not out_bought:
+        return DW_ERR_INVALID_ARGUMENT
+    try:
+        var outcome = hospital.buy_health(world.value()[], Int64(qty))
+        out_bought.value()[] = outcome.amount
+        return _map_trade_code(outcome.code)
+    except:
+        return DW_ERR_INVALID_ARGUMENT
+
+
+@export("dw_health_price")
+def dw_health_price(
+    world: OptionalPointer[world_mod.World, origin=ImmUntrackedOrigin],
+    out_price: OptionalPointer[Int32, origin=MutUntrackedOrigin],
+) abi("C") -> Int32:
+    if not world or not out_price:
+        return DW_ERR_INVALID_ARGUMENT
+    out_price.value()[] = Int32(world.value()[].health_price())
     return DW_OK
 
 

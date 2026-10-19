@@ -70,6 +70,12 @@ struct World:
     var location_index: Int
     var dead: Bool
     var last_day_warned: Bool
+    # The hospital price multiplier, (Random(9)+1), rolled daily with the prices.
+    # The per-point cost is this times 50; 1..9 -> 50..450.
+    var health_price_multiplier: Int64
+    # The nasty-doctor infection flag (1 in 5 after a hospital purchase). Set by
+    # hospital.buy_health; the later infection-counter consumption is out of scope.
+    var infected: Bool
 
     # Loans in the order they were taken, at most one per shark. Balance is whole dollars and
     # days_left goes negative once a loan is past due.
@@ -131,6 +137,9 @@ struct World:
         self.dead = False
         self.last_day_warned = False
 
+        self.health_price_multiplier = 1
+        self.infected = False
+
         self.loan_count = 0
         self.loan_shark = Array[UInt8, sharks.NUM_SHARKS]()
         self.loan_balance = Array[Int64, sharks.NUM_SHARKS]()
@@ -167,6 +176,9 @@ struct World:
 
         self.price_events = Array[PriceEvent, MAX_PRICE_EVENTS](fill=PriceEvent())
         self.price_events_len = 0
+
+    def health_price(ref self) -> Int64:
+        return Int64(rules.HOSPITAL_MULTIPLIER_BASE) * self.health_price_multiplier
 
     # ---- loans ------------------------------------------------------------
 

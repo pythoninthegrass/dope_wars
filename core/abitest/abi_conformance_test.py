@@ -247,15 +247,17 @@ def test_dump_len_is_a_fixed_positive_size(abi: Abi, report: Report) -> None:
     The floor is the scalar block plus the three ordered maps and the price
     events: seed/rng/day/num_days (24B), cash/bank/start_cash as exact
     float decompositions (3x17B), health/coat/guns/location (4x8B), two flags,
-    then each order list as count+DW_NUM_DRUGS slots (3x16B), the price/prev/inv
-    dense slots (13x10B, 13x9B, 13x26B), 13 price-event slots (4+13x16B), and
-    the roll history (13x8B last price, 13B last event, 13x8B seen price, 13B
-    direction), then the loans (4B count, 5x17B slots, 5B released flags) = 1285. core/src/serialize.mojo pins the same number as DUMP_LEN and asserts
-    it at runtime, so the format and this test move together or not at all.
+    a health-price multiplier, then each order list as count+DW_NUM_DRUGS
+    slots (3x16B), the price/prev/inv dense slots (13x10B, 13x9B, 13x26B),
+    13 price-event slots (4+13x16B), and the roll history (13x8B last price,
+    13B last event, 13x8B seen price, 13B direction), then the loans (4B count,
+    5x17B slots, 5B released flags) = 1294. core/src/serialize.mojo pins the
+    same number as DUMP_LEN and asserts it at runtime, so the format and this
+    test move together or not at all.
     """
     got = abi.call("dw_world_dump_len")
     report.expect("dw_world_dump_len() >= 396", got >= 396, f"got {got}")
-    report.expect("dw_world_dump_len() == 1285", got == 1285, f"got {got}")
+    report.expect("dw_world_dump_len() == 1294", got == 1294, f"got {got}")
 
 
 def test_world_align_is_a_power_of_two(abi: Abi, report: Report) -> None:

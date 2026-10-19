@@ -18,6 +18,7 @@ extends PanelContainer
 signal buy_pressed()
 signal sell_pressed()
 signal finances_pressed()
+signal hospital_pressed()
 signal finish_pressed()
 signal travel_requested(location_index: int)
 signal new_game_requested()
@@ -591,6 +592,13 @@ func _build_action_row() -> Control:
 	finances.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	finances.pressed.connect(func() -> void: finances_pressed.emit())
 	row.add_child(finances)
+
+	var hospital := Button.new()
+	hospital.name = "hospitalBtn"
+	hospital.text = tr(Copy.BTN_HOSPITAL)
+	hospital.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	hospital.pressed.connect(func() -> void: hospital_pressed.emit())
+	row.add_child(hospital)
 	return row
 
 
