@@ -1,9 +1,10 @@
 ---
 id: TASK-013.02.07
 title: 'Hospital: buy back health points'
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-10-11 04:02'
+updated_date: '2026-10-19 03:29'
 labels:
   - beermat-2.1
 milestone: m-4
@@ -30,3 +31,12 @@ ordinal: 60000
 - [ ] #4 Mojo tests cover buying, capping and insufficient cash; game:ui-test covers the dialog
 - [ ] #5 Strings are tr() keys
 <!-- AC:END -->
+
+## Implementation Notes
+<!-- NOTES:BEGIN -->
+- Core: `core/src/hospital.mojo` `buy_health` (price = `health_price_multiplier` * 50, cap at full health and cash, then nasty-doctor roll); `world.mojo` adds `health_price_multiplier` + `infected`; `serialize` DUMP_LEN 1285 -> 1294; ABI `dw_buy_health`/`dw_health_price`.
+- Presentation: `HospitalDialog` (shows per-point price + cost to full restore, spinner caps at min(affordable, 100-health), Buy disabled at full health), hospital button in `hud.gd`, `_do_hospital` wired in `main.gd`, `BTN_HOSPITAL`/`DLG_HOSPITAL`/`MSG_HOSPITAL_OFFER` tr() keys.
+- AC#3 decision: the 1.2 post-chase doctor offer is KEPT (unchanged). Beermat 2.1's chase-win reward is "cash only, no gun and no doctor offer" (`docs/beermat-2.1-re.md` M-09), but the doctor offer is a separate post-chase interaction, not the chase-win reward itself, and no 2.1 finding removes it. `doctor_dialog.gd`/`main.gd` are untouched. The 1.2 doctor fixtures/tests that depended on the offer still pass unchanged.
+- AC#4: 11 Mojo tests (buy/cap/insufficient cash/nasty-doctor), `game:ui-test` covers the dialog.
+- Docs: `docs/beermat-2.1-re.md` "Hospital" section records the price formula, nasty-doctor (N-31 partly decoded), and this doctor-offer decision.
+<!-- NOTES:END -->
