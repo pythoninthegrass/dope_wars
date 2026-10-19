@@ -126,6 +126,7 @@ func _loans_group(parent: Container, debt: int, loans: Array) -> void:
 			str(Roster.sharks()[shark_index]["rate_percent"]), str(int(loan["days_left"])),
 		])
 	_loans_tree.item_selected.connect(_on_loan_selected)
+	_on_loan_selected()
 	# The form's LoanLV.OnDblClick is SkinRepayBtnClick.
 	_loans_tree.item_activated.connect(_on_repay_pressed)
 
@@ -328,7 +329,22 @@ func _selected_shark(tree: Tree) -> int:
 	return int(item.get_metadata(0)) if item != null else -1
 
 
+## Mirrors market_table/coat_table's per-cell navy highlight so a selected loan
+## shark row renders navy on white instead of invisible.
+func _paint_selection(tree: Tree, selected: TreeItem) -> void:
+	for row in tree.get_root().get_children():
+		var bg := Palette.ROW_SELECTED
+		var fg := Palette.ROW_SELECTED_TEXT
+		if row != selected:
+			bg = Color.TRANSPARENT
+			fg = Color.BLACK
+		for column in tree.columns:
+			row.set_custom_bg_color(column, bg)
+			row.set_custom_color(column, fg)
+
+
 func _on_loan_selected() -> void:
+	_paint_selection(_loans_tree, _loans_tree.get_selected())
 	var shark_index := _selected_shark(_loans_tree)
 	_name_shark(shark_index)
 	for loan in _loans:
@@ -338,6 +354,7 @@ func _on_loan_selected() -> void:
 
 
 func _on_offer_selected() -> void:
+	_paint_selection(_offers_tree, _offers_tree.get_selected())
 	var shark_index := _selected_shark(_offers_tree)
 	_name_shark(shark_index)
 	for offer in _offers:

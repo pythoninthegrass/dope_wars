@@ -517,6 +517,10 @@ static func _tree(theme: Theme) -> void:
 	theme.set_stylebox("cursor_unfocused", "Tree", StyleBoxEmpty.new())
 	theme.set_stylebox("selected", "Tree", StyleBoxEmpty.new())
 	theme.set_stylebox("selected_focus", "Tree", StyleBoxEmpty.new())
+	# index.html styles no table-row hover, so the engine's default
+	# translucent hover bar (faint grey on the white table) is suppressed.
+	theme.set_stylebox("hovered", "Tree", StyleBoxEmpty.new())
+	theme.set_color("font_hovered_color", "Tree", Color.BLACK)
 	theme.set_constant("draw_guides", "Tree", 0)
 	# Tree reserves 16px on column 0 for a folding arrow (item_margin's
 	# default) even with hide_root and no children, which pushed row text

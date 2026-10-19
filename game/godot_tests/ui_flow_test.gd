@@ -1608,8 +1608,19 @@ func _test_finances_layout() -> void:
 			var needed := Win98Theme.bold_font().get_string_size(title, HORIZONTAL_ALIGNMENT_LEFT, -1, Win98Theme.FONT_TABLE).x + 12
 			_assert(float(tree.get_column_width(column)) >= needed, "the '%s' column is too narrow for its title (%d < %d)" % [title, tree.get_column_width(column), int(needed)])
 
+	# The theme suppresses Tree hover (the prototype styles no table-row hover),
+	# so a hovered row shows no grey bar rather than the engine default.
+	_assert(Win98Theme.shared().get_stylebox("hovered", "Tree") is StyleBoxEmpty, "the Tree theme should suppress hover with an empty stylebox")
+
 	loans.get_root().get_child(0).select(0)
 	_assert(shark_label.text == "Honest Harry", "selecting a loan should name its shark, got '%s'" % shark_label.text)
+	# A selected loan shark row carries the main window's navy highlight
+	# (Palette.ROW_SELECTED / ROW_SELECTED_TEXT) per-cell, like the market and
+	# coat tables do; without it a selected row renders white on white.
+	var selected_loan := loans.get_root().get_child(0)
+	for column in loans.columns:
+		_assert(selected_loan.get_custom_bg_color(column) == Palette.ROW_SELECTED, "the selected loan row should carry the navy highlight, got %s" % selected_loan.get_custom_bg_color(column))
+		_assert(selected_loan.get_custom_color(column) == Palette.ROW_SELECTED_TEXT, "the selected loan row text should be white, got %s" % selected_loan.get_custom_color(column))
 	_main.dialogs().close()
 
 	var guard := 0
@@ -1626,6 +1637,10 @@ func _test_finances_layout() -> void:
 	shark_label = _find_named(dialog, "SharkNameLabel") as Label
 	offers.get_root().get_child(0).select(0)
 	_assert(shark_label.text == String(shark["name"]), "selecting an offer should name its shark, got '%s'" % shark_label.text)
+	var selected_offer := offers.get_root().get_child(0)
+	for column in offers.columns:
+		_assert(selected_offer.get_custom_bg_color(column) == Palette.ROW_SELECTED, "the selected offer row should carry the navy highlight, got %s" % selected_offer.get_custom_bg_color(column))
+		_assert(selected_offer.get_custom_color(column) == Palette.ROW_SELECTED_TEXT, "the selected offer row text should be white, got %s" % selected_offer.get_custom_color(column))
 
 	# The form's OnDblClick handlers: a double-clicked offer borrows and a
 	# double-clicked loan repays.
