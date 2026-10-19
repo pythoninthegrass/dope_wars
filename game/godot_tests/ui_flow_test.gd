@@ -645,13 +645,11 @@ func _test_hospital() -> void:
 
 	# A purchase of 0 at full health is a no-op: drive the dialog with health 100
 	# and confirm should leave cash and health unchanged.
+	# At full health the Buy button is disabled, like Buy/Sell on the main window.
 	var full := HospitalDialog.new().present(100, price, 0)
-	full.set_value(10)
-	var answers: Array[String] = []
-	full.action.connect(func(key: String) -> void: answers.append(key))
-	full.confirm()
-	_assert(answers == ["hospitalBuy"], "Buy should commit the hospitalBuy key")
-	_assert(full.value() == 0, "a full-health dialog should report 0 points, got %d" % full.value())
+	var buy_button := full.find_child("hospitalBuy", true, false) as Button
+	_assert(buy_button != null, "the hospital dialog should have a Buy button")
+	_assert(buy_button.disabled, "Buy should be disabled at full health")
 	full.free()
 
 

@@ -45,6 +45,9 @@ func present(health: int, price: int, max_value: int) -> HospitalDialog:
 
 	add_button("hospitalBuy", Copy.BTN_BUY)
 	add_button("hospitalCancel", Copy.BTN_CANCEL, true)
+	var buy := find_child("hospitalBuy", true, false) as Button
+	if buy != null:
+		buy.disabled = _max <= 0
 	return self
 
 
