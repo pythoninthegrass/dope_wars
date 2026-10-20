@@ -4,8 +4,11 @@ title: Probe whether Mojo can cross-compile the simulation core for Windows
 status: To Do
 assignee: []
 created_date: '2026-10-01 21:01'
+updated_date: '2026-10-20 03:37'
 labels: []
-dependencies: []
+dependencies:
+  - TASK-012.04.01
+  - TASK-012.04.02
 parent_task_id: TASK-012
 ordinal: 43000
 ---
