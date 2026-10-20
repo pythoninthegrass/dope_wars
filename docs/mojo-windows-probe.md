@@ -256,3 +256,78 @@ find core/.venv -type d -iname '*windows*'
 nm -D core/.venv/lib/python3.13/site-packages/modular/lib/libKGENCompilerRTShared.so | grep KGEN_CompilerRT
 .venv/bin/mojo build src/abi.mojo --emit llvm-bitcode --target-triple x86_64-pc-windows-msvc -o abi_msvc.bc
 ```
+---
+
+## Phase B: Native Windows install of the Mojo package (in the dockurr/windows container)
+
+Container: `dockurr/windows`, image `de1f5a165879`, name `windows` — a Windows 11
+GUI install reached from mf over published ports (SSH on 2222, noVNC on 8006).
+See `docs/windows.md` for the access details.
+
+### Environment set up in the container
+
+- Chocolatey 2.7.4 was already present, so all package installs went through it.
+- Python 3.13.16 installed via Chocolatey at `C:\Python313`, matching the host's
+  pinned `python 3.13.16` in `.tool-versions` and the host's `core/.venv`
+  (`lib/python3.13`), because `mojo==1.1.0` ships as a python3.13 wheel.
+  Verified: `C:\Python313\python.exe --version` → `Python 3.13.16`; pip 26.2.1.
+- uv installed via Chocolatey (`uv 0.13.1`, `x86_64-pc-windows-msvc`).
+
+### uv PATH gotcha (dead end, recorded as such)
+
+`uv` is **not on PowerShell's PATH** after the Chocolatey install: the package's
+payload landed at `C:\ProgramData\chocolatey\lib\uv\tools\uv.exe` but no shim was
+created at `C:\ProgramData\chocolatey\bin\uv.exe`, and `where.exe uv` finds nothing.
+
+- Cause: the Chocolatey install run was interrupted, so it unpacked the package
+  without completing the shim/link step.
+- Working around it (no reinstall needed): invoke the absolute path
+  `& 'C:\ProgramData\chocolatey\lib\uv\tools\uv.exe'`. That resolves it —
+  `--version` reports `uv 0.13.1 (x86_64-pc-windows-msvc)`.
+
+A second gotcha: `uv pip install` refuses to run outside a virtual environment
+(`error: No virtual environment found`). Since the target here is the
+Chocolatey-installed system interpreter, the correct invocation is
+`uv pip install --system`, which correctly reports
+`Using Python 3.13.16 environment at: C:\Python313`.
+
+### Decisive result — no Windows wheel exists
+
+```text
+& 'C:\ProgramData\chocolatey\lib\uv\tools\uv.exe' pip install --system 'mojo==1.1.0'
+
+Using Python 3.13.16 environment at: C:\Python313
+error: No solution found when resolving dependencies
+  cause: Because mojo==1.1.0 has no wheels with a matching platform tag (e.g., `win_amd64`) and
+you require mojo==1.1.0, we can conclude that your requirements are unsatisfiable.
+hint: Wheels are available for `mojo` (v1.1.0) on the following platforms:
+`manylinux_2_34_aarch64`, `manylinux_2_34_x86_64`, `macosx_13_0_arm64`
+```
+
+This names the platform tags Mojo 1.1.0 publishes: two Linux flavors plus macOS
+arm64. **There is no Windows wheel of any kind** (`win_amd64` absent), which is
+stronger than the earlier pip attempt, which only reported
+`from versions: none` / `No matching distribution found`.
+
+`import mojo` in the system interpreter consequently fails (`ModuleNotFoundError`),
+so there is nothing to build: no `mojo build`, no `--emit object`, and no Windows
+runtime libraries to inspect. The Phase B checkpoint (build natively if the wheel
+installs) is unreachable, and the MSVC `libdopewars.dll` link checkpoint was never
+reached — no direction was needed, since the probe did not succeed end to end.
+
+### Beermat 2.1 oracle untouched
+
+`C:\dopewars21\` still holds `DopeWars.exe`, `Olchk32.dll`, `cities.txt`,
+`oldlady.txt` and the `Sounds\` assets. Both installs are confined to their own
+locations (`C:\Python313`, `C:\ProgramData\chocolatey\lib\uv`), so the oracle
+install is unaffected.
+
+### Note on probe mechanics
+
+- Host `llvm-nm`/`llvm-objdump` came from an unrelated mise shim that was
+  misconfigured (`mise ERROR No version is set for shim`); the working
+  inspection binaries are documented per-invocation, and no build artifact of
+  this repo depends on them.
+- The container's SSH port mapping changed from `0.0.0.0:2222` to a LAN-bound
+  address after the container was restarted, so `ssh -p 2222 ...@localhost`
+  refused while the LAN address connected. See `docs/windows.md`.

@@ -1,7 +1,7 @@
 ---
 id: TASK-012.04.02
 title: Test native Mojo builds in the dockurr/windows container
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-10-20 03:37'
 labels: []
