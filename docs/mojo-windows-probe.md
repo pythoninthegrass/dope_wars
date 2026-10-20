@@ -152,42 +152,96 @@ linker, not the Mojo compiler itself.
 
 ---
 
-## Phase B: Native Mojo build in the dockurr/windows container (in progress)
+## Phase B: Native Windows install of the Mojo package (in the dockurr/windows container)
 
-> Last updated 2026-10-20. This section is a work in progress; the container was
-> stopped mid-run. See "Handoff" for the exact next steps.
+Container: `dockurr/windows`, image `de1f5a165879`, name `windows` — a Windows 11
+GUI install reached from mf over published ports (SSH on 2222, noVNC on 8006).
+See `docs/windows.md` for the access details.
 
-### Environment
+### Environment set up in the container
 
-- Container: `dockurr/windows`, image `de1f5a165879`, name `windows`.
-- Access from mf: `ssh -p 2222 lance@localhost` (PowerShell; SSH keys work).
-- Chocolatey 2.7.4 was already installed.
-- Python: installed via `choco install python312`, then switched to **python 3.13.16**
-  at `C:\Python313` (to match `.tool-versions`; the host's `core/.venv` is python3.13,
-  so `mojo==1.1.0` is a python3.13 wheel). pip 26.2.1 confirmed working.
-- uv: **not installed** in the container. `choco install uv` was started but the
-  agent tool call was interrupted before it completed.
+- Chocolatey 2.7.4 was already present, so all package installs went through it.
+- Python 3.13.16 installed via Chocolatey at `C:\Python313`, matching the host's
+  pinned `python 3.13.16` in `.tool-versions` and the host's `core/.venv`
+  (`lib/python3.13`), because `mojo==1.1.0` ships as a python3.13 wheel.
+  Verified: `C:\Python313\python.exe --version` → `Python 3.13.16`; pip 26.2.1.
+- uv installed via Chocolatey (`uv 0.13.1`, `x86_64-pc-windows-msvc`).
 
-### Results so far
+### uv PATH gotcha (dead end, recorded as such)
 
-- `& C:\Python313\python.exe -m pip install 'mojo==1.1.0'` → **FAILED**:
-  `ERROR: Could not find a version that satisfies the requirement mojo==1.1.0
-  (from versions: none)` / `No matching distribution found`.
-  This is the decisive Phase B result: pip found **no win_amd64 wheel** for
-  `mojo==1.1.0`. (For comparison, the host installs `mojo==1.1.0` fine via uv, so
-  the linux_amd64 wheel exists — the blocker is Windows-specific.)
-- `uv pip install mojo` was not yet attempted; uv is not installed.
+`uv` is **not on PowerShell's PATH** after the Chocolatey install: the package's
+payload landed at `C:\ProgramData\chocolatey\lib\uv\tools\uv.exe` but no shim was
+created at `C:\ProgramData\chocolatey\bin\uv.exe`, and `where.exe uv` finds nothing.
 
-### Handoff (next agent)
+- Cause: the Chocolatey install run was interrupted, so it unpacked the package
+  without completing the shim/link step.
+- Working around it (no reinstall needed): invoke the absolute path
+  `& 'C:\ProgramData\chocolatey\lib\uv\tools\uv.exe'`. That resolves it —
+  `--version` reports `uv 0.13.1 (x86_64-pc-windows-msvc)`.
 
-1. Confirm the container is running (`docker ps --filter name=windows`).
-2. Install uv into the container: `choco install uv -y --no-progress` (retry the
-   interrupted install).
-3. Retry the decisive test: `& C:\Python313\python.exe -m uv pip install 'mojo==1.1.0'`
-   (and, if it fails, bare `uv pip install mojo`). Capture exact output.
-4. If the wheel installs, build `core/src/abi.mojo` natively
-   (`mojo build --emit object`) and note whether the wheel ships Windows
-   runtime libs. If it does not install, the "no win_amd64 wheel" result above
-   is conclusive — record it and stop.
-5. Append findings to this doc and verify the Beermat 2.1 oracle
-   (`C:\dopewars21\DopeWars.exe`) still launches.
+A second gotcha: `uv pip install` refuses to run outside a virtual environment
+(`error: No virtual environment found`). Since the target here is the
+Chocolatey-installed system interpreter, the correct invocation is
+`uv pip install --system`, which correctly reports
+`Using Python 3.13.16 environment at: C:\Python313`.
+
+### Decisive result — no Windows wheel exists
+
+```text
+& 'C:\ProgramData\chocolatey\lib\uv\tools\uv.exe' pip install --system 'mojo==1.1.0'
+
+Using Python 3.13.16 environment at: C:\Python313
+error: No solution found when resolving dependencies
+  cause: Because mojo==1.1.0 has no wheels with a matching platform tag (e.g., `win_amd64`) and
+you require mojo==1.1.0, we can conclude that your requirements are unsatisfiable.
+hint: Wheels are available for `mojo` (v1.1.0) on the following platforms:
+`manylinux_2_34_aarch64`, `manylinux_2_34_x86_64`, `macosx_13_0_arm64`
+```
+
+This names the platform tags Mojo 1.1.0 publishes: two Linux flavors plus macOS
+arm64. **There is no Windows wheel of any kind** (`win_amd64` absent), which is
+stronger than the earlier pip attempt, which only reported
+`from versions: none` / `No matching distribution found`.
+
+`import mojo` in the system interpreter consequently fails (`ModuleNotFoundError`),
+so there is nothing to build: no `mojo build`, no `--emit object`, and no Windows
+runtime libraries to inspect. The Phase B checkpoint (build natively if the wheel
+installs) is unreachable, and the MSVC `libdopewars.dll` link checkpoint was never
+reached — no direction was needed, since the probe did not succeed end to end.
+
+### Beermat 2.1 oracle untouched
+
+`C:\dopewars21\` still holds `DopeWars.exe`, `Olchk32.dll`, `cities.txt`,
+`oldlady.txt` and the `Sounds\` assets. Both installs are confined to their own
+locations (`C:\Python313`, `C:\ProgramData\chocolatey\lib\uv`), so the oracle
+install is unaffected.
+
+## Overall conclusion (both phases)
+
+Windows is **blocked** for the simulation core, at two independent points:
+
+1. **Package distribution (Phase B, decisive):** the pinned `mojo==1.1.0`
+   publishes only `manylinux_2_34_{x86_64,aarch64}` and `macosx_13_0_arm64`
+   wheels. There is no Windows wheel, so the toolchain cannot even be installed
+   natively on Windows.
+2. **Linking (Phase A):** even cross-compiling from Linux, `--emit object`
+   succeeds and emits valid Windows COFF, but the Mojo runtime libraries ship
+   only as Linux ELF and the object's `KGEN_CompilerRT_*` symbols are
+   unresolvable without Windows builds of them plus a Windows linker.
+
+**What would be needed** to make Windows viable: Windows builds of
+`libKGENCompilerRTShared`, `libAsyncRTRuntimeGlobals` and `libMSupportGlobals`,
+distributed as a `win_amd64` wheel (or built by cross-compiling the runtime),
+plus a Windows linker (MSVC `link.exe` / MinGW) to produce `libdopewars.dll`,
+plus wiring into `extension/SConstruct` and the taskfiles — all out of scope for
+this spike.
+
+### Note on probe mechanics
+
+- Host `llvm-nm`/`llvm-objdump` came from an unrelated mise shim that was
+  misconfigured (`mise ERROR No version is set for shim`); the working
+  inspection binaries are documented per-invocation, and no build artifact of
+  this repo depends on them.
+- The container's SSH port mapping changed from `0.0.0.0:2222` to a LAN-bound
+  address after the container was restarted, so `ssh -p 2222 ...@localhost`
+  refused while the LAN address connected. See `docs/windows.md`.

@@ -1,10 +1,10 @@
 ---
 id: TASK-012.04
 title: Probe whether Mojo can cross-compile the simulation core for Windows
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-10-01 21:01'
-updated_date: '2026-10-20 03:37'
+updated_date: '2026-10-20 05:17'
 labels: []
 dependencies:
   - TASK-012.04.01
@@ -31,3 +31,29 @@ This task is a research spike, not an implementation task. If the probe unexpect
 - [ ] #4 Findings (what compiles, what doesn't, exact error/symbol output) are written to a new `docs/mojo-windows-probe.md`
 - [ ] #5 A conclusion is recorded in this task's final summary: Windows support is either blocked (with the specific blocking reason) or viable (with a clear description of what would be needed), suitable for someone else to decide next steps from
 <!-- AC:END -->
+
+## Final Summary
+
+**Windows is blocked, at two independent points (see `docs/mojo-windows-probe.md`):**
+
+1. **Package distribution (decisive):** the pinned `mojo==1.1.0` publishes only
+   `manylinux_2_34_{x86_64,aarch64}` and `macosx_13_0_arm64` wheels — no
+   `win_amd64`. uv 0.13.1 in the dockurr/windows container confirmed this directly
+   (`No solution found ... no wheels with a matching platform tag`), so the toolchain
+   cannot even be installed natively on Windows. `import mojo` fails, so there is
+   no `mojo build` to run and no Windows runtime libraries to inspect.
+2. **Linking (from Linux):** `mojo build --emit object` cross-compiles
+   `core/src/abi.mojo` to valid Windows COFF for both the MSVC and GNU triples,
+   but the Mojo runtime libraries ship only as Linux ELF and the object's
+   `KGEN_CompilerRT_*` symbols are unresolvable without Windows builds of them
+   plus a Windows linker.
+
+**What would be needed:** Windows builds of
+`libKGENCompilerRTShared`, `libAsyncRTRuntimeGlobals` and `libMSupportGlobals`
+distributed as a `win_amd64` wheel (or the runtime cross-compiled), plus a Windows
+linker (MSVC `link.exe` / MinGW) to produce `libdopewars.dll`, plus wiring into
+`extension/SConstruct` and the taskfiles — all out of scope for this spike.
+
+Subtasks created: `TASK-012.04.01` (Phase A, Linux cross-compile probe) and
+`TASK-012.04.02` (Phase B, native Windows install). `docs/windows.md` documents
+the container access.
