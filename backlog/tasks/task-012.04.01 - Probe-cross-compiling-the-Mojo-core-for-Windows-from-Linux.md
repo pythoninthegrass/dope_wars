@@ -1,7 +1,7 @@
 ---
 id: TASK-012.04.01
 title: Probe cross-compiling the Mojo core for Windows from Linux
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-10-20 03:37'
 labels: []
@@ -27,8 +27,8 @@ This is a research spike, not an implementation task. Write dead ends up as dead
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Both Windows target triples (x86_64-pc-windows-msvc and x86_64-w64-windows-gnu if supported) are attempted on core/src/abi.mojo with full compiler output captured
-- [ ] #2 Any produced object file's symbol table is inspected and categorized against the shipped runtime libraries
-- [ ] #3 The installed toolchain is inventoried for Windows builds of the runtime support libraries
-- [ ] #4 Findings are written to docs/mojo-windows-probe.md (Phase A section), dead ends recorded as dead ends
+- [x] #1 Both Windows target triples (x86_64-pc-windows-msvc and x86_64-w64-windows-gnu) are attempted on core/src/abi.mojo with full compiler output captured
+- [x] #2 Any produced object file's symbol table is inspected and categorized against the shipped runtime libraries
+- [x] #3 The installed toolchain is inventoried for Windows builds of the runtime support libraries
+- [x] #4 Findings are written to docs/mojo-windows-probe.md (Phase A section), dead ends recorded as dead ends
 <!-- AC:END -->
